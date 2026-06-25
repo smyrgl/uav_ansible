@@ -104,21 +104,33 @@ jetson_stats_version: "7.1.5"
 # dt-bindings headers the pps overlay #includes. Confirm the exact name on 7.2:
 #   apt-cache search nvidia-l4t-kernel | grep -i header
 kernel_headers_package: "nvidia-l4t-kernel-headers"
-# Expected to already ship as in-tree modules on the 7.x kernel — verify, don't build:
-kernel_modules_verify:
-  - igc                         # Intel i226 NIC (PTP)
-  - ch341                       # CH34x USB serial
+# Modules we expect ALREADY present in-kernel (verify, don't build). igc and
+# ch341 turned out ABSENT on this kernel (audit confirmed) -> built via DKMS
+# below. Nothing else to verify for now.
+kernel_modules_verify: []
 # Out-of-tree DKMS drivers, VENDORED as pinned tarballs under
 # roles/kernel_modules/files/ (git-lfs). Each tarball has a top-level
-# <name>-<version>/ dir containing the driver's own dkms.conf.
+# <name>-<version>/ dir with the source + a dkms.conf.
 kernel_dkms_drivers:
-  - name: "rtl8852cu"                   # DKMS PACKAGE_NAME (from dkms.conf)
-    version: "1.19.22"                  # DKMS PACKAGE_VERSION
+  # Wi-Fi 802.11ax dongle — BrosTrend installer (linux.brostrend.com/install),
+  # vendored for determinism. If a kernel bump breaks it, re-run that installer
+  # on a bench unit and re-vendor /usr/src/rtl8852cu-<ver>.
+  - name: "rtl8852cu"
+    version: "1.19.22"
     module: "8852cu"                    # BUILT_MODULE_NAME (lsmod/modinfo name)
-    tarball: "rtl8852cu-1.19.22.tar.gz" # in roles/kernel_modules/files/
-# Origin: BrosTrend installer (linux.brostrend.com/install), vendored for
-# determinism. If a kernel bump breaks the build, re-run that installer on a
-# bench unit and re-vendor the new /usr/src/rtl8852cu-<ver> tree.
+    tarball: "rtl8852cu-1.19.22.tar.gz"
+  # Intel i226 NIC (PTP grandmaster) + CH34x USB serial — extracted from the L4T
+  # r39.2 kernel source (kernel-noble), wrapped with a Kbuild + dkms.conf so they
+  # build out-of-tree against the running kernel. Re-vendor from NVIDIA source on
+  # a kernel bump (get_kernel_sources.sh builds the public_sources URL).
+  - name: "igc"
+    version: "6.8.12"
+    module: "igc"
+    tarball: "igc-6.8.12.tar.gz"
+  - name: "ch341"
+    version: "6.8.12"
+    module: "ch341"
+    tarball: "ch341-6.8.12.tar.gz"
 
 # =============================================================================
 # device_tree  (overlays applied via the extlinux OVERLAYS key — require reboot)
