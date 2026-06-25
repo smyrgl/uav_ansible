@@ -1,7 +1,7 @@
 ---
 # Local connection: we don't auto-reboot mid-run. Flag it loudly and let the
 # operator reboot, then re-run the playbook (idempotent).
-- name: Schedule reboot
+- name: Reboot required (kernel_modules)
   ansible.builtin.debug:
     msg: >-
       *** A reboot is required for kernel module changes to take effect.

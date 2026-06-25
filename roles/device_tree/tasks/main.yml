@@ -33,7 +33,7 @@
   ansible.builtin.command:
     cmd: "dtc -I dts -O dtb -o {{ dt_pwm_dtbo }} {{ dt_overlay_src_dir }}/pwm-hdr40.dts"
     creates: "{{ dt_pwm_dtbo }}"
-  notify: Schedule reboot
+  notify: Reboot required (device_tree)
 
 # --- PPS overlay: hand-written; cpp-preprocessed for the tegra234 gpio macro ---
 # The dt-bindings header (tegra234-gpio.h) ships with the kernel headers, so we
@@ -82,7 +82,7 @@
       dtc -@ -I dts -O dtb -o {{ dt_pps_dtbo }} -
     creates: "{{ dt_pps_dtbo }}"
   when: kernel_dt_include_dir | length > 0
-  notify: Schedule reboot
+  notify: Reboot required (device_tree)
 
 # --- Apply: add both overlays to the extlinux OVERLAYS key (BOOT-CRITICAL) -----
 # A backup is taken once; the edit is idempotent (guarded by basename match).
@@ -118,7 +118,7 @@
     executable: /bin/bash
   register: extlinux_edit
   changed_when: "'changed=1' in extlinux_edit.stdout"
-  notify: Schedule reboot
+  notify: Reboot required (device_tree)
 
 - name: Verify note
   ansible.builtin.debug:

@@ -26,11 +26,11 @@
     dest: "/etc/modules-load.d/uav.conf"
     mode: "0644"
     content: |
-      # Managed by uav_ansible
-      {% for m in kernel_modules_verify %}
-      {{ m }}
+      # Managed by uav_ansible — only modules confirmed present in this kernel.
+      {% for r in modinfo_audit.results if r.rc == 0 %}
+      {{ r.item }}
       {% endfor %}
-  notify: Schedule reboot
+  notify: Reboot required (kernel_modules)
 
 # --- Out-of-tree DKMS drivers (Wi-Fi dongle, etc.) --------------------------
 # DKMS rebuilds these automatically on kernel updates — essential on Jetson,
@@ -77,7 +77,7 @@
   loop: "{{ kernel_dkms_drivers }}"
   loop_control:
     label: "{{ item.name }}/{{ item.version }}"
-  notify: Schedule reboot
+  notify: Reboot required (kernel_modules)
 
 - name: Verify the built module is now visible to the kernel
   ansible.builtin.command: "modinfo {{ item.module }}"

@@ -1,5 +1,5 @@
 ---
-- name: Schedule reboot
+- name: Reboot required (device_tree)
   ansible.builtin.debug:
     msg: >-
       *** A reboot is required for device-tree overlay changes to take effect.
