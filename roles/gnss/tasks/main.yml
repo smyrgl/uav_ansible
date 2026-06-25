@@ -1,45 +1,48 @@
 ---
-# Path B: the mosaic-G5 exposes a single serial port (no virtual COMs), so one
-# broker process owns it and tees SBF over TCP to two read-only consumers —
-# gpsd (time + the ONLY writer, for NTRIP->RTCM) and the Septentrio ROS driver
-# (rich data, in the app repo). See README "Architecture decisions".
-- name: Install gpsd + clients
+# The broker owns ONE receiver serial and tees it: a read-broadcast port (gpsd
+# for time now; the ROS driver joins the same stream later) + a write port for
+# RTCM injection. Single owner => clean tee + serialized writes. Works for the
+# Septentrio G5 (production) or a UM982 (bench) — gpsd auto-detects NMEA vs SBF,
+# so the time path is identical either way.
+- name: Install gpsd + broker deps
   ansible.builtin.apt:
     name:
       - gpsd
       - gpsd-clients
-      - socat
+      - python3-serial
     state: present
     update_cache: true
     cache_valid_time: 3600
 
-# --- Stable device name for the Mosaic --------------------------------------
-- name: Install udev rule for a stable Mosaic symlink
+- name: Install udev rule for a stable GNSS symlink
   ansible.builtin.template:
-    src: 99-mosaic.rules.j2
-    dest: /etc/udev/rules.d/99-mosaic.rules
+    src: 99-gnss.rules.j2
+    dest: /etc/udev/rules.d/99-gnss.rules
     mode: "0644"
   notify: Reload udev
 
-# --- Serial broker (single owner; tees reads, single arbitrated writer) ------
-- name: Install GNSS serial broker script (PLACEHOLDER — needs prototyping)
+- name: Install the GNSS serial broker
   ansible.builtin.copy:
-    src: uav-gnss-broker.sh
-    dest: /usr/local/bin/uav-gnss-broker.sh
+    src: uav-gnss-broker.py
+    dest: /usr/local/bin/uav-gnss-broker.py
     mode: "0755"
+  notify: Restart gnss broker
 
-- name: Install GNSS broker systemd unit
+- name: Install the broker systemd unit
   ansible.builtin.template:
     src: uav-gnss-broker.service.j2
     dest: /etc/systemd/system/uav-gnss-broker.service
     mode: "0644"
-  notify: Reload systemd
-  # NOTE: intentionally NOT enabled yet — the broker script is a documented
-  # placeholder. Implement it (str2str / ser2net / custom multiplexer), then
-  # enable: `systemctl enable --now uav-gnss-broker`.
+  notify: Restart gnss broker
 
-# --- gpsd: time SHM for chrony + NTRIP->RTCM write-back (the only writer) ----
-- name: Configure gpsd (reads broker, forwards NTRIP corrections)
+- name: Enable the GNSS broker
+  ansible.builtin.systemd:
+    name: uav-gnss-broker.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Configure gpsd (reads the broker's read-broadcast port)
   ansible.builtin.template:
     src: gpsd.default.j2
     dest: /etc/default/gpsd
@@ -54,13 +57,12 @@
     enabled: true
     state: started
     daemon_reload: true
-  # gpsd will retry until the broker is up; that's expected during bring-up.
 
-# --- Septentrio ROS driver as a boot service (optional, app-repo dependent) --
-- name: Note — Septentrio driver boot unit
+# --- Next pieces (not required for the PTP/time path) ------------------------
+- name: Note — NTRIP client + ROS driver
   ansible.builtin.debug:
     msg: >-
-      TODO: once the ROS workspace exists, add a systemd unit that launches
-      septentrio_gnss_driver against tcp://127.0.0.1:{{ gnss_broker_port_driver }}
-      (read-only) so rich SBF data (NavSatFix + heading + covariances) is
-      published at boot, independent of the main offboard app.
+      NTRIP (write path): point an NTRIP client (e.g. RTKLIB str2str) at the
+      broker write port {{ gnss_broker_write_port }} to inject RTCM — de-risks RTK
+      but is not needed for time. ROS: the Septentrio/Unicore driver reads
+      tcp://127.0.0.1:{{ gnss_broker_read_port }} (read-only) at the ROS2 stage.

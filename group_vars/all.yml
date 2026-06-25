@@ -154,13 +154,18 @@ ptp_profile: "gPTP"             # 802.1AS, for the Robosense E1R
 ptp_grandmaster_interface: "{{ ptp_interface }}"   # i226 carries the GM PHC
 
 # =============================================================================
-# gnss  (Path B: a broker owns the single Mosaic serial; gpsd is the only writer)
+# gnss  (Path B: a broker owns ONE receiver serial; tees reads + injects RTCM)
+# Works for the Septentrio G5 (production) or a UM982 (bench) — gpsd auto-detects
+# NMEA vs SBF, so the time path is identical.
 # =============================================================================
-mosaic_serial: "/dev/ttyACM0"   # TODO confirm: ls /dev/ttyACM*
-mosaic_baud: 115200             # TODO confirm the receiver USB port baud
-mosaic_udev_symlink: "gnss_mosaic"        # -> /dev/gnss_mosaic (stable name)
-gnss_broker_port_gpsd: 28785    # broker TCP for gpsd (read SBF + write RTCM)
-gnss_broker_port_driver: 28786  # broker TCP for the Septentrio ROS driver (read-only)
+gnss_serial: "/dev/gnss"        # the broker opens this (the udev symlink below).
+                                # For first bench bring-up before the udev rule,
+                                # set to the raw path: ls /dev/ttyACM* /dev/ttyUSB*
+gnss_baud: 115200               # TODO confirm the receiver's serial baud
+gnss_udev_symlink: "gnss"       # udev creates /dev/gnss
+gnss_udev_idvendor: ""          # TODO: lsusb -> 4-hex VID of the receiver
+gnss_broker_read_port: 28785    # broadcast: gpsd + ROS driver read here
+gnss_broker_write_port: 28786   # RTCM in -> serial (NTRIP client writes here)
 # NTRIP corrections (gpsd pulls + forwards RTCM). All sourced from vault.yml so
 # your private base station details stay out of the published repo.
 ntrip_caster: "{{ vault_ntrip_caster | default('TODO') }}"
