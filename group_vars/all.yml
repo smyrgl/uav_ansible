@@ -92,6 +92,10 @@ jetson_stats_version: ""        # TODO pin once a 7.2-compatible release is know
 # =============================================================================
 # kernel_modules  (AUDIT FIRST — only build what's genuinely missing)
 # =============================================================================
+# Kernel headers — needed for BOTH out-of-tree DKMS builds (wifi dongle) AND the
+# dt-bindings headers the pps overlay #includes. Confirm the exact name on 7.2:
+#   apt-cache search nvidia-l4t-kernel | grep -i header
+kernel_headers_package: "nvidia-l4t-kernel-headers"
 # Expected to already ship as in-tree modules on the 7.x kernel — verify, don't build:
 kernel_modules_verify:
   - igc                         # Intel i226 NIC (PTP)

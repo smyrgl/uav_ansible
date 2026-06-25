@@ -36,20 +36,52 @@
   notify: Schedule reboot
 
 # --- PPS overlay: hand-written; cpp-preprocessed for the tegra234 gpio macro ---
+# The dt-bindings header (tegra234-gpio.h) ships with the kernel headers, so we
+# install them (same package DKMS needs) and auto-discover the include dir.
+- name: Install kernel headers (dt-bindings for overlays; also required by DKMS)
+  ansible.builtin.apt:
+    name: "{{ kernel_headers_package }}"
+    state: present
+
+- name: Locate the tegra234 dt-bindings header
+  ansible.builtin.find:
+    paths: /usr/src
+    patterns: "tegra234-gpio.h"
+    recurse: true
+  register: dt_bindings_hdr
+  when: not kernel_dt_include_dir
+
+- name: Derive kernel_dt_include_dir (the include/ dir that holds dt-bindings/)
+  ansible.builtin.set_fact:
+    kernel_dt_include_dir: "{{ dt_bindings_hdr.files[0].path | regex_replace('/dt-bindings/gpio/tegra234-gpio.h$', '') }}"
+  when:
+    - not kernel_dt_include_dir
+    - dt_bindings_hdr.files | default([]) | length > 0
+
 - name: Stage PPS overlay source
   ansible.builtin.template:
     src: pps-gpio.dts.j2
     dest: "{{ dt_overlay_src_dir }}/pps-gpio.dts"
     mode: "0644"
 
+- name: Warn if the dt-bindings header was not found
+  ansible.builtin.debug:
+    msg: >-
+      tegra234-gpio.h not found under /usr/src after installing
+      {{ kernel_headers_package }}. The PPS overlay can't preprocess until
+      kernel_dt_include_dir points at an include/ dir containing dt-bindings/
+      (fall back to the L4T public_sources kernel tree). Skipping PPS compile.
+  when: not kernel_dt_include_dir
+
 - name: Compile PPS overlay (preprocess for dt-binding macros)
   ansible.builtin.shell:
     cmd: >
       cpp -nostdinc -undef -x assembler-with-cpp
-      {{ ('-I ' + kernel_dt_include_dir) if kernel_dt_include_dir else '' }}
+      -I {{ kernel_dt_include_dir }}
       {{ dt_overlay_src_dir }}/pps-gpio.dts |
       dtc -@ -I dts -O dtb -o {{ dt_pps_dtbo }} -
     creates: "{{ dt_pps_dtbo }}"
+  when: kernel_dt_include_dir | length > 0
   notify: Schedule reboot
 
 # --- Apply: add both overlays to the extlinux OVERLAYS key (BOOT-CRITICAL) -----

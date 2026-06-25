@@ -35,16 +35,17 @@
 # --- Out-of-tree DKMS drivers (Wi-Fi dongle, etc.) --------------------------
 # DKMS rebuilds these automatically on kernel updates — essential on Jetson,
 # where `nvidia-l4t-kernel` bumps would otherwise drop hand-built modules.
-- name: Install DKMS toolchain + kernel headers
+- name: Install DKMS toolchain + matching L4T kernel headers
   ansible.builtin.apt:
     name:
       - dkms
       - bc
       - libssl-dev
+      - "{{ kernel_headers_package }}"
     state: present
   when: kernel_dkms_drivers | length > 0
-  # TODO: ensure matching Jetson kernel sources/headers for the running L4T are
-  #       present (NVIDIA BSP), not just generic linux-headers.
+  # kernel_headers_package ({{ kernel_headers_package }}) provides headers matching
+  # the running L4T kernel — verify the name on 7.2 (see group_vars).
 
 - name: Clone out-of-tree driver sources (pinned)
   ansible.builtin.git:
