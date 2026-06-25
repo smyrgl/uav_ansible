@@ -1,15 +1,37 @@
 /dts-v1/;
 /plugin/;
 
-/* PWM-out overlay — header pin {{ dt_pwm_gpio_header_pin }} -> RP2040 (neopixels)
- * TODO: set the correct pinmux to PWM function and enable the matching pwm
- *       controller node for the Orin NX on the Holybro carrier.
+/* PWM output — drives the RP2040 (neopixels)
+ * Resolved from NVIDIA Orin NX/Nano Pinmux Template v1.2:
+ *   SODIMM signal GPIO12 (pin 218) -> SOC ball GP88_PWM1 -> GPIO3_PN.01 ({{ dt_pwm_dt_pin_name }})
+ *   SFIO0 = GP_PWM1  (devkit usage: "Baseboard 40 Pin Header PWM")
+ *
+ * Two things to confirm against the JetPack 7.2 device tree on-device — then
+ * this is complete (both are quick checks, e.g. `dtc -I fs /proc/device-tree`):
+ *   1. the PWM1 controller node label (assumed &{{ dt_pwm_controller_label }})
+ *   2. the pinmux controller node label (assumed &pinmux) + exact nvidia,function string
  */
 / {
+    overlay-name = "uav-pwm-out";
+
+    /* 1) Mux {{ dt_pwm_dt_pin_name }} to its PWM function. */
     fragment@0 {
-        target-path = "/";
+        target = <&pinmux>;           /* TODO confirm pinmux node label on JP7.2 */
         __overlay__ {
-            /* TODO: pinmux + &pwmX { status = "okay"; }; */
+            {{ dt_pwm_dt_pin_name }}_pwm {
+                nvidia,pins = "{{ dt_pwm_dt_pin_name }}";
+                nvidia,function = "{{ dt_pwm_function }}";
+                nvidia,tristate = <0x0>;
+                nvidia,enable-input = <0x0>;
+            };
+        };
+    };
+
+    /* 2) Enable the PWM controller -> exposes /sys/class/pwm/pwmchipN. */
+    fragment@1 {
+        target = <&{{ dt_pwm_controller_label }}>;
+        __overlay__ {
+            status = "okay";
         };
     };
 };

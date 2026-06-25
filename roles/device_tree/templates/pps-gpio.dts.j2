@@ -1,18 +1,23 @@
 /dts-v1/;
 /plugin/;
 
-/* pps-gpio overlay — Mosaic 1PPS on header pin {{ dt_pps_gpio_header_pin }} -> /dev/pps0
- * TODO: replace <&gpio PIN GPIO_ACTIVE_HIGH> with the resolved Tegra GPIO for
- *       this header pin, and confirm the gpio controller phandle/label.
+#include <dt-bindings/gpio/tegra234-gpio.h>
+
+/* PPS input — Mosaic 1PPS -> /dev/pps0
+ * Resolved from NVIDIA Orin NX/Nano Pinmux Template v1.2:
+ *   SODIMM signal GPIO11 (pin 216) -> SOC ball GP66 -> GPIO3_PQ.06 ({{ dt_pps_dt_pin_name }})
+ * Main GPIO controller label is &gpio (gpio@2200000); port {{ dt_pps_gpio_port }} is a main port.
  */
 / {
+    overlay-name = "uav-pps-gpio";
+
     fragment@0 {
         target-path = "/";
         __overlay__ {
             pps {
                 compatible = "pps-gpio";
-                /* gpios = <&TODO_gpio_controller TODO_pin_offset 0>; */
-                assert-rising-edge;
+                gpios = <&gpio TEGRA234_MAIN_GPIO({{ dt_pps_gpio_port }}, {{ dt_pps_gpio_offset }}) GPIO_ACTIVE_HIGH>;
+                assert-rising-edge;   /* Mosaic PPS is a rising-edge pulse */
                 status = "okay";
             };
         };

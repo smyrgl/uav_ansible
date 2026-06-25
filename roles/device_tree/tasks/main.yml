@@ -4,10 +4,13 @@
 #   - PWM out on header pin {{ dt_pwm_gpio_header_pin }}   (-> RP2040 neopixels)
 # Overlays require a reboot to apply.
 #
-# TODO (on-device, before this role is functional):
-#   1. Map each header pin to its Tegra SoC pinmux name for the Orin NX on the
-#      Holybro carrier (NVIDIA pinmux spreadsheet / Jetson-IO).
-#   2. Fill the .dts templates with the correct pin + controller phandles.
+# Pins are RESOLVED from the NVIDIA Pinmux Template v1.2 (see group_vars):
+#   pps-gpio: GPIO11 -> GPIO3_PQ.06 (soc_gpio33_pq6)  [overlay complete]
+#   pwm:      GPIO12 -> GPIO3_PN.01 (soc_gpio39_pn1, GP_PWM1)  [2 labels to confirm]
+# Remaining on-device TODOs:
+#   1. Set kernel_dt_include_dir (L4T kernel source include/ with tegra234-gpio.h)
+#      so the pps overlay's macros preprocess.
+#   2. Confirm the &pwm1 + &pinmux node labels for JetPack 7.2 (pwm-out.dts.j2).
 #   3. Confirm the overlay application mechanism for JetPack 7.2 (extlinux FDT
 #      overlay vs /boot/dtb vs jetson-io) and wire the apply step accordingly.
 
@@ -26,9 +29,15 @@
     - pwm-out
   register: dts_staged
 
+# Preprocess with cpp (the pps overlay #includes tegra234-gpio.h and uses macros),
+# then compile. kernel_dt_include_dir must point at the L4T kernel source include/.
 - name: Compile overlays to .dtbo
-  ansible.builtin.command:
-    cmd: "dtc -@ -I dts -O dtb -o /boot/uav-overlays/{{ item }}.dtbo /boot/uav-overlays/{{ item }}.dts"
+  ansible.builtin.shell:
+    cmd: >
+      cpp -nostdinc -undef -x assembler-with-cpp
+      {{ ('-I ' + kernel_dt_include_dir) if kernel_dt_include_dir else '' }}
+      /boot/uav-overlays/{{ item }}.dts |
+      dtc -@ -I dts -O dtb -o /boot/uav-overlays/{{ item }}.dtbo -
     creates: "/boot/uav-overlays/{{ item }}.dtbo"
   loop:
     - pps-gpio

@@ -91,10 +91,20 @@ kernel_dkms_drivers: []
 
 # =============================================================================
 # device_tree  (overlays — require reboot)
+# Pins resolved from the NVIDIA Orin NX/Nano Pinmux Template v1.2 (signal names):
+#   GPIO11 (SODIMM 216) -> SOC GP66      -> GPIO3_PQ.06 (soc_gpio33_pq6) -> 1PPS in
+#   GPIO12 (SODIMM 218) -> SOC GP88_PWM1 -> GPIO3_PN.01 (soc_gpio39_pn1) -> GP_PWM1 out
 # =============================================================================
-dt_pps_gpio_header_pin: 11      # 1PPS in  (Mosaic PPS -> /dev/pps0)
-dt_pwm_gpio_header_pin: 12      # PWM out  (-> RP2040 neopixels) — confirmed PWM-capable
-# TODO: map header pin -> Tegra SoC pinmux for the Orin NX on the Holybro carrier
+# --- pps-gpio (GPIO11) ---
+dt_pps_gpio_port: "Q"             # Tegra234 main GPIO port
+dt_pps_gpio_offset: 6             # line within the port (PQ.06)
+dt_pps_dt_pin_name: "soc_gpio33_pq6"
+# --- pwm (GPIO12) ---
+dt_pwm_dt_pin_name: "soc_gpio39_pn1"
+dt_pwm_function: "pwm1"           # SFIO0 = GP_PWM1; confirm exact nvidia,function string
+dt_pwm_controller_label: "pwm1"   # confirm &pwm1 node label/address in the JP7.2 DT
+# dt-bindings include dir — needed to preprocess the pps overlay's tegra234 macros.
+kernel_dt_include_dir: ""         # TODO: L4T kernel source include/ dir (has tegra234-gpio.h)
 
 # =============================================================================
 # time_sync  (gpsd -> chrony[+PPS] -> phc2sys -> ptp4l gPTP grandmaster)
