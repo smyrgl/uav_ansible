@@ -1,0 +1,70 @@
+---
+# AUDIT FIRST. On a 7.x/Noble kernel, igc (i226) and ch341 (CH34x) are very
+# likely already in-tree modules — verify before building anything. Only the
+# 802.11ax USB Wi-Fi dongle is expected to genuinely need an out-of-tree DKMS
+# driver. This role builds *only* what kernel_dkms_drivers lists.
+
+- name: Audit — check whether expected modules already ship in this kernel
+  ansible.builtin.command:
+    cmd: "modinfo {{ item }}"
+  loop: "{{ kernel_modules_verify }}"
+  register: modinfo_audit
+  changed_when: false
+  failed_when: false
+
+- name: Report audit result (build only what is genuinely missing)
+  ansible.builtin.debug:
+    msg: >-
+      {{ item.item }}:
+      {{ 'present in kernel' if item.rc == 0 else 'MISSING — add to kernel_dkms_drivers if needed' }}
+  loop: "{{ modinfo_audit.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Ensure present modules load at boot
+  ansible.builtin.copy:
+    dest: "/etc/modules-load.d/uav.conf"
+    mode: "0644"
+    content: |
+      # Managed by uav_ansible
+      {% for m in kernel_modules_verify %}
+      {{ m }}
+      {% endfor %}
+  notify: Schedule reboot
+
+# --- Out-of-tree DKMS drivers (Wi-Fi dongle, etc.) --------------------------
+# DKMS rebuilds these automatically on kernel updates — essential on Jetson,
+# where `nvidia-l4t-kernel` bumps would otherwise drop hand-built modules.
+- name: Install DKMS toolchain + kernel headers
+  ansible.builtin.apt:
+    name:
+      - dkms
+      - bc
+      - libssl-dev
+    state: present
+  when: kernel_dkms_drivers | length > 0
+  # TODO: ensure matching Jetson kernel sources/headers for the running L4T are
+  #       present (NVIDIA BSP), not just generic linux-headers.
+
+- name: Clone out-of-tree driver sources (pinned)
+  ansible.builtin.git:
+    repo: "{{ item.repo }}"
+    dest: "/usr/src/{{ item.name }}-uav"
+    version: "{{ item.version }}"
+  loop: "{{ kernel_dkms_drivers }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Build + install each driver via DKMS
+  ansible.builtin.shell:
+    cmd: >
+      dkms add -m {{ item.name }} -v uav --sourcetree /usr/src 2>/dev/null;
+      dkms build -m {{ item.name }} -v uav &&
+      dkms install -m {{ item.name }} -v uav
+    creates: "/var/lib/dkms/{{ item.name }}/uav"
+  loop: "{{ kernel_dkms_drivers }}"
+  loop_control:
+    label: "{{ item.name }}"
+  notify: Schedule reboot
+  # NOTE: each driver repo needs a dkms.conf; if missing, template one. Verify
+  #       the dongle chipset first (lsusb) before pinning a repo.

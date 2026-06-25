@@ -1,0 +1,24 @@
+# Secrets — never commit decrypted vault
+group_vars/vault.yml
+
+# Ansible runtime
+*.retry
+.galaxy/
+fact_cache/
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/
+*.swp
+
+# macOS
+.DS_Store
+
+# Claude Code local settings (machine-local; not for publishing)
+.claude/settings.local.json
+
+# Logs / local scratch
+*.log

@@ -1,0 +1,98 @@
+---
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base system packages
+  ansible.builtin.apt:
+    name: "{{ base_packages }}"
+    state: present
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ system_hostname }}"
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ system_timezone }}"
+
+- name: Ensure locale is generated
+  community.general.locale_gen:
+    name: "{{ system_locale }}"
+    state: present
+
+# --- Swap (sized for colcon builds) -----------------------------------------
+- name: Create swapfile
+  ansible.builtin.command:
+    cmd: "fallocate -l {{ swap_size }} {{ swap_file }}"
+    creates: "{{ swap_file }}"
+  register: swapfile_created
+  when: swap_enabled
+
+- name: Secure swapfile permissions
+  ansible.builtin.file:
+    path: "{{ swap_file }}"
+    owner: root
+    group: root
+    mode: "0600"
+  when: swap_enabled
+
+- name: Format swapfile
+  ansible.builtin.command:
+    cmd: "mkswap {{ swap_file }}"
+  when: swap_enabled and swapfile_created.changed
+
+- name: Enable swapfile in fstab
+  ansible.posix.mount:
+    path: none
+    src: "{{ swap_file }}"
+    fstype: swap
+    opts: sw
+    state: present
+  when: swap_enabled
+
+- name: Activate swap now
+  ansible.builtin.command:
+    cmd: "swapon {{ swap_file }}"
+  register: swapon_now
+  changed_when: swapon_now.rc == 0
+  failed_when: swapon_now.rc != 0 and 'already' not in (swapon_now.stderr | default(''))
+  when: swap_enabled and swapfile_created.changed
+
+# --- Power / performance -----------------------------------------------------
+# nvpmodel/jetson_clocks don't report state cleanly; we set unconditionally and
+# leave changed=false. TODO: make idempotent by parsing `nvpmodel -q`.
+- name: Set nvpmodel power mode
+  ansible.builtin.command:
+    cmd: "nvpmodel -m {{ nvpmodel_mode }}"
+  changed_when: false
+
+- name: Apply jetson_clocks (max clocks)
+  ansible.builtin.command:
+    cmd: jetson_clocks
+  changed_when: false
+  when: jetson_clocks_enabled
+
+- name: Persist jetson_clocks across boots
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/jetson-clocks.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=Apply jetson_clocks at boot (uav_ansible)
+      After=nvpmodel.service
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/jetson_clocks
+      [Install]
+      WantedBy=multi-user.target
+  when: jetson_clocks_enabled
+  notify: Reload systemd
+
+- name: Enable jetson_clocks service
+  ansible.builtin.systemd:
+    name: jetson-clocks.service
+    enabled: true
+    daemon_reload: true
+  when: jetson_clocks_enabled

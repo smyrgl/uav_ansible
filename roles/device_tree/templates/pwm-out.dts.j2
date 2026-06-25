@@ -1,0 +1,15 @@
+/dts-v1/;
+/plugin/;
+
+/* PWM-out overlay — header pin {{ dt_pwm_gpio_header_pin }} -> RP2040 (neopixels)
+ * TODO: set the correct pinmux to PWM function and enable the matching pwm
+ *       controller node for the Orin NX on the Holybro carrier.
+ */
+/ {
+    fragment@0 {
+        target-path = "/";
+        __overlay__ {
+            /* TODO: pinmux + &pwmX { status = "okay"; }; */
+        };
+    };
+};

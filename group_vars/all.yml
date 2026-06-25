@@ -1,0 +1,152 @@
+---
+# =============================================================================
+# uav_ansible — central configuration
+# Every tunable lives here (per the locked scope). Pin versions; don't drift.
+# Items marked TODO need a value confirmed on the actual hardware.
+# =============================================================================
+
+# --- Target platform (pinned) ------------------------------------------------
+jetpack_release: "7.2"
+l4t_release: ""                 # TODO confirm: cat /etc/nv_tegra_release  (e.g. r38.x)
+ubuntu_codename: "noble"        # 24.04
+ros_distro: "jazzy"
+
+# --- Target user (the human account, not root) -------------------------------
+target_user: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
+
+# =============================================================================
+# base
+# =============================================================================
+system_hostname: "uav-jetson"
+system_timezone: "Etc/UTC"
+system_locale: "en_US.UTF-8"
+
+base_packages:
+  - build-essential
+  - python3-pip
+  - python3-venv
+  - curl
+  - wget
+  - ca-certificates
+  - gnupg
+  - lsb-release
+  - i2c-tools
+  - usbutils
+  - pps-tools
+
+# Power / performance
+nvpmodel_mode: 0                # 0 = max on most Orin NX profiles. TODO confirm: nvpmodel -q
+jetson_clocks_enabled: true
+
+# Swap (sized for colcon builds)
+swap_enabled: true
+swap_file: "/swapfile"
+swap_size: "16G"
+
+# =============================================================================
+# dev_tools
+# =============================================================================
+dev_tools_packages:
+  - git
+  - git-lfs
+  - nano
+  - tmux
+  - htop
+  - tree
+  - jq
+
+# =============================================================================
+# networking  (two L2 segments — NEVER bridged; see README)
+# =============================================================================
+netplan_renderer: "networkd"
+netplan_file: "/etc/netplan/60-uav.yaml"
+
+# General drone LAN (Siyi-forced subnet) on the Holybro switch / Realtek r8168
+lan_interface: "eth0"           # TODO confirm: ip -br link
+lan_address: "192.168.144.20/24"
+lan_gateway: ""                 # optional (Siyi/airlink gateway); "" = none
+
+# PTP timing segment on the Intel i226 (M.2) — direct link to Robosense E1R
+ptp_interface: "enP1p1s0"       # TODO confirm: ip -br link
+ptp_address: "192.168.145.1/30"
+
+# =============================================================================
+# jtop
+# =============================================================================
+jetson_stats_version: ""        # TODO pin once a 7.2-compatible release is known
+
+# =============================================================================
+# kernel_modules  (AUDIT FIRST — only build what's genuinely missing)
+# =============================================================================
+# Expected to already ship as in-tree modules on the 7.x kernel — verify, don't build:
+kernel_modules_verify:
+  - igc                         # Intel i226 NIC (PTP)
+  - ch341                       # CH34x USB serial
+# Out-of-tree drivers that need DKMS (the USB Wi-Fi 802.11ax dongle is the usual
+# offender). Fill in once the chipset is confirmed: lsusb
+kernel_dkms_drivers: []
+#  - name: "rtl8852au"
+#    repo: "https://github.com/lwfinger/rtl8852au.git"   # TODO confirm correct driver for the dongle
+#    version: "<pinned-commit-or-tag>"
+
+# =============================================================================
+# device_tree  (overlays — require reboot)
+# =============================================================================
+dt_pps_gpio_header_pin: 11      # 1PPS in  (Mosaic PPS -> /dev/pps0)
+dt_pwm_gpio_header_pin: 12      # PWM out  (-> RP2040 neopixels) — confirmed PWM-capable
+# TODO: map header pin -> Tegra SoC pinmux for the Orin NX on the Holybro carrier
+
+# =============================================================================
+# time_sync  (gpsd -> chrony[+PPS] -> phc2sys -> ptp4l gPTP grandmaster)
+# =============================================================================
+pps_device: "/dev/pps0"
+chrony_serve_subnets:           # who may pull NTP from us
+  - "192.168.144.0/24"
+ptp_domain: 0
+ptp_profile: "gPTP"             # 802.1AS, for the Robosense E1R
+ptp_grandmaster_interface: "{{ ptp_interface }}"   # i226 carries the GM PHC
+
+# =============================================================================
+# gnss  (Path B: a broker owns the single Mosaic serial; gpsd is the only writer)
+# =============================================================================
+mosaic_serial: "/dev/ttyACM0"   # TODO confirm: ls /dev/ttyACM*
+mosaic_baud: 115200             # TODO confirm the receiver USB port baud
+mosaic_udev_symlink: "gnss_mosaic"        # -> /dev/gnss_mosaic (stable name)
+gnss_broker_port_gpsd: 28785    # broker TCP for gpsd (read SBF + write RTCM)
+gnss_broker_port_driver: 28786  # broker TCP for the Septentrio ROS driver (read-only)
+# NTRIP corrections (gpsd pulls + forwards RTCM). SECRETS live in vault.yml.
+ntrip_caster: "TODO"
+ntrip_port: 2101
+ntrip_mountpoint: "TODO"
+ntrip_user: "{{ vault_ntrip_user | default('TODO') }}"
+ntrip_password: "{{ vault_ntrip_password | default('CHANGEME') }}"
+
+# =============================================================================
+# ros2
+# =============================================================================
+ros2_apt_packages:
+  - "ros-{{ ros_distro }}-ros-base"
+  - "ros-dev-tools"
+ros2_setup_global: true         # source /opt/ros/<distro> from /etc/profile.d
+
+# =============================================================================
+# px4_link  (Micro XRCE-DDS Agent over UDP — the Ethernet DDS transport)
+# =============================================================================
+xrce_agent_repo: "https://github.com/eProsima/Micro-XRCE-DDS-Agent.git"
+xrce_agent_version: ""          # TODO pin a release tag (e.g. v3.0.x)
+xrce_agent_transport: "udp4"
+xrce_agent_port: 8888
+
+# =============================================================================
+# rt_tuning  (soft-RT: isolation, SCHED_FIFO, mlock, IRQ affinity, governor)
+# =============================================================================
+rt_cpu_governor: "performance"
+rt_isolated_cpus: ""            # e.g. "4,5"; "" = no isolation
+rt_preempt_full: false          # PREEMPT_DYNAMIC boot toggle (cheap A/B)
+rt_memlock_unlimited: true      # raise memlock + rtprio limits for target_user
+
+# =============================================================================
+# Parked roles (opt-in only)
+# =============================================================================
+enable_rt_kernel: false
+enable_isaac_ros: false

@@ -1,0 +1,23 @@
+# Managed by uav_ansible — do not edit by hand.
+# Two un-bridged segments (see README "Architecture decisions").
+network:
+  version: 2
+  renderer: {{ netplan_renderer }}
+  ethernets:
+    # --- General drone LAN: Holybro switch / r8168 (PX4 + Siyi + external) ---
+    {{ lan_interface }}:
+      dhcp4: false
+      addresses:
+        - {{ lan_address }}
+{% if lan_gateway %}
+      routes:
+        - to: default
+          via: {{ lan_gateway }}
+{% endif %}
+
+    # --- PTP timing segment: Intel i226 (direct link to Robosense E1R) -------
+    {{ ptp_interface }}:
+      dhcp4: false
+      addresses:
+        - {{ ptp_address }}
+      # No gateway: this segment is timing-only and intentionally isolated.

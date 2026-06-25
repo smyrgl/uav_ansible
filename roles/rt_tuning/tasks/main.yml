@@ -1,0 +1,57 @@
+---
+# Soft-RT: the determinism offboard control actually needs, without a custom
+# kernel. PX4 owns the hard loops on the FMU; this just keeps the companion's
+# setpoint/DDS threads jitter-bounded. See README + the parked rt_kernel role.
+
+# --- CPU frequency governor: performance --------------------------------------
+- name: Set CPU governor to performance
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/uav-cpu-governor.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=uav_ansible CPU governor -> {{ rt_cpu_governor }}
+      After=multi-user.target
+      [Service]
+      Type=oneshot
+      ExecStart=/bin/sh -c 'for c in /sys/devices/system/cpu/cpu*/cpufreq/scaling_governor; do echo {{ rt_cpu_governor }} > "$c"; done'
+      [Install]
+      WantedBy=multi-user.target
+  notify: Reload systemd
+
+- name: Enable CPU governor service
+  ansible.builtin.systemd:
+    name: uav-cpu-governor.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# --- rtprio / memlock limits for the control user ----------------------------
+- name: Raise rtprio + memlock limits for the target user
+  ansible.builtin.copy:
+    dest: /etc/security/limits.d/90-uav-rt.conf
+    mode: "0644"
+    content: |
+      # Managed by uav_ansible — allow SCHED_FIFO + mlockall for control threads.
+      {{ target_user }}   -   rtprio   99
+      {{ target_user }}   -   memlock  {{ 'unlimited' if rt_memlock_unlimited else '262144' }}
+
+# --- Boot-parameter levers (require editing extlinux + a reboot) --------------
+# isolcpus / nohz_full and preempt=full live on the kernel command line. On
+# Jetson that's /boot/extlinux/extlinux.conf APPEND. Left as TODO so we don't
+# touch the boot config blindly.
+- name: Boot-parameter tuning (PLACEHOLDER)
+  ansible.builtin.debug:
+    msg: >-
+      TODO (extlinux APPEND, needs reboot):
+      {{ ('isolcpus=' ~ rt_isolated_cpus ~ ' nohz_full=' ~ rt_isolated_cpus) if rt_isolated_cpus else 'CPU isolation disabled' }};
+      {{ 'preempt=full' if rt_preempt_full else 'preempt=voluntary (default)' }}.
+      Confirm JetPack 7.2 kernel is built with CONFIG_PREEMPT_DYNAMIC before
+      relying on preempt=full.
+
+# --- IRQ affinity (keep NIC IRQs off isolated cores) -------------------------
+- name: IRQ affinity (PLACEHOLDER)
+  ansible.builtin.debug:
+    msg: >-
+      TODO: pin i226/r8168 NIC IRQs away from {{ rt_isolated_cpus | default('the control cores') }}
+      once isolation is enabled and DDS thread placement is measured.

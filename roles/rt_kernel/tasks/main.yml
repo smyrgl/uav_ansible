@@ -1,0 +1,18 @@
+---
+# PARKED — opt-in only (enable_rt_kernel: true, and --tags rt_kernel).
+# Default is the stock kernel + rt_tuning. Only build a PREEMPT_RT kernel if a
+# measured jitter budget on the tuned stock kernel proves it necessary, AND you
+# accept that it breaks the DKMS/apt-kernel reproducibility story (every DKMS
+# module rebuilds against the custom kernel; `nvidia-l4t-kernel` updates no
+# longer apply cleanly).
+#
+# First question to answer before writing this: does NVIDIA ship a *prebuilt,
+# apt-installable* RT kernel for JetPack 7.2 (with matching headers)? If so this
+# becomes a package swap. If it's a from-source patched build, it's the
+# "here-be-dragons" path.
+- name: rt_kernel is parked
+  ansible.builtin.debug:
+    msg: >-
+      rt_kernel is intentionally unimplemented. Default path is stock kernel +
+      rt_tuning. Implement only after measurement (cyclictest + end-to-end
+      setpoint jitter) shows the tuned stock kernel can't meet budget.

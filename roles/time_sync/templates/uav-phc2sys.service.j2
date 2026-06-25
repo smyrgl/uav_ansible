@@ -1,0 +1,14 @@
+[Unit]
+Description=uav_ansible phc2sys (system clock -> i226 PHC)
+After=chrony.service
+Wants=chrony.service
+
+[Service]
+Type=simple
+# -s CLOCK_REALTIME (source, GNSS-disciplined by chrony) -> -c PHC (slave).
+ExecStart=/usr/sbin/phc2sys -s CLOCK_REALTIME -c {{ ptp_grandmaster_interface }} -O 0 -w
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

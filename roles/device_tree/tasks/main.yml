@@ -1,0 +1,42 @@
+---
+# Device-tree overlays for:
+#   - pps-gpio on header pin {{ dt_pps_gpio_header_pin }}  (Mosaic 1PPS -> /dev/pps0)
+#   - PWM out on header pin {{ dt_pwm_gpio_header_pin }}   (-> RP2040 neopixels)
+# Overlays require a reboot to apply.
+#
+# TODO (on-device, before this role is functional):
+#   1. Map each header pin to its Tegra SoC pinmux name for the Orin NX on the
+#      Holybro carrier (NVIDIA pinmux spreadsheet / Jetson-IO).
+#   2. Fill the .dts templates with the correct pin + controller phandles.
+#   3. Confirm the overlay application mechanism for JetPack 7.2 (extlinux FDT
+#      overlay vs /boot/dtb vs jetson-io) and wire the apply step accordingly.
+
+- name: Install device-tree compiler
+  ansible.builtin.apt:
+    name: device-tree-compiler
+    state: present
+
+- name: Stage overlay sources
+  ansible.builtin.template:
+    src: "{{ item }}.dts.j2"
+    dest: "/boot/uav-overlays/{{ item }}.dts"
+    mode: "0644"
+  loop:
+    - pps-gpio
+    - pwm-out
+  register: dts_staged
+
+- name: Compile overlays to .dtbo
+  ansible.builtin.command:
+    cmd: "dtc -@ -I dts -O dtb -o /boot/uav-overlays/{{ item }}.dtbo /boot/uav-overlays/{{ item }}.dts"
+    creates: "/boot/uav-overlays/{{ item }}.dtbo"
+  loop:
+    - pps-gpio
+    - pwm-out
+  notify: Schedule reboot
+
+- name: Apply overlays (PLACEHOLDER)
+  ansible.builtin.debug:
+    msg: >-
+      TODO: wire .dtbo application for JetPack 7.2 (extlinux FDTOVERLAYS /
+      jetson-io). Until then, overlays are compiled but not yet applied.

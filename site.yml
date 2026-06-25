@@ -1,0 +1,47 @@
+---
+# Master playbook. Roles run in dependency order. Each is tagged so it can be
+# run/re-run in isolation (e.g. --tags time_sync). Parked roles are opt-in.
+- name: Provision Jetson Orin NX UAV companion computer
+  hosts: all
+  become: true
+  gather_facts: true
+
+  roles:
+    - role: base
+      tags: ['base']
+    - role: dev_tools
+      tags: ['dev_tools']
+    - role: networking
+      tags: ['networking']
+    - role: jtop
+      tags: ['jtop']
+
+    # --- reboot point: kernel_modules / device_tree may require a reboot ---
+    - role: kernel_modules
+      tags: ['kernel_modules']
+    - role: device_tree
+      tags: ['device_tree']
+
+    # --- sensors + timing (gnss first: gpsd produces the SHM chrony consumes) ---
+    - role: gnss
+      tags: ['gnss']
+    - role: time_sync
+      tags: ['time_sync']
+
+    # --- ROS 2 + autopilot link ---
+    - role: ros2
+      tags: ['ros2']
+    - role: px4_link
+      tags: ['px4_link']
+
+    # --- real-time tuning (soft-RT) ---
+    - role: rt_tuning
+      tags: ['rt_tuning']
+
+    # --- parked: opt-in only (run explicitly with their tag) ---
+    - role: rt_kernel
+      tags: ['rt_kernel', 'never']
+      when: enable_rt_kernel | default(false) | bool
+    - role: isaac_ros
+      tags: ['isaac_ros', 'never']
+      when: enable_isaac_ros | default(false) | bool

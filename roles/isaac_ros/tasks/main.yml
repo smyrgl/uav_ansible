@@ -1,0 +1,12 @@
+---
+# PARKED — deferred until Isaac ROS publishes explicit JetPack 7.2 support
+# (expected shortly). The newest Isaac ROS installs as NATIVE apt packages from
+# an NVIDIA apt repository (the old Docker-only assumption is out of date), so
+# when it lands this role is mostly: add the NVIDIA Isaac apt repo + key, then
+# apt-install the pinned isaac_ros_* packages. Revisit version pinning then.
+- name: isaac_ros is parked
+  ansible.builtin.debug:
+    msg: >-
+      isaac_ros is intentionally unimplemented pending JetPack 7.2 support.
+      When ready: native apt install from the NVIDIA Isaac repo (no Docker
+      required for the core packages).

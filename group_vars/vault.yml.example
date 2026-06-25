@@ -1,0 +1,5 @@
+---
+# Copy to group_vars/vault.yml, fill in, then:  ansible-vault encrypt group_vars/vault.yml
+# vault.yml is git-ignored. Run the playbook with --ask-vault-pass.
+vault_ntrip_user: "your-ntrip-username"
+vault_ntrip_password: "your-ntrip-password"

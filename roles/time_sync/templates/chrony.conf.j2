@@ -1,0 +1,21 @@
+# Managed by uav_ansible.
+# Coarse time-of-day from gpsd (Mosaic SBF) via shared memory:
+refclock SHM 0 refid GPS precision 1e-1 offset 0.0 delay 0.2
+
+# Precise edge from the GPIO 1PPS ({{ pps_device }}), labelled by the GPS source:
+refclock PPS {{ pps_device }} lock GPS refid PPS
+
+# Step the clock if off by > 1s on the first 3 updates (boot convergence).
+makestep 1.0 3
+rtcsync
+
+# Serve NTP to LAN clients that can't do PTP (fallback/general timekeeping).
+{% for subnet in chrony_serve_subnets %}
+allow {{ subnet }}
+{% endfor %}
+# Remain a usable server even before GNSS lock (holdover).
+local stratum 10
+
+driftfile /var/lib/chrony/chrony.drift
+logdir /var/log/chrony
+log measurements statistics tracking

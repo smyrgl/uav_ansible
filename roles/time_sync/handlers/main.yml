@@ -1,0 +1,19 @@
+---
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+- name: Restart chrony
+  ansible.builtin.systemd:
+    name: chrony
+    state: restarted
+
+- name: Restart ptp4l
+  ansible.builtin.systemd:
+    name: uav-ptp4l.service
+    state: restarted
+
+- name: Restart phc2sys
+  ansible.builtin.systemd:
+    name: uav-phc2sys.service
+    state: restarted

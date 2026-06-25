@@ -1,0 +1,47 @@
+---
+- name: Ensure the universe repository is enabled
+  ansible.builtin.apt_repository:
+    repo: "deb http://ports.ubuntu.com/ubuntu-ports {{ ubuntu_codename }} universe"
+    state: present
+    filename: ubuntu-universe
+
+- name: Add ROS 2 apt GPG key
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/ros/rosdistro/master/ros.key
+    dest: /usr/share/keyrings/ros-archive-keyring.gpg
+    mode: "0644"
+
+- name: Add ROS 2 apt repository
+  ansible.builtin.apt_repository:
+    repo: >-
+      deb [arch=arm64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg]
+      http://packages.ros.org/ros2/ubuntu {{ ubuntu_codename }} main
+    state: present
+    filename: ros2
+
+- name: Install ROS 2 ({{ ros_distro }}) packages
+  ansible.builtin.apt:
+    name: "{{ ros2_apt_packages }}"
+    state: present
+    update_cache: true
+
+- name: Initialise rosdep
+  ansible.builtin.command:
+    cmd: rosdep init
+    creates: /etc/ros/rosdep/sources.list.d/20-default.list
+
+- name: Update rosdep for the target user
+  ansible.builtin.command:
+    cmd: rosdep update
+  become: true
+  become_user: "{{ target_user }}"
+  changed_when: false
+
+- name: Source ROS 2 for all login shells
+  ansible.builtin.copy:
+    dest: /etc/profile.d/ros2.sh
+    mode: "0644"
+    content: |
+      # Managed by uav_ansible
+      source /opt/ros/{{ ros_distro }}/setup.bash
+  when: ros2_setup_global

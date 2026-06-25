@@ -1,0 +1,16 @@
+[Unit]
+Description=uav_ansible GNSS serial broker (Mosaic single-port fan-out)
+After=dev-{{ mosaic_udev_symlink }}.device
+
+[Service]
+Type=simple
+Environment=MOSAIC_DEV=/dev/{{ mosaic_udev_symlink }}
+Environment=MOSAIC_BAUD={{ mosaic_baud }}
+Environment=GPSD_PORT={{ gnss_broker_port_gpsd }}
+Environment=DRIVER_PORT={{ gnss_broker_port_driver }}
+ExecStart=/usr/local/bin/uav-gnss-broker.sh
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

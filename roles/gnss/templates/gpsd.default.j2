@@ -1,0 +1,8 @@
+# Managed by uav_ansible.
+# gpsd reads SBF from the broker (read side) and forwards NTRIP->RTCM back to it
+# (gpsd is the ONLY writer to the receiver). gpsd exports SHM(0) for chrony.
+START_DAEMON="true"
+USBAUTO="false"
+DEVICES="tcp://127.0.0.1:{{ gnss_broker_port_gpsd }} ntrip://{{ ntrip_user }}:{{ ntrip_password }}@{{ ntrip_caster }}:{{ ntrip_port }}/{{ ntrip_mountpoint }}"
+# -n: poll continuously (export SHM without a connected client)
+GPSD_OPTIONS="-n -s {{ mosaic_baud }}"

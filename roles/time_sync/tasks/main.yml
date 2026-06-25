@@ -1,0 +1,65 @@
+---
+# Clock daemons. The GNSS/gpsd side (which produces the SHM coarse-time source
+# and owns the mosaic serial) lives in the `gnss` role and runs first.
+#
+# Topology (see README): chrony disciplines the system clock from the GPIO PPS
+# (precise) + gpsd SHM (coarse) and serves NTP; phc2sys pushes the system clock
+# to the i226 PHC; ptp4l distributes that PHC as a gPTP grandmaster.
+- name: Install chrony + linuxptp
+  ansible.builtin.apt:
+    name:
+      - chrony
+      - linuxptp
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# --- chrony: system-clock discipline (PPS + SHM) + NTP server ----------------
+- name: Configure chrony
+  ansible.builtin.template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart chrony
+
+# --- ptp4l: gPTP grandmaster on the i226 segment -----------------------------
+- name: Configure ptp4l (gPTP profile)
+  ansible.builtin.template:
+    src: ptp4l.conf.j2
+    dest: /etc/linuxptp/ptp4l.conf
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ptp4l
+
+- name: Install ptp4l systemd unit
+  ansible.builtin.template:
+    src: uav-ptp4l.service.j2
+    dest: /etc/systemd/system/uav-ptp4l.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart ptp4l
+
+# --- phc2sys: system clock -> i226 PHC ---------------------------------------
+- name: Install phc2sys systemd unit
+  ansible.builtin.template:
+    src: uav-phc2sys.service.j2
+    dest: /etc/systemd/system/uav-phc2sys.service
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart phc2sys
+
+- name: Enable timing services
+  ansible.builtin.systemd:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - chrony
+    - uav-ptp4l.service
+    - uav-phc2sys.service

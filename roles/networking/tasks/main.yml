@@ -1,0 +1,17 @@
+---
+# Two L2 segments, never bridged. gPTP (802.1AS) is link-local and a Linux bridge
+# is not a transparent clock — bridging would wreck PTP sync. The Jetson is
+# multi-homed; route at L3 if cross-segment IP reachability is needed.
+- name: Render netplan configuration
+  ansible.builtin.template:
+    src: 60-uav.yaml.j2
+    dest: "{{ netplan_file }}"
+    owner: root
+    group: root
+    mode: "0600"        # netplan warns on world-readable files
+  notify: Apply netplan
+
+- name: Validate netplan generation
+  ansible.builtin.command:
+    cmd: netplan generate
+  changed_when: false

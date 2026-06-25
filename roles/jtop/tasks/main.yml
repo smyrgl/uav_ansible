@@ -1,0 +1,26 @@
+---
+# jetson-stats provides the `jtop` CLI + jtop.service. On Ubuntu 24.04 (Noble),
+# PEP 668 marks the system Python "externally managed", so a plain `pip install`
+# is refused. Install deliberately with --break-system-packages into the system
+# location so the bundled systemd service is registered.
+- name: Install jetson-stats (jtop)
+  ansible.builtin.pip:
+    name: "jetson-stats{{ ('==' + jetson_stats_version) if jetson_stats_version else '' }}"
+    state: present
+    extra_args: "--break-system-packages"
+    executable: pip3
+
+- name: Ensure jtop.service is enabled and running
+  ansible.builtin.systemd:
+    name: jtop.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+# jetson-stats creates the 'jtop' group; members talk to the service without sudo.
+- name: Add target user to the jtop group (non-sudo access)
+  ansible.builtin.user:
+    name: "{{ target_user }}"
+    groups: jtop
+    append: true
+  # NOTE: the user must log out/in (or reboot) for the new group to take effect.

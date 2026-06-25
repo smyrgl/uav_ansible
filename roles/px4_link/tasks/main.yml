@@ -1,0 +1,54 @@
+---
+# Micro XRCE-DDS Agent — the PX4 <-> ROS 2 bridge over Ethernet/UDP (not serial).
+- name: Install build dependencies
+  ansible.builtin.apt:
+    name:
+      - cmake
+      - g++
+      - git
+      - python3-pip
+    state: present
+
+- name: Clone Micro-XRCE-DDS-Agent (pinned)
+  ansible.builtin.git:
+    repo: "{{ xrce_agent_repo }}"
+    dest: /opt/Micro-XRCE-DDS-Agent
+    version: "{{ xrce_agent_version | default('HEAD', true) }}"
+  # TODO: pin xrce_agent_version to a release tag in group_vars/all.yml.
+
+- name: Build + install the agent
+  ansible.builtin.shell:
+    cmd: |
+      set -e
+      mkdir -p build && cd build
+      cmake .. -DCMAKE_BUILD_TYPE=Release
+      make -j"$(nproc)"
+      make install
+      ldconfig
+    chdir: /opt/Micro-XRCE-DDS-Agent
+    creates: /usr/local/bin/MicroXRCEAgent
+
+- name: Install MicroXRCEAgent systemd unit
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/uav-xrce-agent.service
+    mode: "0644"
+    content: |
+      [Unit]
+      Description=uav_ansible Micro XRCE-DDS Agent (PX4 link, UDP)
+      After=network-online.target
+      Wants=network-online.target
+      [Service]
+      Type=simple
+      ExecStart=/usr/local/bin/MicroXRCEAgent {{ xrce_agent_transport }} -p {{ xrce_agent_port }}
+      Restart=on-failure
+      RestartSec=2
+      [Install]
+      WantedBy=multi-user.target
+  notify: Reload systemd
+
+- name: Enable the XRCE-DDS agent
+  ansible.builtin.systemd:
+    name: uav-xrce-agent.service
+    enabled: true
+    state: started
+    daemon_reload: true

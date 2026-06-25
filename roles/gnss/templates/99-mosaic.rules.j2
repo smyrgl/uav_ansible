@@ -1,0 +1,4 @@
+# Managed by uav_ansible — stable symlink for the Septentrio mosaic-G5.
+# TODO: confirm idVendor/idProduct with:  udevadm info -a -n {{ mosaic_serial }} | grep -m2 idVendor
+# Septentrio USB vendor id is commonly 152a — VERIFY on the actual device.
+SUBSYSTEM=="tty", ATTRS{idVendor}=="152a", SYMLINK+="{{ mosaic_udev_symlink }}", MODE="0660", GROUP="dialout"

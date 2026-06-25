@@ -1,0 +1,13 @@
+[Unit]
+Description=uav_ansible ptp4l (gPTP grandmaster)
+After=network-online.target uav-phc2sys.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/ptp4l -f /etc/linuxptp/ptp4l.conf
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

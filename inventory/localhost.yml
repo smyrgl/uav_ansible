@@ -1,0 +1,7 @@
+---
+# Runs against the Jetson itself (local connection) — ansible-pull friendly.
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      ansible_python_interpreter: /usr/bin/python3

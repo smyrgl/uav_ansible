@@ -1,0 +1,19 @@
+# Managed by uav_ansible — gPTP (IEEE 802.1AS) grandmaster for the Robosense E1R.
+[global]
+gmCapable               1
+priority1               128
+priority2               128
+domainNumber            {{ ptp_domain }}
+
+# --- 802.1AS / gPTP profile ---
+transportSpecific       0x1
+ptp_dst_mac             01:80:C2:00:00:0E
+network_transport       L2
+delay_mechanism         P2P
+time_stamping           hardware
+
+# This node is the grandmaster (its PHC is GNSS-disciplined via phc2sys).
+# TODO: confirm ptp4l does not fight phc2sys for the PHC in GM-only operation;
+#       tune servo/announce intervals once measured against the E1R.
+
+[{{ ptp_grandmaster_interface }}]
