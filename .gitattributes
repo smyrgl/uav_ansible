@@ -1,0 +1,2 @@
+# Vendored driver source tarballs are large/binary — store via git-lfs.
+roles/kernel_modules/files/*.tar.gz filter=lfs diff=lfs merge=lfs -text

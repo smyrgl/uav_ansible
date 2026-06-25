@@ -100,12 +100,17 @@ kernel_headers_package: "nvidia-l4t-kernel-headers"
 kernel_modules_verify:
   - igc                         # Intel i226 NIC (PTP)
   - ch341                       # CH34x USB serial
-# Out-of-tree drivers that need DKMS (the USB Wi-Fi 802.11ax dongle is the usual
-# offender). Fill in once the chipset is confirmed: lsusb
-kernel_dkms_drivers: []
-#  - name: "rtl8852au"
-#    repo: "https://github.com/lwfinger/rtl8852au.git"   # TODO confirm correct driver for the dongle
-#    version: "<pinned-commit-or-tag>"
+# Out-of-tree DKMS drivers, VENDORED as pinned tarballs under
+# roles/kernel_modules/files/ (git-lfs). Each tarball has a top-level
+# <name>-<version>/ dir containing the driver's own dkms.conf.
+kernel_dkms_drivers:
+  - name: "rtl8852cu"                   # DKMS PACKAGE_NAME (from dkms.conf)
+    version: "1.19.22"                  # DKMS PACKAGE_VERSION
+    module: "8852cu"                    # BUILT_MODULE_NAME (lsmod/modinfo name)
+    tarball: "rtl8852cu-1.19.22.tar.gz" # in roles/kernel_modules/files/
+# Origin: BrosTrend installer (linux.brostrend.com/install), vendored for
+# determinism. If a kernel bump breaks the build, re-run that installer on a
+# bench unit and re-vendor the new /usr/src/rtl8852cu-<ver> tree.
 
 # =============================================================================
 # device_tree  (overlays applied via the extlinux OVERLAYS key — require reboot)

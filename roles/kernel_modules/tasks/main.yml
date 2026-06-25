@@ -47,25 +47,43 @@
   # kernel_headers_package ({{ kernel_headers_package }}) provides headers matching
   # the running L4T kernel — verify the name on 7.2 (see group_vars).
 
-- name: Clone out-of-tree driver sources (pinned)
-  ansible.builtin.git:
-    repo: "{{ item.repo }}"
-    dest: "/usr/src/{{ item.name }}-uav"
-    version: "{{ item.version }}"
+# Source is VENDORED (pinned) as a tarball under files/ and committed via
+# git-lfs — deterministic, offline, no remote scripts. Each tarball contains a
+# top-level <name>-<version>/ dir with the driver's own dkms.conf.
+- name: Extract vendored driver source into /usr/src
+  ansible.builtin.unarchive:
+    src: "{{ item.tarball }}"
+    dest: /usr/src
+    creates: "/usr/src/{{ item.name }}-{{ item.version }}"
   loop: "{{ kernel_dkms_drivers }}"
   loop_control:
-    label: "{{ item.name }}"
+    label: "{{ item.name }}-{{ item.version }}"
 
-- name: Build + install each driver via DKMS
+- name: Build + install each driver via DKMS (its own dkms.conf name/version)
   ansible.builtin.shell:
-    cmd: >
-      dkms add -m {{ item.name }} -v uav --sourcetree /usr/src 2>/dev/null;
-      dkms build -m {{ item.name }} -v uav &&
-      dkms install -m {{ item.name }} -v uav
-    creates: "/var/lib/dkms/{{ item.name }}/uav"
+    cmd: |
+      set -e
+      name="{{ item.name }}"; ver="{{ item.version }}"
+      if dkms status -m "$name" -v "$ver" 2>/dev/null | grep -q installed; then
+        echo "already installed"; exit 0
+      fi
+      dkms add -m "$name" -v "$ver" 2>/dev/null || true
+      dkms build -m "$name" -v "$ver"
+      dkms install -m "$name" -v "$ver" --force
+      echo "installed now"
+    executable: /bin/bash
+  register: dkms_build
+  changed_when: "'already installed' not in dkms_build.stdout"
   loop: "{{ kernel_dkms_drivers }}"
   loop_control:
-    label: "{{ item.name }}"
+    label: "{{ item.name }}/{{ item.version }}"
   notify: Schedule reboot
-  # NOTE: each driver repo needs a dkms.conf; if missing, template one. Verify
-  #       the dongle chipset first (lsusb) before pinning a repo.
+
+- name: Verify the built module is now visible to the kernel
+  ansible.builtin.command: "modinfo {{ item.module }}"
+  loop: "{{ kernel_dkms_drivers }}"
+  loop_control:
+    label: "{{ item.module }}"
+  register: dkms_modinfo
+  changed_when: false
+  failed_when: false

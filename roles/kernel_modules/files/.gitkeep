@@ -1,0 +1,2 @@
+# Vendored DKMS driver tarballs live here (tracked via git-lfs).
+# e.g. rtl8852cu-1.19.22.tar.gz  (tar of /usr/src/rtl8852cu-1.19.22)
