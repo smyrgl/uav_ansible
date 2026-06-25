@@ -23,6 +23,34 @@
     state: present
 
 # --- Swap (sized for colcon builds) -----------------------------------------
+# Enforce the swapfile SIZE: a wrong-sized one (e.g. the 2G default) is swapped
+# off and recreated at swap_size. Idempotent — fallocate's "G" is GiB, matching
+# `human_to_bytes`, so a correctly-sized file produces no further changes.
+- name: Stat current swapfile
+  ansible.builtin.stat:
+    path: "{{ swap_file }}"
+  register: swapfile_stat
+  when: swap_enabled
+
+- name: Replace swapfile if its size differs from {{ swap_size }}
+  when:
+    - swap_enabled
+    - swapfile_stat.stat.exists
+    - swapfile_stat.stat.size | int != (swap_size | human_to_bytes | int)
+  block:
+    - name: Disable the wrong-sized swapfile
+      ansible.builtin.command: "swapoff {{ swap_file }}"
+      register: _swapoff
+      changed_when: true
+      failed_when:
+        - _swapoff.rc != 0
+        - "'Invalid argument' not in _swapoff.stderr"
+        - "'not found' not in _swapoff.stderr"
+    - name: Remove the wrong-sized swapfile
+      ansible.builtin.file:
+        path: "{{ swap_file }}"
+        state: absent
+
 - name: Create swapfile
   ansible.builtin.command:
     cmd: "fallocate -l {{ swap_size }} {{ swap_file }}"
