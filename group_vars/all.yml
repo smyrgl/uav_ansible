@@ -164,8 +164,9 @@ gnss_serial: "/dev/gnss"        # the broker opens this (the udev symlink below)
 gnss_baud: 115200               # TODO confirm the receiver's serial baud
 gnss_udev_symlink: "gnss"       # udev creates /dev/gnss
 gnss_udev_idvendor: ""          # TODO: lsusb -> 4-hex VID of the receiver
-gnss_broker_read_port: 28785    # broadcast: gpsd + ROS driver read here
-gnss_broker_write_port: 28786   # RTCM in -> serial (NTRIP client writes here)
+gnss_broker_port: 28785         # broker's bidirectional localhost port: gpsd
+                                # reads the stream + injects NTRIP RTCM here; the
+                                # ROS driver reads the same port (read-only).
 # NTRIP corrections (gpsd pulls + forwards RTCM). All sourced from vault.yml so
 # your private base station details stay out of the published repo.
 ntrip_caster: "{{ vault_ntrip_caster | default('TODO') }}"

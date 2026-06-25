@@ -58,11 +58,11 @@
     state: started
     daemon_reload: true
 
-# --- Next pieces (not required for the PTP/time path) ------------------------
-- name: Note — NTRIP client + ROS driver
+# --- ROS driver (read-only consumer, ROS2 stage) -----------------------------
+- name: Note — ROS driver
   ansible.builtin.debug:
     msg: >-
-      NTRIP (write path): point an NTRIP client (e.g. RTKLIB str2str) at the
-      broker write port {{ gnss_broker_write_port }} to inject RTCM — de-risks RTK
-      but is not needed for time. ROS: the Septentrio/Unicore driver reads
-      tcp://127.0.0.1:{{ gnss_broker_read_port }} (read-only) at the ROS2 stage.
+      ROS2 stage: the Septentrio/Unicore driver reads
+      tcp://127.0.0.1:{{ gnss_broker_port }} (read-only) for NavSatFix etc. NTRIP
+      RTCM is handled by gpsd (set the vault ntrip_* vars); a standalone fix is
+      enough for the time path, RTCM adds the RTK fix.

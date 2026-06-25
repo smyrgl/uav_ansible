@@ -6,8 +6,7 @@ After=network.target
 Type=simple
 Environment=SERIAL_DEV={{ gnss_serial }}
 Environment=SERIAL_BAUD={{ gnss_baud }}
-Environment=READ_PORT={{ gnss_broker_read_port }}
-Environment=WRITE_PORT={{ gnss_broker_write_port }}
+Environment=PORT={{ gnss_broker_port }}
 ExecStart=/usr/bin/python3 /usr/local/bin/uav-gnss-broker.py
 Restart=on-failure
 RestartSec=2
