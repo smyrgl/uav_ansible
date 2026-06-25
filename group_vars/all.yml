@@ -7,7 +7,7 @@
 
 # --- Target platform (pinned) ------------------------------------------------
 jetpack_release: "7.2"
-l4t_release: ""                 # TODO confirm: cat /etc/nv_tegra_release  (e.g. r38.x)
+l4t_release: "r39.2"                 # TODO confirm: cat /etc/nv_tegra_release  (e.g. r38.x)
 ubuntu_codename: "noble"        # 24.04
 ros_distro: "jazzy"
 
@@ -17,7 +17,7 @@ target_user: "{{ ansible_env.SUDO_USER | default(ansible_user_id) }}"
 # =============================================================================
 # base
 # =============================================================================
-system_hostname: "uav-jetson"
+system_hostname: "jethawk"
 system_timezone: "Etc/UTC"
 system_locale: "en_US.UTF-8"
 
@@ -87,7 +87,7 @@ wifi_password: "{{ vault_wifi_password | default('CHANGEME') }}"
 # =============================================================================
 # jtop
 # =============================================================================
-jetson_stats_version: ""        # TODO pin once a 7.2-compatible release is known
+jetson_stats_version: "7.1.5"
 
 # =============================================================================
 # kernel_modules  (AUDIT FIRST — only build what's genuinely missing)
@@ -171,7 +171,7 @@ ros2_setup_global: true         # source /opt/ros/<distro> from /etc/profile.d
 # The agent binds all interfaces (udp4), so no bind address is needed here.
 # =============================================================================
 xrce_agent_repo: "https://github.com/eProsima/Micro-XRCE-DDS-Agent.git"
-xrce_agent_version: ""          # TODO pin a release tag (e.g. v3.0.x)
+xrce_agent_version: "v3.0.1"
 xrce_agent_transport: "udp4"
 xrce_agent_port: 8888
 
