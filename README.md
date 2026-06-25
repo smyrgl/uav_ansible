@@ -56,6 +56,11 @@ to the LAN; GNSS time + RTK corrections flow at boot independent of any GCS.
   is link-local and a vanilla Linux bridge is **not** a transparent clock —
   bridging would wreck sync. The Jetson is multi-homed and routes at L3; DDS
   discovery across segments uses a Fast-DDS Discovery Server, not bridged multicast.
+- **Addressing.** Jetson `192.168.144.1` (the de-facto L3 gateway — it owns the
+  wifi/NTRIP egress, so `.1` is conventional, not a hack), PX4 `192.168.144.2`,
+  XRCE agent on UDP `8888`. The 144 interface carries **no default route**; the
+  default route comes from the USB wifi dongle. The home wifi subnet must not
+  overlap `192.168.144.0/24` or the i226 `.145.0/30` segment.
 - **Time topology** (GPIO PPS lands in the *system-clock* domain, so chrony owns it —
   `ts2phc` is out because the i226 card exposes no SDP/extts pin):
   ```

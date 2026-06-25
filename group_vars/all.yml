@@ -61,14 +61,28 @@ dev_tools_packages:
 netplan_renderer: "networkd"
 netplan_file: "/etc/netplan/60-uav.yaml"
 
-# General drone LAN (Siyi-forced subnet) on the Holybro switch / Realtek r8168
+# General drone LAN (Siyi-forced subnet) on the Holybro switch / Realtek r8168.
+# The Jetson is the de-facto L3 gateway for this segment (it owns the wifi/NTRIP
+# egress), so .1 is the conventional gateway address — fine here, not bad practice.
+# PX4 is preconfigured at 192.168.144.2 and expects the XRCE agent at .1:8888.
+# This interface carries NO default route (the Jetson IS the gateway); the
+# default route comes from wifi below — keep lan_gateway empty.
 lan_interface: "eth0"           # TODO confirm: ip -br link
-lan_address: "192.168.144.20/24"
-lan_gateway: ""                 # optional (Siyi/airlink gateway); "" = none
+lan_address: "192.168.144.1/24"
+lan_gateway: ""                 # leave empty — default route is via wifi
 
 # PTP timing segment on the Intel i226 (M.2) — direct link to Robosense E1R
 ptp_interface: "enP1p1s0"       # TODO confirm: ip -br link
 ptp_address: "192.168.145.1/30"
+
+# Uplink: USB 802.11ax dongle (Realtek). Provides the Jetson's default route /
+# internet egress (NTRIP, apt, etc.). Credentials are secrets -> vault.yml.
+# CAUTION: the home wifi subnet must NOT overlap 192.168.144.0/24 or .145.0/30.
+# Depends on the dongle's DKMS driver (kernel_modules) being loaded first.
+wifi_enabled: true
+wifi_interface: "wlan0"         # TODO confirm once the dongle driver is loaded
+wifi_ssid: "{{ vault_wifi_ssid | default('TODO') }}"
+wifi_password: "{{ vault_wifi_password | default('CHANGEME') }}"
 
 # =============================================================================
 # jtop
@@ -141,6 +155,9 @@ ros2_setup_global: true         # source /opt/ros/<distro> from /etc/profile.d
 
 # =============================================================================
 # px4_link  (Micro XRCE-DDS Agent over UDP — the Ethernet DDS transport)
+# PX4 is at 192.168.144.2 and connects to this agent at 192.168.144.1:8888.
+# (PX4-side: set UXRCE_DDS_AG_IP=192.168.144.1, UXRCE_DDS_PRT=8888.)
+# The agent binds all interfaces (udp4), so no bind address is needed here.
 # =============================================================================
 xrce_agent_repo: "https://github.com/eProsima/Micro-XRCE-DDS-Agent.git"
 xrce_agent_version: ""          # TODO pin a release tag (e.g. v3.0.x)

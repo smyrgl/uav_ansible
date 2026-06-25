@@ -21,3 +21,13 @@ network:
       addresses:
         - {{ ptp_address }}
       # No gateway: this segment is timing-only and intentionally isolated.
+{% if wifi_enabled %}
+
+  # --- Uplink: USB 802.11ax dongle — Jetson's default route / internet egress -
+  wifis:
+    {{ wifi_interface }}:
+      dhcp4: true
+      access-points:
+        "{{ wifi_ssid }}":
+          password: "{{ wifi_password }}"
+{% endif %}

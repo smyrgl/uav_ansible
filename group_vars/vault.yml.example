@@ -3,3 +3,5 @@
 # vault.yml is git-ignored. Run the playbook with --ask-vault-pass.
 vault_ntrip_user: "your-ntrip-username"
 vault_ntrip_password: "your-ntrip-password"
+vault_wifi_ssid: "your-wifi-ssid"
+vault_wifi_password: "your-wifi-password"

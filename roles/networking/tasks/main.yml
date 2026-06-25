@@ -2,6 +2,14 @@
 # Two L2 segments, never bridged. gPTP (802.1AS) is link-local and a Linux bridge
 # is not a transparent clock — bridging would wreck PTP sync. The Jetson is
 # multi-homed; route at L3 if cross-segment IP reachability is needed.
+- name: Install wpa_supplicant (wifi via netplan/networkd)
+  ansible.builtin.apt:
+    name: wpasupplicant
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: wifi_enabled | default(false)
+
 - name: Render netplan configuration
   ansible.builtin.template:
     src: 60-uav.yaml.j2
