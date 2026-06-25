@@ -1,7 +1,12 @@
 ---
 # Copy to group_vars/vault.yml, fill in, then:  ansible-vault encrypt group_vars/vault.yml
 # vault.yml is git-ignored. Run the playbook with --ask-vault-pass.
+# --- NTRIP / RTK base station ---
+vault_ntrip_caster: "caster.example.com"     # hostname or IP of your base/caster
+vault_ntrip_port: 2101                        # NTRIP caster port (often 2101)
+vault_ntrip_mountpoint: "YOUR_MOUNTPOINT"
 vault_ntrip_user: "your-ntrip-username"
 vault_ntrip_password: "your-ntrip-password"
+# --- Wi-Fi uplink ---
 vault_wifi_ssid: "your-wifi-ssid"
 vault_wifi_password: "your-wifi-password"

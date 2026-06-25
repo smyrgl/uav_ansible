@@ -148,10 +148,11 @@ mosaic_baud: 115200             # TODO confirm the receiver USB port baud
 mosaic_udev_symlink: "gnss_mosaic"        # -> /dev/gnss_mosaic (stable name)
 gnss_broker_port_gpsd: 28785    # broker TCP for gpsd (read SBF + write RTCM)
 gnss_broker_port_driver: 28786  # broker TCP for the Septentrio ROS driver (read-only)
-# NTRIP corrections (gpsd pulls + forwards RTCM). SECRETS live in vault.yml.
-ntrip_caster: "TODO"
-ntrip_port: 2101
-ntrip_mountpoint: "TODO"
+# NTRIP corrections (gpsd pulls + forwards RTCM). All sourced from vault.yml so
+# your private base station details stay out of the published repo.
+ntrip_caster: "{{ vault_ntrip_caster | default('TODO') }}"
+ntrip_port: "{{ vault_ntrip_port | default(2101) }}"
+ntrip_mountpoint: "{{ vault_ntrip_mountpoint | default('TODO') }}"
 ntrip_user: "{{ vault_ntrip_user | default('TODO') }}"
 ntrip_password: "{{ vault_ntrip_password | default('CHANGEME') }}"
 
