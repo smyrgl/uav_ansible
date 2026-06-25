@@ -124,3 +124,31 @@
     enabled: true
     daemon_reload: true
   when: jetson_clocks_enabled
+
+# --- Headless posture + user service autostart -------------------------------
+# Boot target: multi-user (headless) frees RAM/GPU for ROS/perception. Takes
+# effect on the NEXT reboot. Set gui_enabled=true to keep the GNOME desktop.
+- name: Check current default boot target
+  ansible.builtin.command: systemctl get-default
+  register: current_boot_target
+  changed_when: false
+
+- name: Set default boot target
+  ansible.builtin.command: "systemctl set-default {{ desired_boot_target }}"
+  vars:
+    desired_boot_target: "{{ 'graphical.target' if gui_enabled else 'multi-user.target' }}"
+  when: current_boot_target.stdout | trim != desired_boot_target
+
+# Linger lets the user's `systemd --user` services start at boot without a login
+# (the pattern we'll use for ROS app services running as the user).
+- name: Check linger state for the target user
+  ansible.builtin.command: "loginctl show-user {{ target_user }} --property=Linger --value"
+  register: linger_state
+  changed_when: false
+  failed_when: false
+
+- name: Enable systemd linger for the target user
+  ansible.builtin.command: "loginctl enable-linger {{ target_user }}"
+  when:
+    - enable_user_linger | default(true)
+    - linger_state.stdout | trim != "yes"

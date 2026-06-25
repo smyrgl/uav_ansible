@@ -43,6 +43,14 @@ swap_enabled: true
 swap_file: "/swapfile"
 swap_size: "16G"
 
+# Headless posture. false = boot to multi-user (no desktop), freeing RAM/GPU for
+# ROS/perception — the right setting for the flight build. true keeps the GNOME
+# desktop (handy during bench work with a monitor). Applies on the NEXT reboot.
+gui_enabled: true               # TODO flip to false for the headless flight config
+# Start the user's `systemd --user` services at boot without a login (for ROS
+# app services run as the user). Harmless to leave on.
+enable_user_linger: true
+
 # =============================================================================
 # dev_tools
 # =============================================================================
