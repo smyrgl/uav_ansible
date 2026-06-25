@@ -6,17 +6,20 @@
  *   SODIMM signal GPIO12 (pin 218) -> SOC ball GP88_PWM1 -> GPIO3_PN.01 ({{ dt_pwm_dt_pin_name }})
  *   SFIO0 = GP_PWM1  (devkit usage: "Baseboard 40 Pin Header PWM")
  *
- * Two things to confirm against the JetPack 7.2 device tree on-device — then
- * this is complete (both are quick checks, e.g. `dtc -I fs /proc/device-tree`):
- *   1. the PWM1 controller node label (assumed &{{ dt_pwm_controller_label }})
- *   2. the pinmux controller node label (assumed &pinmux) + exact nvidia,function string
+ * Node labels CONFIRMED on-device (JetPack 7.2 __symbols__):
+ *   &{{ dt_pwm_controller_label }}   = /bus@0/pwm@3280000     (GP_PWM1)
+ *   &pinmux = /bus@0/pinmux@2430000
+ * Remaining: the exact nvidia,function string + Tegra pinmux state wiring. On
+ * Tegra the pinmux is normally set by MB1, so the supported way to enable a
+ * 40-pin PWM is jetson-io — generate it there for this pin and reconcile the
+ * fragment@0 (pinmux) block below against jetson-io's output before trusting it.
  */
 / {
     overlay-name = "uav-pwm-out";
 
     /* 1) Mux {{ dt_pwm_dt_pin_name }} to its PWM function. */
     fragment@0 {
-        target = <&pinmux>;           /* TODO confirm pinmux node label on JP7.2 */
+        target = <&pinmux>;           /* confirmed: /bus@0/pinmux@2430000 */
         __overlay__ {
             {{ dt_pwm_dt_pin_name }}_pwm {
                 nvidia,pins = "{{ dt_pwm_dt_pin_name }}";

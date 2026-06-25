@@ -115,8 +115,9 @@ dt_pps_gpio_offset: 6             # line within the port (PQ.06)
 dt_pps_dt_pin_name: "soc_gpio33_pq6"
 # --- pwm (GPIO12) ---
 dt_pwm_dt_pin_name: "soc_gpio39_pn1"
-dt_pwm_function: "pwm1"           # SFIO0 = GP_PWM1; confirm exact nvidia,function string
-dt_pwm_controller_label: "pwm1"   # confirm &pwm1 node label/address in the JP7.2 DT
+dt_pwm_function: "pwm1"           # SFIO0 = GP_PWM1; verify exact nvidia,function string (see role)
+dt_pwm_controller_label: "pwm1"   # CONFIRMED on-device: &pwm1 = /bus@0/pwm@3280000
+# pinmux controller CONFIRMED on-device: &pinmux = /bus@0/pinmux@2430000
 # dt-bindings include dir — needed to preprocess the pps overlay's tegra234 macros.
 kernel_dt_include_dir: ""         # TODO: L4T kernel source include/ dir (has tegra234-gpio.h)
 

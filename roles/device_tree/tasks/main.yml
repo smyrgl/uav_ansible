@@ -10,9 +10,12 @@
 # Remaining on-device TODOs:
 #   1. Set kernel_dt_include_dir (L4T kernel source include/ with tegra234-gpio.h)
 #      so the pps overlay's macros preprocess.
-#   2. Confirm the &pwm1 + &pinmux node labels for JetPack 7.2 (pwm-out.dts.j2).
-#   3. Confirm the overlay application mechanism for JetPack 7.2 (extlinux FDT
-#      overlay vs /boot/dtb vs jetson-io) and wire the apply step accordingly.
+#   2. PWM pinmux: &pwm1 (pwm@3280000) + &pinmux (pinmux@2430000) CONFIRMED. Use
+#      jetson-io to generate/verify the pinmux function + state wiring for the PWM
+#      pin (the Tegra-supported path), then reconcile with pwm-out.dts.j2. The
+#      function name is listed under /sys/kernel/debug/pinctrl/*pinmux*/pinmux-functions.
+#   3. Wire the overlay-apply step (extlinux FDTOVERLAYS; jetson-io manages this
+#      too) — the pps-gpio overlay in particular must be added to FDTOVERLAYS.
 
 - name: Install device-tree compiler
   ansible.builtin.apt:
