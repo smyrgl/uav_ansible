@@ -104,22 +104,27 @@ kernel_dkms_drivers: []
 #    version: "<pinned-commit-or-tag>"
 
 # =============================================================================
-# device_tree  (overlays — require reboot)
+# device_tree  (overlays applied via the extlinux OVERLAYS key — require reboot)
 # Pins resolved from the NVIDIA Orin NX/Nano Pinmux Template v1.2 (signal names):
-#   GPIO11 (SODIMM 216) -> SOC GP66      -> GPIO3_PQ.06 (soc_gpio33_pq6) -> 1PPS in
-#   GPIO12 (SODIMM 218) -> SOC GP88_PWM1 -> GPIO3_PN.01 (soc_gpio39_pn1) -> GP_PWM1 out
+#   GPIO11 (SODIMM 216) -> GPIO3_PQ.06 (soc_gpio33_pq6) -> 1PPS in    [hand overlay]
+#   GPIO12 (SODIMM 218) -> GPIO3_PN.01 (soc_gpio39_pn1) -> PWM, hdr pin 15 [jetson-io]
 # =============================================================================
-# --- pps-gpio (GPIO11) ---
+# --- pps-gpio (GPIO11): hand-written overlay (pps-gpio node -> &gpio PQ.06) ---
 dt_pps_gpio_port: "Q"             # Tegra234 main GPIO port
 dt_pps_gpio_offset: 6             # line within the port (PQ.06)
 dt_pps_dt_pin_name: "soc_gpio33_pq6"
-# --- pwm (GPIO12) ---
-dt_pwm_dt_pin_name: "soc_gpio39_pn1"
-dt_pwm_function: "pwm1"           # SFIO0 = GP_PWM1; verify exact nvidia,function string (see role)
-dt_pwm_controller_label: "pwm1"   # CONFIRMED on-device: &pwm1 = /bus@0/pwm@3280000
-# pinmux controller CONFIRMED on-device: &pinmux = /bus@0/pinmux@2430000
 # dt-bindings include dir — needed to preprocess the pps overlay's tegra234 macros.
 kernel_dt_include_dir: ""         # TODO: L4T kernel source include/ dir (has tegra234-gpio.h)
+# --- pwm (GPIO12): jetson-io-generated overlay, committed at files/pwm-hdr40.dts
+#     nvidia,function = "gp" (the GP_PWM1 group); PWM controllers already enabled.
+# --- compiled outputs + apply (extlinux OVERLAYS, boot-critical) ---
+dt_overlay_src_dir: "/boot/uav-overlays"
+dt_pps_dtbo: "/boot/uav-pps-gpio.dtbo"
+dt_pwm_dtbo: "/boot/uav-pwm-hdr40.dtbo"
+dt_overlay_dtbos:
+  - "{{ dt_pwm_dtbo }}"
+  - "{{ dt_pps_dtbo }}"
+extlinux_conf: "/boot/extlinux/extlinux.conf"
 
 # =============================================================================
 # time_sync  (gpsd -> chrony[+PPS] -> phc2sys -> ptp4l gPTP grandmaster)
