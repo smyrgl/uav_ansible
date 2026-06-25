@@ -75,12 +75,12 @@ netplan_file: "/etc/netplan/60-uav.yaml"
 # PX4 is preconfigured at 192.168.144.2 and expects the XRCE agent at .1:8888.
 # This interface carries NO default route (the Jetson IS the gateway); the
 # default route comes from wifi below — keep lan_gateway empty.
-lan_interface: "eth0"           # TODO confirm: ip -br link
+lan_interface: "enP8p1s0"       # Holybro r8168 — confirmed via ip -br link
 lan_address: "192.168.144.1/24"
 lan_gateway: ""                 # leave empty — default route is via wifi
 
 # PTP timing segment on the Intel i226 (M.2) — direct link to Robosense E1R
-ptp_interface: "enP1p1s0"       # TODO confirm: ip -br link
+ptp_interface: "enP1p1s0"       # Intel i226 (igc) — confirmed via ip -br link
 ptp_address: "192.168.145.1/30"
 
 # Uplink: USB 802.11ax dongle (Realtek). Provides the Jetson's default route /
@@ -88,7 +88,7 @@ ptp_address: "192.168.145.1/30"
 # CAUTION: the home wifi subnet must NOT overlap 192.168.144.0/24 or .145.0/30.
 # Depends on the dongle's DKMS driver (kernel_modules) being loaded first.
 wifi_enabled: true
-wifi_interface: "wlan0"         # TODO confirm once the dongle driver is loaded
+wifi_interface: "wlx7419f815e6a9"  # rtl8852cu dongle — confirmed via ip -br link
 wifi_ssid: "{{ vault_wifi_ssid | default('TODO') }}"
 wifi_password: "{{ vault_wifi_password | default('CHANGEME') }}"
 
