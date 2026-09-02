@@ -25,7 +25,8 @@ deliberately does **not** cover:
 
 **Definition of done:** with the flight controller connected,
 `ros2 topic list` shows PX4 topics; the box serves PTP (gPTP) to sensors and NTP
-to the LAN; GNSS time + RTK corrections flow at boot independent of any GCS.
+to the LAN; GNSS time + RTK corrections flow at boot independent of any GCS
+(`drone-link-connect` enabled at boot).
 
 ---
 
@@ -72,9 +73,10 @@ to the LAN; GNSS time + RTK corrections flow at boot independent of any GCS.
   — no contention. RTC = boot/holdover fallback only.
 - **GNSS is Path B (single serial, broker).** The mosaic-G5 (unlike the X5) exposes
   no virtual COM ports, so one process owns the serial and tees SBF over TCP to two
-  read-only consumers — `gpsd` (time + RTK write-back) and the Septentrio ROS driver
-  (rich data: NavSatFix + baseline heading + covariances). **gpsd is the only writer**
-  (NTRIP→RTCM), runs under systemd at boot, GCS-independent.
+  consumers — `gpsd` (time) and the Septentrio ROS driver (rich data: NavSatFix +
+  baseline heading + covariances). **drone-link-connect is the RTCM writer** over
+  the broker port; gpsd and the ROS driver read only. It runs under systemd at
+  boot, GCS-independent, and is enrolled from the station (see *RTK corrections*).
 - **Real-time: tune, don't rebuild.** PX4 owns the hard loops on the FMU; the Jetson
   is supervisory/offboard. `rt_tuning` (CPU isolation, SCHED_FIFO, mlock, IRQ
   affinity, governor, `preempt=full` toggle) covers it. A full `rt_kernel` is a
@@ -126,13 +128,33 @@ sudo ansible-playbook -i inventory/localhost.yml site.yml --tags time_sync
 > effect — re-run the playbook after rebooting; roles are idempotent.
 
 ### Secrets
-NTRIP credentials and anything sensitive live in `group_vars/vault.yml`
+Wi-Fi credentials and anything sensitive live in `group_vars/vault.yml`
 (git-ignored). Copy `group_vars/vault.yml.example`, fill it in, and encrypt:
 ```bash
 cp group_vars/vault.yml.example group_vars/vault.yml
 ansible-vault encrypt group_vars/vault.yml
 # add --ask-vault-pass to your playbook runs
 ```
+
+### RTK corrections
+Corrections reach the receiver through **drone-link**, not through this
+playbook. Converge first (the `gnss` role provisions the broker gpsd and the
+driver read from); then, on your rtk-station's **Connectors** page, *Add
+client*, and paste the one line it shows into a shell on the Jetson. That line
+installs the drone-link binary, its client certificate and the
+`drone-link-connect` unit, enabled at boot, writing RTCM to the broker port.
+
+- A converge **never touches `/etc/drone-link` or `drone-link-connect`**;
+  `bootstrap.sh` does a `git reset --hard` and a full converge, and the
+  gpsd/broker restart handlers are absorbed by drone-link's reconnect backoff.
+- After a re-flash, *Remove* the client on the station and *Add* it again — the
+  old key is on the old disk.
+- Why not a role: the enrollment spends a single-use token and mints a private
+  key, so a converge cannot replay it, and a YAML copy of the bootstrap would
+  drift from the one every other rover uses.
+- The receiver's own profile (rover mode, message set, ports) is configured on
+  the receiver, not by this playbook: a bench unit that was last a base still
+  is one after a converge. Reset it and load the vendor's rover profile first.
 
 ---
 
@@ -147,7 +169,7 @@ ansible-vault encrypt group_vars/vault.yml
 | `kernel_modules` | **audit-first** DKMS (igc/ch341 likely in-tree; Wi-Fi dongle isn't) |
 | `device_tree` | overlays: pps-gpio (GPIO11), PWM out (GPIO12) |
 | `time_sync` | gpsd · chrony (PPS+SHM+NTP) · phc2sys · ptp4l gPTP grandmaster |
-| `gnss` | mosaic serial broker (Path B) + udev + gpsd NTRIP write path |
+| `gnss` | receiver serial broker (Path B) + udev; RTCM arrives from drone-link-connect |
 | `ros2` | ROS 2 Jazzy `ros-base`, rosdep, colcon, global sourcing |
 | `px4_link` | Micro XRCE-DDS Agent (UDP) as a systemd service |
 | `rt_tuning` | soft-RT: isolation, SCHED_FIFO, mlock, IRQ affinity, governor |

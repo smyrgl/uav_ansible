@@ -1,9 +1,9 @@
 ---
-# The broker owns ONE receiver serial and tees it: a read-broadcast port (gpsd
-# for time now; the ROS driver joins the same stream later) + a write port for
-# RTCM injection. Single owner => clean tee + serialized writes. Works for the
-# Septentrio G5 (production) or a UM982 (bench) — gpsd auto-detects NMEA vs SBF,
-# so the time path is identical either way.
+# The broker owns ONE receiver serial and tees it on one localhost port: gpsd
+# (time) and the ROS driver read the stream; drone-link-connect writes RTCM to
+# it, and the broker relays writes to the serial. Single owner => clean tee +
+# serialized writes. Works for the Septentrio G5 (production) or a u-blox unit
+# (bench) — gpsd auto-detects NMEA/UBX/SBF, so the time path is identical.
 - name: Install gpsd + broker deps
   ansible.builtin.apt:
     name:
@@ -63,6 +63,6 @@
   ansible.builtin.debug:
     msg: >-
       ROS2 stage: the Septentrio/Unicore driver reads
-      tcp://127.0.0.1:{{ gnss_broker_port }} (read-only) for NavSatFix etc. NTRIP
-      RTCM is handled by gpsd (set the vault ntrip_* vars); a standalone fix is
-      enough for the time path, RTCM adds the RTK fix.
+      tcp://127.0.0.1:{{ gnss_broker_port }} (read-only) for NavSatFix etc. RTCM
+      arrives from drone-link-connect once the rover is enrolled from the
+      station; a standalone fix is enough for the time path.

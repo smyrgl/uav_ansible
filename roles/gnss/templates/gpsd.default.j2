@@ -1,10 +1,11 @@
 # Managed by uav_ansible.
-# gpsd reads the GNSS stream from the broker's bidirectional port (NMEA or SBF,
-# auto-detected) and exports SHM(0) for chrony. When NTRIP is configured, gpsd
-# also pulls RTCM and forwards it back over the same broker connection -> serial
-# (the broker relays gpsd's writes). gpsd is the only writer.
+# gpsd reads the broker for time and never writes. It takes the GNSS stream
+# (NMEA, UBX or SBF, auto-detected) from the broker's port and exports SHM(0)
+# for chrony. RTCM is written to the same broker port by drone-link-connect,
+# enrolled at runtime from the station's Connectors page (README, "RTK
+# corrections"). gpsd carries no ntrip:// device: one RTCM writer, not two.
 START_DAEMON="true"
 USBAUTO="false"
-DEVICES="tcp://127.0.0.1:{{ gnss_broker_port }}{% if ntrip_caster != 'TODO' %} ntrip://{{ ntrip_user }}:{{ ntrip_password }}@{{ ntrip_caster }}:{{ ntrip_port }}/{{ ntrip_mountpoint }}{% endif %}"
+DEVICES="tcp://127.0.0.1:{{ gnss_broker_port }}"
 # -n: poll continuously so SHM is exported without a connected client.
 GPSD_OPTIONS="-n"

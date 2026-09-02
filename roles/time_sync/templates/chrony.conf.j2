@@ -5,6 +5,12 @@ refclock SHM 0 refid GPS precision 1e-1 offset 0.0 delay 0.2
 # Precise edge from the GPIO 1PPS ({{ pps_device }}), labelled by the GPS source:
 refclock PPS {{ pps_device }} lock GPS refid PPS
 
+# A network pool beside the receiver. This board has no battery RTC and boots at
+# January 1st; a companion that learns the time only from its own receiver cannot
+# verify a certificate (the drone-link QUIC handshake) until it has a fix, and on
+# a bench that can be never. maxsources 2 keeps the pool a minority next to GPS/PPS.
+pool ntp.ubuntu.com iburst maxsources 2
+
 # Step the clock if off by > 1s on the first 3 updates (boot convergence).
 makestep 1.0 3
 rtcsync

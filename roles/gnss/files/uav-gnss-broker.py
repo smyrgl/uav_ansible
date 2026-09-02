@@ -7,12 +7,15 @@ localhost:
   * everything read from the serial is broadcast to ALL connected clients
     (gpsd reads it for time; the Septentrio/Unicore ROS driver joins the same
     stream later, read-only)
-  * everything a client sends is written to the serial (gpsd injects NTRIP RTCM
-    over its read connection; the broker owns the fd so writes never interleave)
+  * everything a client sends is written to the serial (drone-link-connect
+    writes RTCM here; the broker owns the fd so writes never interleave)
 
 Because one process owns the serial fd, reads tee cleanly and the write path is
 serialized — the thing str2str/socat can't do for a single bidirectional port.
-Keep gpsd the only writer; other consumers are read-only.
+Clients may write to the serial; drone-link-connect is the RTCM writer, gpsd
+and the ROS driver read. Note the broadcast: a client that never reads its
+socket fills it, and this loop's blocking sendall then stalls every reader —
+drone-link ≥ 0.2.0 drains for exactly that reason.
 
 Config via environment: SERIAL_DEV, SERIAL_BAUD, PORT, BIND (default 127.0.0.1 —
 the port can write to the serial, so it is not exposed off-host by default).

@@ -1,7 +1,7 @@
 # Managed by uav_ansible — stable symlink for the GNSS receiver.
-# Set gnss_udev_idvendor from `lsusb` (the receiver's 4-hex VID), then re-run.
-{% if gnss_udev_idvendor %}
-SUBSYSTEM=="tty", ATTRS{idVendor}=="{{ gnss_udev_idvendor }}", SYMLINK+="{{ gnss_udev_symlink }}", MODE="0660", GROUP="dialout"
-{% else %}
-# (gnss_udev_idvendor not set yet — fill it in, then re-run the gnss role.)
-{% endif %}
+# One rule per entry in gnss_udev_receivers (group_vars/all.yml): the USB vendor
+# and the CDC interface that carries the data stream.
+{% for r in gnss_udev_receivers %}
+# {{ r.name }}
+SUBSYSTEM=="tty", ATTRS{idVendor}=="{{ r.vendor }}", ENV{ID_USB_INTERFACE_NUM}=="{{ r.interface }}", SYMLINK+="{{ gnss_udev_symlink }}", MODE="0660", GROUP="dialout"
+{% endfor %}

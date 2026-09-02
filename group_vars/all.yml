@@ -33,6 +33,8 @@ base_packages:
   - i2c-tools
   - usbutils
   - pps-tools
+  - openssl                     # Priority: important on Ubuntu already; the
+                                # station's enrollment bootstrap uses it
 
 # Power / performance
 nvpmodel_mode: 0                # 0 = max on most Orin NX profiles. TODO confirm: nvpmodel -q
@@ -166,26 +168,30 @@ ptp_profile: "gPTP"             # 802.1AS, for the Robosense E1R
 ptp_grandmaster_interface: "{{ ptp_interface }}"   # i226 carries the GM PHC
 
 # =============================================================================
-# gnss  (Path B: a broker owns ONE receiver serial; tees reads + injects RTCM)
-# Works for the Septentrio G5 (production) or a UM982 (bench) — gpsd auto-detects
-# NMEA vs SBF, so the time path is identical.
+# gnss  (Path B: a broker owns ONE receiver serial; tees reads, relays writes)
+# Works for the Septentrio G5 (production) or a u-blox/Unicore unit (bench) —
+# gpsd auto-detects NMEA/UBX/SBF, so the time path is identical.
 # =============================================================================
 gnss_serial: "/dev/gnss"        # the broker opens this (the udev symlink below).
                                 # For first bench bring-up before the udev rule,
                                 # set to the raw path: ls /dev/ttyACM* /dev/ttyUSB*
-gnss_baud: 115200               # TODO confirm the receiver's serial baud
+gnss_baud: 115200               # ignored by USB CDC receivers (both below)
 gnss_udev_symlink: "gnss"       # udev creates /dev/gnss
-gnss_udev_idvendor: ""          # TODO: lsusb -> 4-hex VID of the receiver
+# Receivers the udev rule recognises: USB vendor ID plus the CDC interface that
+# carries the data stream. /dev/gnss points at whichever is plugged in.
+# Septentrio exposes two interfaces and the stream is on 02 (00 is silent);
+# u-blox exposes one. `lsusb` for the VID, `udevadm info` for the interface.
+gnss_udev_receivers:
+  - { vendor: "152a", interface: "02", name: "Septentrio mosaic (production)" }
+  - { vendor: "1546", interface: "00", name: "u-blox X20P / F9P (bench)" }
 gnss_broker_port: 28785         # broker's bidirectional localhost port: gpsd
-                                # reads the stream + injects NTRIP RTCM here; the
-                                # ROS driver reads the same port (read-only).
-# NTRIP corrections (gpsd pulls + forwards RTCM). All sourced from vault.yml so
-# your private base station details stay out of the published repo.
-ntrip_caster: "{{ vault_ntrip_caster | default('TODO') }}"
-ntrip_port: "{{ vault_ntrip_port | default(2101) }}"
-ntrip_mountpoint: "{{ vault_ntrip_mountpoint | default('TODO') }}"
-ntrip_user: "{{ vault_ntrip_user | default('TODO') }}"
-ntrip_password: "{{ vault_ntrip_password | default('CHANGEME') }}"
+                                # and the ROS driver read the stream here;
+                                # drone-link-connect writes RTCM to it.
+# RTK corrections: drone-link, enrolled by the station's one-liner AFTER this
+# converge (README, "RTK corrections"). Deliberately not an Ansible artifact:
+# the enrollment spends a single-use token and mints a key, so a converge cannot
+# replay it, and a YAML copy of the bootstrap would be drift. Ansible never
+# touches /etc/drone-link.
 
 # =============================================================================
 # ros2
