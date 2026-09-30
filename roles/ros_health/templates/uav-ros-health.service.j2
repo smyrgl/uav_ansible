@@ -1,0 +1,24 @@
+[Unit]
+Description=Grouped sensor health and clock diagnostics
+After=network-online.target
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ ros_health_user }}
+Group={{ ros_health_user }}
+WorkingDirectory={{ ros_health_workspace }}
+EnvironmentFile={{ ros_health_environment }}
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ ros_health_workspace }}/install/local_setup.bash && source {{ ros_health_px4_workspace }}/install/local_setup.bash && exec {{ ros_health_venv }}/bin/python {{ ros_health_workspace }}/install/lib/uav_sensor_health/sensor_health --ros-args --params-file {{ ros_health_config }}'
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=15
+KillSignal=SIGINT
+NoNewPrivileges=true
+UMask=0027
+
+[Install]
+WantedBy=multi-user.target

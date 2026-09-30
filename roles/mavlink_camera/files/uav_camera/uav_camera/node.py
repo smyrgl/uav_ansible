@@ -1,0 +1,220 @@
+"""ROS 2 native-DDS RGB consumer and MAVLink camera application."""
+import json
+import logging
+from array import array
+import threading
+import time
+
+import cv2
+import numpy as np
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+from sensor_msgs.msg import CameraInfo, Image
+from std_msgs.msg import String
+try:
+    from foxglove_msgs.msg import CompressedVideo
+except ImportError:  # ros-<distro>-foxglove-msgs missing: the video topic is disabled
+    CompressedVideo = None
+
+from .media import MediaManager
+from .protocol import CameraProtocol
+
+DEFAULTS = {
+    'image_topic': '/realsense/D555_261622302751_Color',
+    'camera_info_topic': '/realsense/D555_261622302751_Color/camera_info',
+    'codec': 'h265', 'bitrate': 4000000, 'fps': 30, 'rotation_degrees': 180,
+    'rtsp_bind': '0.0.0.0', 'rtsp_port': 8554, 'rtsp_path': '/rgb',
+    'rtsp_uri': 'rtsp://192.168.144.1:8554/rgb',
+    'storage_dir': '/home/john/camera-media',
+    'frame_timeout_s': 2.0, 'photo_timeout_s': 3.0,
+    'mavlink_endpoint': 'tcp:127.0.0.1:5760',
+    'system_id': 1, 'component_id': 100,
+    'camera_name': 'D555 RGB', 'vendor_name': 'RealSense',
+    # Encoded access units as foxglove_msgs/CompressedVideo ('' disables). The
+    # same NVENC output as RTSP, so Foxglove costs no second encode and never
+    # touches the D555's own compressed streams (see README: they throttle the
+    # imager to ~3.5 fps and replay stale buffers).
+    'video_topic': '/d555/color/video', 'video_frame_id': 'camera_color_optical_frame',
+}
+
+
+def rgb_bytes(msg, rotation_degrees=0):
+    """Respect sensor_msgs/Image row stride; convert in the worker, never callback."""
+    enc = msg.encoding.lower()
+    channels = {'rgb8': 3, 'bgr8': 3, 'rgba8': 4, 'bgra8': 4,
+                'mono8': 1, 'yuv422_yuy2': 2, 'yuv422': 2}.get(enc)
+    if channels is None:
+        raise ValueError(f'Unsupported RGB source encoding {msg.encoding!r}')
+    if msg.width <= 0 or msg.height <= 0 or msg.step < msg.width * channels:
+        raise ValueError('Invalid image dimensions or stride')
+    if len(msg.data) != msg.step * msg.height:
+        raise ValueError('Image data length does not match stride and height')
+    rows = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step)
+    pixels = rows[:, :msg.width * channels].reshape(msg.height, msg.width, channels)
+    code = {'bgr8': cv2.COLOR_BGR2RGB, 'rgba8': cv2.COLOR_RGBA2RGB,
+            'bgra8': cv2.COLOR_BGRA2RGB, 'mono8': cv2.COLOR_GRAY2RGB,
+            'yuv422_yuy2': cv2.COLOR_YUV2RGB_YUY2,
+            'yuv422': cv2.COLOR_YUV2RGB_UYVY}.get(enc)
+    if code is not None:
+        pixels = cv2.cvtColor(pixels, code)
+    if rotation_degrees == 180:
+        pixels = pixels[::-1, ::-1]
+    elif rotation_degrees != 0:
+        raise ValueError('rotation_degrees must be 0 or 180')
+    return pixels.tobytes()
+
+
+class CameraNode(Node):
+    def __init__(self):
+        super().__init__('uav_camera')
+        self.declare_parameters('', list(DEFAULTS.items()))
+        self.config = {k: self.get_parameter(k).value for k in DEFAULTS}
+        if self.config['rotation_degrees'] not in (0, 180):
+            raise ValueError('rotation_degrees must be 0 or 180')
+        self.log = logging.getLogger('uav_camera')
+        self._video_pub = None
+        self._video_published = 0
+        if self.config['video_topic']:
+            if CompressedVideo is None:
+                self.log.error('video_topic %s disabled: foxglove_msgs is not installed',
+                               self.config['video_topic'])
+            else:
+                video_qos = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=10,
+                                       reliability=ReliabilityPolicy.RELIABLE,
+                                       durability=DurabilityPolicy.VOLATILE)
+                self._video_pub = self.create_publisher(CompressedVideo, self.config['video_topic'], video_qos)
+        self.media = MediaManager(self.config, logger=self.log,
+                                  on_encoded=self._encoded if self._video_pub else None)
+        self.protocol = CameraProtocol(self.media, self.config, logger=self.log)
+        self._condition = threading.Condition()
+        self._pending = None
+        self._info = None
+        self._stopping = False
+        self._received = 0
+        self._dropped = 0
+        self._converted = 0
+        self._conversion_error = ''
+        self._last_arrival = None
+        qos = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=1,
+                         reliability=ReliabilityPolicy.BEST_EFFORT,
+                         durability=DurabilityPolicy.VOLATILE)
+        self._image_sub = self.create_subscription(Image, self.config['image_topic'], self._image, qos)
+        self._info_sub = self.create_subscription(CameraInfo, self.config['camera_info_topic'], self._camera_info, qos)
+        self._status_pub = self.create_publisher(String, '~/status', 1)
+        self._timer = self.create_timer(1.0, self._status)
+        self.media.start()
+        self._worker = threading.Thread(target=self._convert, name='rgb-converter', daemon=True)
+        self._worker.start()
+        self.protocol.start()
+        self.log.info('Listening to %s; advertised video %s; video topic %s',
+                      self.config['image_topic'], self.config['rtsp_uri'],
+                      self.config['video_topic'] if self._video_pub else 'disabled')
+
+    def _image(self, msg):
+        with self._condition:
+            self._received += 1
+            self._last_arrival = time.monotonic()
+            if self._pending is not None:
+                self._dropped += 1
+            self._pending = (msg, self._info, time.time_ns(), time.monotonic_ns())
+            self._condition.notify()
+
+    def _encoded(self, data, keyframe, meta):
+        """Runs on the GStreamer streaming thread; one Annex B access unit
+        per message, keyframes self-contained (VPS/SPS/PPS inserted). Stamped
+        with host receive time: the D555's own stamps are its unmapped device
+        clock, and the dashboard timeline is host time."""
+        msg = CompressedVideo()  # Foxglove schemas are flat: timestamp + frame_id, no std_msgs Header
+        utc_us = meta[2] if meta else time.time_ns() // 1000
+        msg.timestamp.sec = utc_us // 1000000
+        msg.timestamp.nanosec = (utc_us % 1000000) * 1000
+        msg.frame_id = self.config['video_frame_id'] or (meta[1].rstrip('\x00') if meta else '')
+        msg.format = self.media.codec
+        msg.data = array('B', data)  # array fast path: no per-byte range check
+        self._video_pub.publish(msg)
+        self._video_published += 1
+
+    def _camera_info(self, msg):
+        self._info = {
+            'width': msg.width, 'height': msg.height, 'frame_id': msg.header.frame_id,
+            'stamp_ns': msg.header.stamp.sec * 1000000000 + msg.header.stamp.nanosec,
+            'distortion_model': msg.distortion_model, 'd': list(msg.d),
+            'k': list(msg.k), 'r': list(msg.r), 'p': list(msg.p),
+            'binning_x': msg.binning_x, 'binning_y': msg.binning_y,
+            'roi': {'x_offset': msg.roi.x_offset, 'y_offset': msg.roi.y_offset,
+                    'height': msg.roi.height, 'width': msg.roi.width, 'do_rectify': msg.roi.do_rectify},
+            'source_clock': 'camera_device_clock_unmapped',
+            'pose_available': False,
+        }
+
+    def _convert(self):
+        while True:
+            with self._condition:
+                self._condition.wait_for(lambda: self._pending is not None or self._stopping)
+                if self._stopping:
+                    return
+                msg, info, received_utc_ns, received_monotonic_ns = self._pending
+                self._pending = None
+            try:
+                rotation = self.config['rotation_degrees']
+                valid_info = (info and info.get('width') == msg.width and
+                              info.get('height') == msg.height and
+                              info.get('frame_id') == msg.header.frame_id)
+                info = dict(info) if valid_info else {'calibration_available': False}
+                info['host_ros_callback_utc_ns'] = received_utc_ns
+                info['host_ros_callback_monotonic_ns'] = received_monotonic_ns
+                info['output_rotation_degrees'] = rotation
+                info['intrinsics_reference'] = 'original_unrotated_source_pixels'
+                info['source_to_saved_pixel_transform'] = (
+                    [[-1, 0, msg.width-1], [0, -1, msg.height-1], [0, 0, 1]]
+                    if rotation == 180 else [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
+                self.media.submit_frame(rgb_bytes(msg, rotation), msg.width, msg.height,
+                                        msg.header.stamp.sec * 1000000000 + msg.header.stamp.nanosec,
+                                        msg.header.frame_id, info)
+                self._converted += 1
+                self._conversion_error = ''
+            except Exception as exc:
+                if str(exc) != self._conversion_error:
+                    self.log.exception('RGB conversion failed')
+                self._conversion_error = str(exc)
+
+    def _status(self):
+        status = self.media.status()
+        status.update(received_frames=self._received, converted_frames=self._converted,
+                      dropped_before_conversion=self._dropped,
+                      source_age_s=None if self._last_arrival is None else time.monotonic()-self._last_arrival,
+                      conversion_error=self._conversion_error,
+                      video_topic=self.config['video_topic'] if self._video_pub else '',
+                      video_frames_published=self._video_published,
+                      source_timestamp_clock='camera_device_clock_unmapped')
+        self._status_pub.publish(String(data=json.dumps(status, default=str)))
+
+    def close(self):
+        self.protocol.close()
+        with self._condition:
+            self._stopping = True
+            self._condition.notify_all()
+        self._worker.join(timeout=5)
+        self.media.close()
+
+
+def main(args=None):
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
+    rclpy.init(args=args)
+    node = None
+    try:
+        node = CameraNode()
+        rclpy.spin(node)
+    except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
+        pass
+    finally:
+        if node is not None:
+            node.close()
+            node.destroy_node()
+        if rclpy.ok():
+            rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

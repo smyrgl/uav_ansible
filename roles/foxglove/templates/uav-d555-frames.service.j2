@@ -1,0 +1,27 @@
+[Unit]
+Description=UAV D555 visualization frame-name adapter
+After=network-online.target
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ uav_ros_user }}
+Group={{ uav_ros_user }}
+EnvironmentFile={{ uav_ros_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/d555_frame_adapter.py --serial {{ d555_frame_adapter_serial | default("261622302751") }}'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=20
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

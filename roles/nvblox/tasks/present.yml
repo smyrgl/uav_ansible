@@ -1,0 +1,106 @@
+---
+# nvblox + its two helpers (nvblox_state: present). The isaac_ros role owns the NVIDIA apt repository
+# and the pinned nvblox packages; this role only configures and runs them.
+- name: Install nvblox runtime dependencies
+  ansible.builtin.apt:
+    name:
+      - "ros-{{ ros_distro }}-nvblox-ros"
+      - "ros-{{ ros_distro }}-nvblox-msgs"
+      - "ros-{{ ros_distro }}-tf2-ros"
+      - "ros-{{ ros_distro }}-rclpy"
+      - "ros-{{ ros_distro }}-sensor-msgs"
+      - "ros-{{ ros_distro }}-diagnostic-msgs"
+      - python3-opencv
+      - python3-numpy
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create nvblox configuration and program directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/uav/ros
+    - /usr/local/lib/uav
+
+- name: Create the nvblox state directory (save_ply / save_map outputs)
+  ansible.builtin.file:
+    path: "{{ nvblox_state_dir }}"
+    state: directory
+    owner: "{{ nvblox_service_user }}"
+    group: "{{ nvblox_service_user }}"
+    mode: "0755"
+
+- name: Install the D555 rectified-RGB adapter and its tests
+  ansible.builtin.copy:
+    src: "{{ item.src }}"
+    dest: "/usr/local/lib/uav/{{ item.src }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - { src: d555_rgb_adapter.py, mode: "0755" }
+    - { src: test_d555_rgb_adapter.py, mode: "0644" }
+  notify: Restart D555 RGB adapter
+
+# Pure conversion/geometry tests (no ROS needed): proves cv2's YUY2 path and the
+# rectified-CameraInfo contract on the actual runtime before the service starts.
+- name: Run the RGB adapter self-test
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, -m, unittest, -q, test_d555_rgb_adapter]
+    chdir: /usr/local/lib/uav
+  changed_when: false
+
+- name: Install the nvblox bench verification tool
+  ansible.builtin.copy:
+    src: verify_nvblox.py
+    dest: /usr/local/lib/uav/verify_nvblox.py
+    mode: "0755"
+
+- name: Configure nvblox
+  ansible.builtin.template:
+    src: nvblox.yaml.j2
+    dest: "{{ nvblox_config_path }}"
+    mode: "0644"
+  notify: Restart nvblox
+
+- name: Install the nvblox service
+  ansible.builtin.template:
+    src: uav-nvblox.service.j2
+    dest: /etc/systemd/system/uav-nvblox.service
+    mode: "0644"
+  notify: Restart nvblox
+
+- name: Install the D555 RGB adapter service
+  ansible.builtin.template:
+    src: uav-d555-rgb.service.j2
+    dest: /etc/systemd/system/uav-d555-rgb.service
+    mode: "0644"
+  notify: Restart D555 RGB adapter
+
+- name: Install the bench odometry stand-in service
+  ansible.builtin.template:
+    src: uav-bench-odom.service.j2
+    dest: /etc/systemd/system/uav-bench-odom.service
+    mode: "0644"
+  notify: Restart bench odometry
+
+- name: Apply nvblox changes before starting
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the bench odometry stand-in (identity odom->base_link)
+  ansible.builtin.systemd_service:
+    name: uav-bench-odom.service
+    enabled: "{{ nvblox_bench_static_odom | bool }}"
+    state: "{{ 'started' if nvblox_bench_static_odom | bool else 'stopped' }}"
+    daemon_reload: true
+
+- name: Enable the D555 RGB adapter and nvblox at boot
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - uav-d555-rgb.service
+    - uav-nvblox.service

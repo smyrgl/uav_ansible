@@ -1,0 +1,14 @@
+# Managed by uav_ansible — stable name for the GNSS PPS input.
+# /dev/ppsN numbering is not stable on this board: the L4T kernel builds in the
+# "ktimer" test source (CONFIG_PPS_CLIENT_KTIMER=y), which takes pps0 at every
+# boot and ticks off a kernel timer, not a real edge; igc adds the i226 PHC as
+# another PPS source when it loads. Name the pps-gpio one instead.
+#
+# By its name attribute, the only handle it has: pps-gpio registers its source
+# without a parent device (/devices/virtual/pps/ppsN), so DRIVERS=="pps-gpio"
+# matches nothing. It names the source "<platform device>.<id>": a platform
+# device created from the device tree is named after its node and gets id -1
+# (PLATFORM_DEVID_NONE), so the overlay's root-level node "pps"
+# (pps-gpio.dts.j2) becomes "pps.-1". A root node name is unique, so this
+# cannot match anything else; rename the node and this must follow.
+SUBSYSTEM=="pps", ATTR{name}=="pps.-1", SYMLINK+="{{ pps_device | basename }}"

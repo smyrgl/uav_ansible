@@ -1,0 +1,10 @@
+---
+avia_workspace: "{{ uav_ros_workspace | default('/opt/uav/ros') }}"
+avia_service_user: "{{ uav_ros_user | default('uav-ros') }}"
+avia_sdk_repository: https://github.com/Livox-SDK/Livox-SDK.git
+avia_sdk_revision: 14c533dd7175bd90a6b568c0aa1733f35d36cb89
+avia_broadcast_code: 3JEDNAP001S5701
+avia_lidar_ip: 192.168.144.80
+avia_frame_id: avia_nominal_lidar_frame
+avia_publish_rate_hz: 10.0
+avia_receipt_timeout_sec: 2.0

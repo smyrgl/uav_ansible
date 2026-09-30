@@ -1,0 +1,27 @@
+[Unit]
+Description=UAV robot_localization EKF, map layer (+ GNSS; map -> odom)
+After=network-online.target uav-px4-bridge.service uav-ekf-odom.service
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ localization_user }}
+Group={{ localization_user }}
+EnvironmentFile={{ localization_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && exec ros2 run robot_localization ekf_node --ros-args -r __node:=ekf_map --params-file {{ localization_ekf_map_config }} -r odometry/filtered:=/odometry/filtered/map'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=20
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,35 @@
+#!/bin/bash
+# Managed by uav_ansible. Declare the D555's stream profiles: read each ROS
+# parameter of the camera node and set it when it differs. Exits 0 once every
+# profile matches; retries because the camera may finish booting after us.
+# No `set -u`: ROS's setup.bash reads unset variables (AMENT_TRACE_SETUP_FILES).
+source /opt/ros/{{ ros_distro }}/setup.bash
+export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+export CYCLONEDDS_URI="file://{{ mavlink_camera_root }}/config/cyclonedds.xml"
+export ROS_DOMAIN_ID={{ mavlink_camera_ros_domain }}
+node="/D555_{{ d555_serial }}"
+declare -A want=(
+  ["RGB.Profile"]="{{ d555_rgb_profile }}"
+  ["Depth.Profile"]="{{ d555_depth_profile }}"
+)
+for attempt in $(seq 1 {{ d555_profile_attempts }}); do
+  all_ok=1
+  for p in "${!want[@]}"; do
+    cur=$(timeout 25 ros2 param get "$node" "$p" 2>/dev/null | sed -n 's/^String value is: //p')
+    if [ "$cur" = "${want[$p]}" ]; then continue; fi
+    all_ok=0
+    if [ -n "$cur" ]; then
+      if timeout 40 ros2 param set "$node" "$p" "${want[$p]}" >/dev/null 2>&1; then
+        echo "$p: '$cur' -> '${want[$p]}'"
+      else
+        echo "$p: set failed (current '$cur')" >&2
+      fi
+    else
+      echo "$p: camera not answering yet (attempt $attempt)"
+    fi
+  done
+  if [ "$all_ok" = 1 ]; then echo "D555 profiles match"; exit 0; fi
+  sleep 10
+done
+echo "D555 profiles not confirmed after {{ d555_profile_attempts }} attempts" >&2
+exit 1

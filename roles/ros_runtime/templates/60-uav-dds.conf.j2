@@ -1,0 +1,4 @@
+# Managed by uav_ansible (ros_runtime). Ceiling for the DDS socket buffers
+# Cyclone asks for in /etc/uav/ros/cyclonedds.xml ({{ dds_socket_rcvbuf }}).
+net.core.rmem_max = {{ dds_rmem_max }}
+net.core.wmem_max = {{ dds_rmem_max }}

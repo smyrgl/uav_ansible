@@ -1,0 +1,13 @@
+# Managed by uav_ansible (hflow). The Jetson's CAN controller sits on the flight
+# controller's CAN2 bus with the H-Flow. Listen-only: the controller never
+# transmits, not even ACK bits, so it cannot disturb the flight-critical bus.
+[Match]
+Name={{ hflow_can_interface }}
+
+[Link]
+RequiredForOnline=no
+
+[CAN]
+BitRate={{ hflow_can_bitrate }}
+ListenOnly=yes
+RestartSec=100ms

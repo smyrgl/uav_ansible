@@ -1,0 +1,91 @@
+---
+- name: Install shared ROS runtime and build dependencies
+  ansible.builtin.apt:
+    name:
+      - "ros-{{ ros_distro }}-rmw-cyclonedds-cpp"
+      - python3-colcon-common-extensions
+      - build-essential
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create unprivileged ROS service account
+  ansible.builtin.user:
+    name: "{{ uav_ros_user }}"
+    system: true
+    home: /var/lib/uav-ros
+    create_home: true
+    shell: /usr/sbin/nologin
+
+- name: Create shared runtime directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: '0755'
+  loop:
+    - /etc/uav/ros
+    - /usr/local/lib/uav
+    - "{{ uav_ros_workspace }}/src"
+
+- name: Create service state and log directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ uav_ros_user }}"
+    group: "{{ uav_ros_user }}"
+    mode: '0755'
+  loop:
+    - /var/lib/uav-ros
+    - /var/log/uav-ros
+
+# Applied (handler) before the services restart: Cyclone sizes its sockets at
+# start-up and silently settles for the kernel ceiling if it is lower.
+- name: Raise the kernel ceiling for DDS socket buffers
+  ansible.builtin.template:
+    src: 60-uav-dds.conf.j2
+    dest: /etc/sysctl.d/60-uav-dds.conf
+    mode: '0644'
+  notify:
+    - Apply DDS sysctl
+    - Restart ROS inspection services
+
+- name: Install shared ROS environment
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/uav/ros/{{ item }}"
+    mode: '0644'
+  loop:
+    - environment
+    - cyclonedds.xml
+  notify: Restart ROS inspection services
+
+- name: Install read-only clock mapping probe
+  ansible.builtin.copy:
+    src: ptp_status.py
+    dest: /usr/local/lib/uav/ptp_status.py
+    mode: '0755'
+  notify: Restart PTP status
+
+- name: Install clock probe and ROS group units
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: '0644'
+  loop:
+    - uav-ptp-status.service
+    - uav-ros.target
+  notify: Restart PTP status
+
+- name: Enable clock mapping probe and ROS group at boot
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    daemon_reload: true
+    enabled: true
+  loop:
+    - uav-ptp-status.service
+    - uav-ros.target
+
+- name: Start clock mapping probe
+  ansible.builtin.systemd_service:
+    name: uav-ptp-status.service
+    state: started

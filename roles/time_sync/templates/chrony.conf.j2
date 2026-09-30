@@ -1,9 +1,20 @@
 # Managed by uav_ansible.
-# Coarse time-of-day from gpsd (Mosaic SBF) via shared memory:
-refclock SHM 0 refid GPS precision 1e-1 offset 0.0 delay 0.2
+# Coarse time-of-day from the receiver: SBF ReceiverTime, sent by uav-gnss-time
+# (gnss role) once a second while the receiver clock is synchronised. It says
+# which second it is; the PPS below says where each second begins.
+#   offset    samples are stamped on arrival, so they trail true time by the SBF
+#             output latency; this adds it back (gnss_time_offset).
+#   precision arrival jitter is milliseconds (not NMEA's 100s of ms), and the
+#             PPS lock needs |GPS - PPS| plus both dispersions under 0.2 s.
+#   delay     keeps it a last resort next to PPS and even the network pool.
+# Selectable, not noselect: in the field there is no network, and without PPS
+# (a broken wire) this is the only source that takes the clock out of 1970.
+refclock SOCK {{ gnss_time_sock }} refid GPS precision 1e-2 offset {{ gnss_time_offset }} delay 0.2
 
-# Precise edge from the GPIO 1PPS ({{ pps_device }}), labelled by the GPS source:
-refclock PPS {{ pps_device }} lock GPS refid PPS
+# Precise edge from the GPIO 1PPS ({{ pps_device }}), labelled by the GPS source.
+# The refclock line is written at each start by uav-chrony-pps (ExecStartPre)
+# only if the device exists: chronyd treats a missing refclock device as fatal.
+include /run/chrony/uav-pps.conf
 
 # A network pool beside the receiver. This board has no battery RTC and boots at
 # January 1st; a companion that learns the time only from its own receiver cannot
@@ -21,6 +32,10 @@ allow {{ subnet }}
 {% endfor %}
 # Remain a usable server even before GNSS lock (holdover).
 local stratum 10
+
+# Leap seconds from tzdata, as Ubuntu's stock config has it: the SBF time feed
+# sends no leap-second warning.
+leapsectz right/UTC
 
 driftfile /var/lib/chrony/chrony.drift
 logdir /var/log/chrony

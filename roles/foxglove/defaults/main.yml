@@ -1,0 +1,12 @@
+---
+uav_ros_workspace: /opt/uav/ros
+uav_ros_user: uav-ros
+uav_ros_environment_file: /etc/uav/ros/environment
+foxglove_bind_address: 192.168.144.1
+foxglove_port: 8765
+foxglove_num_threads: 2
+
+foxglove_message_backlog_size: 128
+foxglove_depth_source_topic: /realsense/D555_261622302751_Depth
+foxglove_depth_throttled_topic: /d555/depth/throttled
+foxglove_depth_throttle_hz: 2.0

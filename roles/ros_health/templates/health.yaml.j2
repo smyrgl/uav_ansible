@@ -1,0 +1,20 @@
+uav_sensor_health:
+  ros__parameters:
+    d555_serial: {{ ros_health_d555_serial | to_json }}
+    d555_color_topic: {{ ros_health_d555_color_topic | to_json }}
+    d555_depth_topic: {{ ros_health_d555_depth_topic | to_json }}
+    d555_camera_info_suffix: {{ ros_health_d555_camera_info_suffix | to_json }}
+    receipt_timeout_sec: {{ ros_health_receipt_timeout_sec | float }}
+    startup_grace_sec: {{ ros_health_startup_grace_sec | float }}
+    min_rate_hz: {{ ros_health_min_rate_hz | float }}
+    rate_window_sec: {{ ros_health_rate_window_sec | float }}
+    clock_tolerance_sec: {{ ros_health_clock_tolerance_sec | float }}
+    avia_topic: {{ ros_health_avia_topic | to_json }}
+    e1r_topic: {{ ros_health_e1r_topic | to_json }}
+    mavlink_endpoint: {{ ros_health_mavlink_endpoint | to_json }}
+    mavlink_source_system: {{ ros_health_mavlink_source_system | int }}
+    hflow_flow_topic: {{ ros_health_hflow_flow_topic | to_json }}
+    hflow_range_topic: {{ ros_health_hflow_range_topic | to_json }}
+    hflow_min_quality: {{ ros_health_hflow_min_quality | int }}
+    gnss_broker_port: {{ ros_health_gnss_broker_port | int }}
+    ptp_status_path: {{ ros_health_ptp_status_path | to_json }}

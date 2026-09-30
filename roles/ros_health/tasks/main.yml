@@ -1,0 +1,75 @@
+---
+- name: Install firmware-matched PX4 message definitions
+  ansible.builtin.include_tasks: px4_messages.yml
+
+- name: Install sensor health dependencies
+  ansible.builtin.apt:
+    name:
+      - python3-colcon-common-extensions
+      - python3-venv
+      - "ros-{{ ros_distro }}-rclpy"
+      - "ros-{{ ros_distro }}-sensor-msgs"
+      - "ros-{{ ros_distro }}-diagnostic-msgs"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install pinned read-only MAVLink observer dependency
+  ansible.builtin.pip:
+    name: "pymavlink=={{ ros_health_pymavlink_version }}"
+    virtualenv: "{{ ros_health_venv }}"
+    virtualenv_command: /usr/bin/python3 -m venv
+    virtualenv_site_packages: true
+  notify: Restart ROS sensor health
+
+- name: Install sensor health source package
+  ansible.builtin.copy:
+    src: uav_sensor_health
+    dest: "{{ ros_health_workspace }}/src/"
+    owner: root
+    group: root
+    mode: preserve
+  register: ros_health_source
+  notify: Restart ROS sensor health
+
+- name: Check installed sensor health executable
+  ansible.builtin.stat:
+    path: "{{ ros_health_workspace }}/install/lib/uav_sensor_health/sensor_health"
+  register: ros_health_executable
+
+- name: Build the sensor health package
+  become: true
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    /usr/bin/colcon build --packages-select uav_sensor_health --merge-install
+  args:
+    executable: /bin/bash
+    chdir: "{{ ros_health_workspace }}"
+  when: ros_health_source is changed or not ros_health_executable.stat.exists
+  notify: Restart ROS sensor health
+
+- name: Configure sensor health thresholds and topics
+  ansible.builtin.template:
+    src: health.yaml.j2
+    dest: "{{ ros_health_config }}"
+    owner: root
+    group: "{{ ros_health_user }}"
+    mode: "0644"
+  notify: Restart ROS sensor health
+
+- name: Install sensor health system service
+  ansible.builtin.template:
+    src: uav-ros-health.service.j2
+    dest: /etc/systemd/system/uav-ros-health.service
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart ROS sensor health
+
+- name: Enable sensor health at boot
+  ansible.builtin.systemd_service:
+    name: uav-ros-health.service
+    daemon_reload: true
+    enabled: true
+    state: started

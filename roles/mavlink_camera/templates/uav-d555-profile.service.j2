@@ -1,0 +1,14 @@
+[Unit]
+Description=D555 stream profiles (declared ROS 2 parameters, set at boot)
+After=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart={{ mavlink_camera_root }}/uav-d555-profile
+Restart=on-failure
+RestartSec=30
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

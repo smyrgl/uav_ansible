@@ -6,6 +6,16 @@
   become: true
   gather_facts: true
 
+  # group_vars/ only auto-loads files named after an inventory group, and there
+  # is no "vault" group: without this, vault.yml is silently ignored and every
+  # vault_* var falls back to its placeholder. Optional (a fresh clone has none).
+  pre_tasks:
+    - name: Load secrets (group_vars/vault.yml)
+      ansible.builtin.include_vars:
+        file: "{{ playbook_dir }}/group_vars/vault.yml"
+      when: (playbook_dir ~ '/group_vars/vault.yml') is file
+      tags: ['always']
+
   roles:
     - role: base
       tags: ['base']
@@ -22,7 +32,7 @@
     - role: device_tree
       tags: ['device_tree']
 
-    # --- sensors + timing (gnss first: gpsd produces the SHM chrony consumes) ---
+    # --- sensors + timing (gnss first: it feeds the GNSS time chrony consumes) ---
     - role: gnss
       tags: ['gnss']
     - role: time_sync
@@ -31,8 +41,36 @@
     # --- ROS 2 + autopilot link ---
     - role: ros2
       tags: ['ros2']
+    - role: isaac_ros            # NVIDIA apt repo + pinned nvblox debs (native Jazzy, no Docker)
+      tags: ['isaac_ros']
     - role: px4_link
       tags: ['px4_link']
+    - role: mavlink_router
+      tags: ['mavlink_router']
+    - role: mavlink_camera
+      tags: ['mavlink_camera']
+    - role: ros_runtime
+      tags: ['ros_runtime', 'ros_inspection']
+    - role: robot_description
+      tags: ['robot_description', 'ros_inspection']
+    - role: e1r
+      tags: ['e1r', 'ros_inspection']
+    - role: avia
+      tags: ['avia', 'ros_inspection']
+    - role: hflow                # H-Flow over CAN2 (listen-only) -> PX4-typed ROS 2 topics
+      tags: ['hflow', 'ros_inspection']
+    - role: ros_health
+      tags: ['ros_health', 'ros_inspection']
+    - role: foxglove
+      tags: ['foxglove', 'ros_inspection']
+    - role: px4_bridge           # uORB -> ROS-native ENU/FLU (needs the px4_msgs overlay from ros_health)
+      tags: ['px4_bridge', 'ros_inspection']
+    - role: gnss_ros             # Septentrio ROS 2 driver on the read-only SBF fan-out
+      tags: ['gnss_ros', 'ros_inspection']
+    - role: localization         # robot_localization EKF + navsat_transform (informational)
+      tags: ['localization', 'ros_inspection']
+    - role: nvblox               # D555 + Avia -> GPU TSDF; needs isaac_ros, description, foxglove adapters
+      tags: ['nvblox', 'ros_inspection']
 
     # --- real-time tuning (soft-RT) ---
     - role: rt_tuning
@@ -42,6 +80,12 @@
     - role: rt_kernel
       tags: ['rt_kernel', 'never']
       when: enable_rt_kernel | default(false) | bool
-    - role: isaac_ros
-      tags: ['isaac_ros', 'never']
-      when: enable_isaac_ros | default(false) | bool
+
+  post_tasks:
+    - name: Start the ROS inspection service group
+      ansible.builtin.systemd_service:
+        name: uav-ros.target
+        state: started
+        enabled: true
+        daemon_reload: true
+      tags: [ros_inspection]

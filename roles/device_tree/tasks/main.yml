@@ -1,14 +1,24 @@
 ---
 # Device-tree overlays, applied via the extlinux OVERLAYS key (confirmed on the
 # target). Two overlays:
-#   - pps-gpio  : Mosaic 1PPS on GPIO11 (PQ.06) -> /dev/pps0   [hand-written]
-#   - pwm-hdr40 : PWM out on GPIO12 (pin 15, soc_gpio39_pn1)   [jetson-io-generated]
+#   - pps-gpio  : mosaic 1PPS on GPIO07 (PG.06) -> /dev/gnss-pps  [hand-written]
+#   - pwm-hdr40 : PWM out on GPIO12 (pin 15, soc_gpio39_pn1)      [jetson-io-generated]
 #
-# Remaining on-device TODOs:
-#   1. Set kernel_dt_include_dir (L4T kernel source include/ with tegra234-gpio.h)
-#      so the pps overlay's macros preprocess.
-#   2. Verify the PWM actually drives (see "verify" note at the end) — jetson-io
-#      emitted nvidia,function="gp" + gpio-mode=1, which we trust but should confirm.
+# Remaining on-device TODO: verify the PWM actually drives (see the note at the
+# end) — jetson-io emitted nvidia,function="gp" + gpio-mode=1, which we trust
+# but should confirm.
+
+# Overlays name the board they apply to; read it from the running tree so the
+# same role works on any p3767 SKU/carrier the UEFI would match.
+- name: Read the board compatible
+  ansible.builtin.shell:
+    cmd: "tr '\\0' '\\n' < /proc/device-tree/compatible | head -n1"
+  register: dt_board_compatible_raw
+  changed_when: false
+
+- name: Use it for the overlays
+  ansible.builtin.set_fact:
+    dt_board_compatible: "{{ dt_board_compatible_raw.stdout | trim }}"
 
 - name: Install device-tree compiler
   ansible.builtin.apt:
@@ -29,10 +39,16 @@
     mode: "0644"
   register: pwm_src
 
+- name: Check for the compiled PWM overlay
+  ansible.builtin.stat:
+    path: "{{ dt_pwm_dtbo }}"
+  register: pwm_dtbo
+
+# Recompile when the source changes, not only when the dtbo is missing.
 - name: Compile PWM overlay
   ansible.builtin.command:
     cmd: "dtc -I dts -O dtb -o {{ dt_pwm_dtbo }} {{ dt_overlay_src_dir }}/pwm-hdr40.dts"
-    creates: "{{ dt_pwm_dtbo }}"
+  when: pwm_src is changed or not pwm_dtbo.stat.exists
   notify: Reboot required (device_tree)
 
 # --- PPS overlay: hand-written; cpp-preprocessed for the tegra234 gpio macro ---
@@ -63,6 +79,12 @@
     src: pps-gpio.dts.j2
     dest: "{{ dt_overlay_src_dir }}/pps-gpio.dts"
     mode: "0644"
+  register: pps_src
+
+- name: Check for the compiled PPS overlay
+  ansible.builtin.stat:
+    path: "{{ dt_pps_dtbo }}"
+  register: pps_dtbo
 
 - name: Warn if the dt-bindings header was not found
   ansible.builtin.debug:
@@ -80,15 +102,25 @@
       -I {{ kernel_dt_include_dir }}
       {{ dt_overlay_src_dir }}/pps-gpio.dts |
       dtc -@ -I dts -O dtb -o {{ dt_pps_dtbo }} -
-    creates: "{{ dt_pps_dtbo }}"
-  when: kernel_dt_include_dir | length > 0
+  when:
+    - kernel_dt_include_dir | length > 0
+    - pps_src is changed or not pps_dtbo.stat.exists
   notify: Reboot required (device_tree)
 
-# --- Apply: add both overlays to the extlinux OVERLAYS key (BOOT-CRITICAL) -----
-# A backup is taken once; the edit is idempotent (guarded by basename match).
-# NOTE: if you enabled PWM manually via jetson-io, your OVERLAYS line already
-# references /boot/jetson-io-hdr40-user-custom.dtbo — remove that entry so the
-# same pinmux isn't applied twice (this role now manages the equivalent).
+# /dev/ppsN numbering isn't stable (see the rule), so chrony uses this name.
+- name: Install udev rule for a stable PPS device name
+  ansible.builtin.template:
+    src: 99-gnss-pps.rules.j2
+    dest: /etc/udev/rules.d/99-gnss-pps.rules
+    mode: "0644"
+  notify: Reload udev (pps)
+
+# --- Apply: FDT + OVERLAYS in the DEFAULT entry (BOOT-CRITICAL) ----------------
+# A backup is taken once; the script also keeps the previous file as
+# .uav-prev and replaces the config atomically. It edits dt_extlinux_label and
+# makes it the DEFAULT — see group_vars for why that is L4T's "primary".
+# NOTE: if you enabled PWM manually via jetson-io, its entry references
+# /boot/jetson-io-hdr40-user-custom.dtbo — this role manages the equivalent.
 - name: Back up extlinux.conf (once)
   ansible.builtin.copy:
     src: "{{ extlinux_conf }}"
@@ -96,26 +128,12 @@
     remote_src: true
     force: false
 
-- name: Ensure overlays are listed in the extlinux OVERLAYS key
-  ansible.builtin.shell:
-    cmd: |
-      set -euo pipefail
-      conf="{{ extlinux_conf }}"
-      changed=0
-      for dtbo in {{ dt_overlay_dtbos | join(' ') }}; do
-        base="${dtbo##*/}"
-        if grep -qE "^[[:space:]]*OVERLAYS\b.*${base}" "$conf"; then
-          continue
-        fi
-        if grep -qE "^[[:space:]]*OVERLAYS\b" "$conf"; then
-          sed -i -E "s#^([[:space:]]*OVERLAYS\b.*)#\1,${dtbo}#" "$conf"
-        else
-          sed -i -E "0,/^([[:space:]]*)FDT\b.*/s##&\n\1OVERLAYS ${dtbo}#" "$conf"
-        fi
-        changed=1
-      done
-      echo "changed=${changed}"
-    executable: /bin/bash
+- name: Put FDT + OVERLAYS in the DEFAULT boot entry
+  ansible.builtin.script:
+    cmd: >-
+      uav-extlinux-overlays.py {{ extlinux_conf }} {{ dt_extlinux_label }}
+      {{ dt_base_dtb }} {{ dt_overlay_dtbos | join(',') }}
+    executable: /usr/bin/python3
   register: extlinux_edit
   changed_when: "'changed=1' in extlinux_edit.stdout"
   notify: Reboot required (device_tree)
@@ -125,4 +143,6 @@
     msg: >-
       After reboot, confirm PWM works: `ls /sys/class/pwm/` should show a chip and
       `cat /sys/kernel/debug/pinctrl/*pinmux*/pinmux-pins | grep pn1` should show
-      soc_gpio39_pn1 muxed to its PWM function. Confirm PPS with `sudo ppstest /dev/pps0`.
+      soc_gpio39_pn1 muxed to its PWM function. Confirm PPS with
+      `sudo ppstest {{ pps_device }}` (one assert a second, sequence counting up;
+      the receiver drives it only while it has a PVT).

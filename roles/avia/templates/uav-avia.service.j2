@@ -1,0 +1,27 @@
+[Unit]
+Description=Livox Avia ROS 2 point clouds (bench host receipt timestamps)
+After=network-online.target
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ avia_service_user }}
+Group={{ avia_service_user }}
+EnvironmentFile=/etc/uav/ros/environment
+WorkingDirectory={{ avia_workspace }}
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ avia_workspace }}/install/setup.bash && exec {{ avia_workspace }}/install/lib/uav_avia/avia_node --ros-args --params-file /etc/uav/ros/avia.yaml'
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGINT
+TimeoutStopSec=15
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/uav-ros
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

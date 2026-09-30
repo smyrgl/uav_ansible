@@ -1,0 +1,29 @@
+[Unit]
+Description=UAV Septentrio GNSS ROS 2 driver (read-only SBF client of the fan-out)
+After=network-online.target uav-gnss-broker.service
+Wants=network-online.target uav-gnss-broker.service
+PartOf=uav-ros.target uav-gnss-broker.service
+# PartOf the fan-out: when the fan-out restarts (receiver re-plugged, converge),
+# the driver restarts with it instead of sitting on a closed TCP connection.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ gnss_ros_user }}
+Group={{ gnss_ros_user }}
+EnvironmentFile={{ gnss_ros_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && exec ros2 run septentrio_gnss_driver {{ gnss_ros_executable }} --ros-args -r __ns:={{ gnss_ros_namespace }} --params-file {{ gnss_ros_config }}'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=20
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

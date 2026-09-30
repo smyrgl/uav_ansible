@@ -1,0 +1,20 @@
+uav_camera:
+  ros__parameters:
+    image_topic: "{{ mavlink_camera_image_topic }}"
+    camera_info_topic: "{{ mavlink_camera_image_topic }}/camera_info"
+    codec: "{{ mavlink_camera_codec }}"
+    bitrate: {{ mavlink_camera_bitrate }}
+    fps: {{ mavlink_camera_fps }}
+    rotation_degrees: {{ mavlink_camera_rotation_degrees }}
+    rtsp_bind: "0.0.0.0"
+    rtsp_port: {{ mavlink_camera_rtsp_port }}
+    rtsp_path: "/rgb"
+    rtsp_uri: "rtsp://{{ mavlink_camera_rtsp_host }}:{{ mavlink_camera_rtsp_port }}/rgb"
+    video_topic: "{{ mavlink_camera_video_topic }}"
+    video_frame_id: "{{ mavlink_camera_video_frame_id }}"
+    storage_dir: "{{ mavlink_camera_storage }}"
+    mavlink_endpoint: "tcp:127.0.0.1:{{ mavlink_router_tcp_port }}"
+    system_id: {{ mavlink_camera_system_id }}
+    component_id: {{ mavlink_camera_component_id }}
+    camera_name: "D555 RGB"
+    vendor_name: "RealSense"

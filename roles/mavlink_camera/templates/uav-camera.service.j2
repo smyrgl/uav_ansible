@@ -1,0 +1,22 @@
+[Unit]
+Description=D555 ROS2 RGB, NVENC RTSP and MAVLink camera
+# Keep retrying if Ethernet/IP becomes available late during boot.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+WorkingDirectory={{ mavlink_camera_root }}
+Environment=ROS_DOMAIN_ID={{ mavlink_camera_ros_domain }}
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment=CYCLONEDDS_URI=file://{{ mavlink_camera_root }}/config/cyclonedds.xml
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ mavlink_camera_root }}/ws/install/setup.bash && exec {{ mavlink_camera_root }}/venv/bin/python -m uav_camera.node --ros-args --params-file {{ mavlink_camera_root }}/config/camera.yaml'
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+KillSignal=SIGINT
+UMask=0027
+NoNewPrivileges=true
+
+[Install]
+WantedBy=default.target

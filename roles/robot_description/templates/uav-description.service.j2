@@ -1,0 +1,27 @@
+[Unit]
+Description=UAV X950 robot description and nominal sensor transforms
+After=network-online.target
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ uav_ros_user }}
+Group={{ uav_ros_user }}
+EnvironmentFile={{ uav_ros_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/usr/local/libexec/uav-description
+Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=20
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

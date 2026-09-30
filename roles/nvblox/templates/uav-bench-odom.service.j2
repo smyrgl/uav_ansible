@@ -1,0 +1,28 @@
+[Unit]
+Description=BENCH ONLY static identity {{ nvblox_global_frame }}->{{ nvblox_pose_frame }} (nvblox pose stand-in; replace with real odometry)
+After=network-online.target
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ nvblox_service_user }}
+Group={{ nvblox_service_user }}
+EnvironmentFile={{ nvblox_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && exec /opt/ros/{{ ros_distro }}/lib/tf2_ros/static_transform_publisher --frame-id {{ nvblox_global_frame }} --child-frame-id {{ nvblox_pose_frame }} --ros-args -r __node:=bench_static_odom'
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGINT
+TimeoutStopSec=10
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

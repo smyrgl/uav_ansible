@@ -1,0 +1,19 @@
+---
+- name: Restart nvblox
+  ansible.builtin.systemd_service:
+    name: uav-nvblox.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart D555 RGB adapter
+  ansible.builtin.systemd_service:
+    name: uav-d555-rgb.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart bench odometry
+  ansible.builtin.systemd_service:
+    name: uav-bench-odom.service
+    state: restarted
+    daemon_reload: true
+  when: nvblox_bench_static_odom | bool

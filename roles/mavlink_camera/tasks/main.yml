@@ -1,0 +1,160 @@
+---
+- name: Install camera runtime and ROS build dependencies
+  ansible.builtin.apt:
+    name:
+      - python3-venv
+      - python3-opencv
+      - python3-numpy
+      - python3-gi
+      - python3-colcon-common-extensions
+      - gir1.2-gst-rtsp-server-1.0
+      - gstreamer1.0-plugins-good
+      - gstreamer1.0-plugins-bad
+      - "ros-{{ ros_distro }}-rmw-cyclonedds-cpp"
+      - "ros-{{ ros_distro }}-sensor-msgs"
+      - "ros-{{ ros_distro }}-foxglove-msgs"   # CompressedVideo for the dashboard video topic
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create camera directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0755"
+  loop:
+    - "{{ mavlink_camera_root }}/ws/src"
+    - "{{ mavlink_camera_root }}/config"
+    - "{{ mavlink_camera_storage }}"
+    - "/home/{{ target_user }}/.config/systemd/user"
+
+- name: Install camera source package
+  ansible.builtin.copy:
+    src: uav_camera
+    dest: "{{ mavlink_camera_root }}/ws/src/"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: preserve
+  notify: Restart user camera
+
+- name: Create isolated Python runtime with system ROS and GStreamer access
+  become_user: "{{ target_user }}"
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, -m, venv, --system-site-packages, "{{ mavlink_camera_root }}/venv"]
+    creates: "{{ mavlink_camera_root }}/venv/bin/python"
+
+- name: Install pinned MAVLink bindings in the camera environment
+  become_user: "{{ target_user }}"
+  ansible.builtin.pip:
+    name: pymavlink==2.4.49
+    virtualenv: "{{ mavlink_camera_root }}/venv"
+  notify: Restart user camera
+
+- name: Build the ROS camera package
+  become_user: "{{ target_user }}"
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    /usr/bin/colcon build --packages-select uav_camera --merge-install
+  args:
+    executable: /bin/bash
+    chdir: "{{ mavlink_camera_root }}/ws"
+  changed_when: false
+
+- name: Configure the camera runtime
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "{{ mavlink_camera_root }}/config/{{ item }}"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+  loop: [camera.yaml, cyclonedds.xml]
+  notify: Restart user camera
+
+# Only the local camera-facing Ethernet receives jumbo frames. RTP output is
+# separately limited to 1200-byte packets so the radio does not need jumbo MTU.
+- name: Persist camera LAN MTU without rewriting address or uplink settings
+  ansible.builtin.template:
+    src: 90-uav-camera-mtu.yaml.j2
+    dest: /etc/netplan/90-uav-camera-mtu.yaml
+    mode: "0600"
+  register: camera_mtu_config
+
+- name: Validate persistent network configuration
+  ansible.builtin.command: netplan generate
+  when: camera_mtu_config is changed
+  changed_when: false
+
+- name: Read current camera LAN MTU
+  ansible.builtin.slurp:
+    src: "/sys/class/net/{{ lan_interface }}/mtu"
+  register: camera_current_mtu
+
+- name: Apply camera LAN MTU without restarting networking
+  ansible.builtin.command:
+    argv: [ip, link, set, dev, "{{ lan_interface }}", mtu, "{{ mavlink_camera_lan_mtu | string }}"]
+  when: (camera_current_mtu.content | b64decode | trim | int) != mavlink_camera_lan_mtu
+
+- name: Install the D555 stream-profile setter
+  ansible.builtin.template:
+    src: uav-d555-profile.sh.j2
+    dest: "{{ mavlink_camera_root }}/uav-d555-profile"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0755"
+  notify: Restart D555 profile setter
+
+- name: Install the D555 stream-profile unit
+  ansible.builtin.template:
+    src: uav-d555-profile.service.j2
+    dest: "/home/{{ target_user }}/.config/systemd/user/uav-d555-profile.service"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+  notify: Restart D555 profile setter
+
+- name: Install the user camera service
+  ansible.builtin.template:
+    src: uav-camera.service.j2
+    dest: "/home/{{ target_user }}/.config/systemd/user/uav-camera.service"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0644"
+  notify: Restart user camera
+
+- name: Resolve service user UID
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ target_user }}"
+
+- name: Enable user manager at boot
+  ansible.builtin.command: "loginctl enable-linger {{ target_user }}"
+  args:
+    creates: "/var/lib/systemd/linger/{{ target_user }}"
+
+- name: Apply pending camera changes before starting the service
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the D555 stream-profile setter
+  become_user: "{{ target_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd[target_user][1] }}"
+  ansible.builtin.systemd_service:
+    scope: user
+    name: uav-d555-profile.service
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Enable camera service
+  become_user: "{{ target_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd[target_user][1] }}"
+  ansible.builtin.systemd_service:
+    scope: user
+    name: uav-camera.service
+    daemon_reload: true
+    enabled: true
+    state: started

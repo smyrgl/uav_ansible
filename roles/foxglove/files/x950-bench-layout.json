@@ -1,0 +1,229 @@
+{
+  "configById": {
+    "3D!x950bench": {
+      "cameraState": {
+        "perspective": true,
+        "distance": 3.5,
+        "phi": 62,
+        "thetaOffset": 135,
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "fovy": 45,
+        "near": 0.05,
+        "far": 100
+      },
+      "followMode": "follow-pose",
+      "followTf": "base_link",
+      "scene": {
+        "meshUpAxis": "z_up",
+        "transforms": {
+          "visible": false,
+          "showLabel": false,
+          "enablePreloading": true
+        }
+      },
+      "transforms": {},
+      "topics": {
+        "/e1r/points": {
+          "visible": true,
+          "colorMode": "colormap",
+          "colorField": "intensity",
+          "colorMap": "turbo",
+          "pointSize": 2,
+          "pointShape": "circle",
+          "decayTime": 0
+        },
+        "/robot_description": {
+          "visible": false
+        },
+        "/avia/points": {
+          "visible": true,
+          "colorMode": "colormap",
+          "colorField": "intensity",
+          "colorMap": "turbo",
+          "pointSize": 2,
+          "pointShape": "circle",
+          "decayTime": 0.5
+        }
+      },
+      "layers": {
+        "grid": {
+          "visible": true,
+          "frameLocked": true,
+          "label": "Grid",
+          "instanceId": "0410b5a5-2df6-458e-b7a2-65ed8cce745f",
+          "layerId": "foxglove.Grid",
+          "size": 10,
+          "divisions": 20,
+          "lineWidth": 1,
+          "color": "#506273",
+          "position": [
+            0,
+            0,
+            -0.5
+          ],
+          "rotation": [
+            0,
+            0,
+            0
+          ]
+        },
+        "fc9fb9f4-2708-4c8b-9531-75e6c3702002": {
+          "displayMode": "visual",
+          "fallbackColor": "#ffffff",
+          "showAxis": false,
+          "axisScale": 1,
+          "showOutlines": false,
+          "opacity": 1,
+          "visible": true,
+          "frameLocked": true,
+          "instanceId": "fc9fb9f4-2708-4c8b-9531-75e6c3702002",
+          "label": "X950 nominal geometry",
+          "layerId": "foxglove.Urdf",
+          "sourceType": "topic",
+          "url": "",
+          "filePath": "",
+          "parameter": "",
+          "topic": "/robot_description",
+          "framePrefix": "",
+          "order": 2
+        }
+      },
+      "imageMode": {},
+      "synchronize": false
+    },
+    "Image!d555color": {
+      "imageMode": {
+        "imageTopic": "/d555/color/video",
+        "rotation": 0,
+        "rectifyImage": false
+      },
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 60,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "synchronize": false
+    },
+    "Image!d555depth": {
+      "imageMode": {
+        "imageTopic": "/d555/depth/throttled",
+        "calibrationTopic": "/realsense/D555_261622302751_Depth/camera_info",
+        "rotation": 180,
+        "rectifyImage": false,
+        "colorMode": "colormap",
+        "colorMap": "turbo",
+        "minValue": 0,
+        "maxValue": 10000
+      },
+      "cameraState": {
+        "distance": 20,
+        "perspective": true,
+        "phi": 60,
+        "target": [
+          0,
+          0,
+          0
+        ],
+        "targetOffset": [
+          0,
+          0,
+          0
+        ],
+        "targetOrientation": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "thetaOffset": 60,
+        "fovy": 45,
+        "near": 0.5,
+        "far": 5000
+      },
+      "followMode": "follow-pose",
+      "scene": {},
+      "transforms": {},
+      "topics": {},
+      "layers": {},
+      "synchronize": false
+    },
+    "DiagnosticSummary!uavhealth": {
+      "topicToRender": "/uav/health",
+      "minLevel": 0,
+      "pinnedIds": [],
+      "hardwareIdFilter": "",
+      "sortByLevel": true,
+      "secondsUntilStale": 5
+    },
+    "DiagnosticStatusPanel!uavdetail": {
+      "topicToRender": "/uav/health",
+      "secondsUntilStale": 5
+    }
+  },
+  "globalVariables": {},
+  "userNodes": {},
+  "playbackConfig": {
+    "speed": 1
+  },
+  "layout": {
+    "direction": "column",
+    "first": {
+      "direction": "row",
+      "first": "3D!x950bench",
+      "second": {
+        "direction": "column",
+        "first": "Image!d555color",
+        "second": "Image!d555depth",
+        "splitPercentage": 50
+      },
+      "splitPercentage": 65
+    },
+    "second": {
+      "direction": "row",
+      "first": "DiagnosticSummary!uavhealth",
+      "second": "DiagnosticStatusPanel!uavdetail",
+      "splitPercentage": 50
+    },
+    "splitPercentage": 75
+  }
+}

@@ -1,0 +1,74 @@
+# Managed by uav_ansible (gnss_ros). Septentrio ROS 2 driver, read-only client
+# of the SBF fan-out: the receiver is configured by the gnss role's boot
+# profile, so configure_rx is false and the driver never writes to it. The
+# fan-out already carries every block the enabled publishers need (PVTGeodetic,
+# PosCovGeodetic, VelCovGeodetic, AttEuler, AttCovEuler at 100 Hz; DOP,
+# ReceiverStatus, QualityInd, RFStatus, GALAuthStatus, BaseVectorGeod,
+# ChannelStatus, MeasEpoch at 1 Hz).
+/**:
+  ros__parameters:
+    device: {{ gnss_ros_device | to_json }}
+    configure_rx: false
+    custom_commands_file: ""
+    receiver_type: gnss
+    multi_antenna: true
+    datum: Default
+    frame_id: {{ gnss_ros_frame_id | to_json }}
+    aux1_frame_id: {{ gnss_ros_aux1_frame_id | to_json }}
+    poi_frame_id: {{ gnss_ros_poi_frame_id | to_json }}
+    vehicle_frame_id: {{ gnss_ros_poi_frame_id | to_json }}
+    local_frame_id: {{ gnss_ros_local_frame_id | to_json }}
+    insert_local_frame: false
+    get_spatial_config_from_tf: false
+    lock_utm_zone: true
+    use_ros_axis_orientation: true          # ENU / FLU (REP-103)
+    att_offset:
+      heading: {{ gnss_ros_att_offset_heading_deg | float }}
+      pitch: 0.0
+    poi_to_arp:
+      delta_e: 0.0
+      delta_n: 0.0
+      delta_u: 0.0
+    use_gnss_time: {{ gnss_ros_use_gnss_time | bool | to_json }}
+    ntp_server: false
+    ptp_server_clock: false
+    latency_compensation: true
+    publish:
+      auto_publish: false
+      publish_only_valid: false
+      navsatfix: true          # sensor_msgs/NavSatFix with the full 3x3 position covariance
+      gpsfix: true             # gps_msgs/GPSFix: DOPs, speed/track, dual-antenna heading
+      gpst: true               # sensor_msgs/TimeReference (receiver time)
+      pvtgeodetic: true
+      poscovgeodetic: true
+      velcovgeodetic: true
+      atteuler: true           # moving-baseline heading/pitch (+ covariance below)
+      attcoveuler: true
+      pose: true               # geometry_msgs/PoseWithCovarianceStamped
+      twist: true              # geometry_msgs/TwistWithCovarianceStamped (ENU)
+      diagnostics: true        # ReceiverStatus / QualityInd
+      aimplusstatus: true      # RF interference / spoofing indicators
+      galauthstatus: true      # OSNMA
+      basevectorgeod: true
+      measepoch: false
+      pvtcartesian: false
+      basevectorcart: false
+      poscovcartesian: false
+      velcovcartesian: false
+      gpgga: false
+      gprmc: false
+      gpgsa: false
+      gpgsv: false
+      insnavcart: false
+      insnavgeod: false
+      extsensormeas: false
+      imusetup: false
+      velsensorsetup: false
+      exteventinsnavcart: false
+      exteventinsnavgeod: false
+      imu: false
+      localization: false
+      tf: false
+      localization_ecef: false
+      tf_ecef: false
+    activate_debug_log: false

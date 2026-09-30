@@ -1,0 +1,6 @@
+---
+- name: Restart E1R ROS driver
+  ansible.builtin.systemd_service:
+    name: uav-e1r.service
+    daemon_reload: true
+    state: restarted

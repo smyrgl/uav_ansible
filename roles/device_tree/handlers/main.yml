@@ -4,3 +4,10 @@
     msg: >-
       *** A reboot is required for device-tree overlay changes to take effect.
       Reboot and re-run the playbook. ***
+
+- name: Reload udev (pps)
+  # trigger re-runs the rules for a PPS source that already exists, so the
+  # name appears without a reboot once the overlay is live.
+  ansible.builtin.shell:
+    cmd: udevadm control --reload-rules && udevadm trigger --subsystem-match=pps --action=add
+  changed_when: true

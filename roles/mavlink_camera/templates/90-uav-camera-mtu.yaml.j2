@@ -1,0 +1,6 @@
+# Managed by uav_ansible: D555 native DDS ingress; RTP output remains <=1200B.
+network:
+  version: 2
+  ethernets:
+    {{ lan_interface }}:
+      mtu: {{ mavlink_camera_lan_mtu }}

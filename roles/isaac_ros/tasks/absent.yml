@@ -1,0 +1,26 @@
+---
+# isaac_ros_state: absent — remove the Isaac ROS packages that only the retired
+# nvblox POC used, then the apt source and its keyring. Targeted: the package
+# family the repository installed, never a global autoremove.
+- name: Remove the Isaac ROS package family
+  ansible.builtin.shell: |
+    set -e
+    pkgs=$(dpkg-query -W -f '${Package}\n' 'ros-{{ ros_distro }}-nvblox-*' 'ros-{{ ros_distro }}-isaac-ros-*' 2>/dev/null || true)
+    if [ -n "$pkgs" ]; then
+      DEBIAN_FRONTEND=noninteractive apt-get remove -y --purge $pkgs
+      echo REMOVED
+    fi
+  register: isaac_ros_removed
+  changed_when: "'REMOVED' in isaac_ros_removed.stdout"
+
+- name: Remove the Isaac ROS apt source
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by={{ isaac_ros_keyring }}] {{ isaac_ros_apt_url }} {{ isaac_ros_apt_suite }} main"
+    filename: nvidia-isaac-ros
+    state: absent
+    update_cache: true
+
+- name: Remove the Isaac ROS keyring
+  ansible.builtin.file:
+    path: "{{ isaac_ros_keyring }}"
+    state: absent

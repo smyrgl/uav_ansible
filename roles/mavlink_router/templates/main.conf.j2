@@ -1,0 +1,57 @@
+# Managed by uav_ansible — do not edit by hand. Local additions go in
+# /etc/mavlink-router/config.d/*.conf (read after this file; may override it).
+#
+{% if mavlink_router_px4_link == 'serial' %}
+#   PX4 (TELEM2 MAVLink instance) <--UART {{ mavlink_router_px4_serial_device }} @ {{ mavlink_router_px4_serial_baud }}--> router <--TCP {{ mavlink_router_tcp_port }}--> GCS (QGC)
+{% else %}
+#   PX4 (Ethernet MAVLink instance) <--UDP {{ mavlink_router_px4_port }}--> router <--TCP {{ mavlink_router_tcp_port }}--> GCS (QGC)
+{% endif %}
+#                                                          <--UDP {{ mavlink_router_onboard_port }}--> onboard apps (localhost)
+
+[General]
+# Any number of GCSs connect here (QGC: Comm Links -> TCP -> <jethawk>:{{ mavlink_router_tcp_port }}).
+TcpServerPort = {{ mavlink_router_tcp_port }}
+ReportStats = false
+{% if mavlink_router_px4_link != 'serial' %}
+# While no GCS heartbeat reaches it, PX4 sends every message twice: unicast to
+# its latched partner (this router) and broadcast to .255 (its discovery
+# beacon). Both copies land on the px4 socket below; drop the second one. Safe
+# at this window: a false match needs the same 8-bit sequence number and the
+# same content, and PX4 does not wrap the sequence inside {{ mavlink_router_dedup_ms }} ms.
+DeDuplicationPeriod = {{ mavlink_router_dedup_ms }}
+{% endif %}
+
+{% if mavlink_router_px4_link == 'serial' %}
+# PX4 over the baseboard's internal UART (Pixhawk TELEM2 <-> Jetson UART1):
+# one peer, no partner latch to lose, and nothing shared with the XRCE-DDS
+# Ethernet link (group_vars, "mavlink_router"). Baud = PX4 SER_TEL2_BAUD.
+# No flow control: the router leaves RTS/CTS off, and PX4 only enables it on
+# a port where it sees CTS.
+[UartEndpoint px4]
+Device = {{ mavlink_router_px4_serial_device }}
+Baud = {{ mavlink_router_px4_serial_baud }}
+{% else %}
+# PX4. Server mode: learn PX4's address from its broadcast, then answer from
+# this fixed port so PX4's partner latch always points back at us. Bound to
+# 0.0.0.0 because a socket bound to a unicast address never receives the .255
+# broadcast that PX4 uses to find its partner.
+[UdpEndpoint px4]
+Mode = Server
+Address = 0.0.0.0
+Port = {{ mavlink_router_px4_port }}
+{% endif %}
+
+# Onboard consumers on this box listen here (MAVSDK: udpin://0.0.0.0:{{ mavlink_router_onboard_port }},
+# pymavlink: udpin:127.0.0.1:{{ mavlink_router_onboard_port }}). Sends into the void until one does.
+[UdpEndpoint onboard]
+Mode = Normal
+Address = 127.0.0.1
+Port = {{ mavlink_router_onboard_port }}
+{% for e in mavlink_router_gcs_endpoints %}
+
+# GCS push target: {{ e.name }} (QGC auto-connects when it hears us on its port).
+[UdpEndpoint {{ e.name }}]
+Mode = Normal
+Address = {{ e.address }}
+Port = {{ e.port | default(14550) }}
+{% endfor %}

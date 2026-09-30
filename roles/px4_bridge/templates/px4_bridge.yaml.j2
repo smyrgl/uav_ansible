@@ -1,0 +1,11 @@
+# Managed by uav_ansible (px4_bridge).
+uav_px4_bridge:
+  ros__parameters:
+    prefix: {{ px4_bridge_prefix | to_json }}
+    imu_frame_id: {{ px4_bridge_imu_frame | to_json }}
+    odom_frame_id: {{ px4_bridge_odom_frame | to_json }}
+    base_frame_id: {{ px4_bridge_base_frame | to_json }}
+    gyro_stddev_rad_s: {{ px4_bridge_gyro_stddev_rad_s | float }}
+    accel_stddev_m_s2: {{ px4_bridge_accel_stddev_m_s2 | float }}
+    attitude_max_age_sec: 0.5
+    stale_sec: 3.0

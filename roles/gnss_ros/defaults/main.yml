@@ -1,0 +1,13 @@
+---
+gnss_ros_user: "{{ uav_ros_user | default('uav-ros') }}"
+gnss_ros_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+gnss_ros_config: /etc/uav/ros/gnss.yaml
+gnss_ros_namespace: /gnss
+gnss_ros_executable: septentrio_gnss_driver_node
+gnss_ros_device: "tcp://127.0.0.1:{{ gnss_broker_port | default(28785) }}"
+gnss_ros_frame_id: gnss_main_link          # URDF: main antenna (ARP) link
+gnss_ros_aux1_frame_id: gnss_aux_link      # URDF: aux antenna link (moving baseline)
+gnss_ros_poi_frame_id: base_link
+gnss_ros_local_frame_id: odom
+gnss_ros_att_offset_heading_deg: 0.0       # the receiver's own attitude offset applies (configure_rx false)
+gnss_ros_use_gnss_time: false              # stamp with receipt time; chrony disciplines the host from the same receiver

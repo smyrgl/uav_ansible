@@ -1,10 +1,12 @@
 ---
-# Clock daemons. The GNSS/gpsd side (which produces the SHM coarse-time source
-# and owns the mosaic serial) lives in the `gnss` role and runs first.
+# Clock daemons. The GNSS side (the fan-out that owns the receiver's data port,
+# and uav-gnss-time, which turns its SBF ReceiverTime into chrony's coarse GPS
+# source over the SOCK protocol) lives in the `gnss` role and runs first.
 #
 # Topology (see README): chrony disciplines the system clock from the GPIO PPS
-# (precise) + gpsd SHM (coarse) and serves NTP; phc2sys pushes the system clock
-# to the i226 PHC; ptp4l distributes that PHC as a gPTP grandmaster.
+# (precise) + the GNSS SOCK source (coarse) and serves NTP; phc2sys pushes the
+# system clock to the i226 PHC; ptp4l distributes that PHC as a gPTP
+# grandmaster.
 - name: Install chrony + linuxptp
   ansible.builtin.apt:
     name:
@@ -14,7 +16,7 @@
     update_cache: true
     cache_valid_time: 3600
 
-# --- chrony: system-clock discipline (PPS + SHM) + NTP server ----------------
+# --- chrony: system-clock discipline (PPS + GNSS SOCK) + NTP server ---------
 - name: Configure chrony
   ansible.builtin.template:
     src: chrony.conf.j2
@@ -24,6 +26,28 @@
     mode: "0644"
   notify: Restart chrony
 
+- name: Install the conditional PPS refclock writer
+  ansible.builtin.template:
+    src: uav-chrony-pps.sh.j2
+    dest: /usr/local/sbin/uav-chrony-pps
+    mode: "0755"
+  notify: Restart chrony
+
+- name: Create the chrony unit drop-in dir
+  ansible.builtin.file:
+    path: /etc/systemd/system/chrony.service.d
+    state: directory
+    mode: "0755"
+
+- name: Run the PPS refclock writer before chronyd starts
+  ansible.builtin.template:
+    src: chrony-uav-pps.conf.j2
+    dest: /etc/systemd/system/chrony.service.d/uav-pps.conf
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart chrony
+
 # --- ptp4l: gPTP grandmaster on the i226 segment -----------------------------
 - name: Configure ptp4l (gPTP profile)
   ansible.builtin.template:
@@ -32,7 +56,9 @@
     owner: root
     group: root
     mode: "0644"
-  notify: Restart ptp4l
+  notify:
+    - Restart ptp4l
+    - Restart phc2sys
 
 - name: Install ptp4l systemd unit
   ansible.builtin.template:

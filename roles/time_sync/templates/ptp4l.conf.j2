@@ -1,19 +1,32 @@
-# Managed by uav_ansible — gPTP (IEEE 802.1AS) grandmaster for the Robosense E1R.
+# Managed by uav_ansible — E1R static gPTP (IEEE 802.1AS) grandmaster.
+# RoboSense E1R manual section 2.4.2:
+# https://robosense-robotics.github.io/product-manual/en/E1R/#242-use-linuxptp-tool-to-verify-time-synchronization
 [global]
 gmCapable               1
 priority1               128
 priority2               128
 domainNumber            {{ ptp_domain }}
 
-# --- 802.1AS / gPTP profile ---
+# E1R expects the automotive/static-role profile, including the 802.1AS
+# Follow_Up information TLV and Sync/Follow_Up pairs every 125 ms.
+logSyncInterval         -3
+syncReceiptTimeout      3
+neighborPropDelayThresh 800
+path_trace_enabled      1
+follow_up_info          1
 transportSpecific       0x1
 ptp_dst_mac             01:80:C2:00:00:0E
 network_transport       L2
 delay_mechanism         P2P
 time_stamping           hardware
 
-# This node is the grandmaster (its PHC is GNSS-disciplined via phc2sys).
-# TODO: confirm ptp4l does not fight phc2sys for the PHC in GM-only operation;
-#       tune servo/announce intervals once measured against the E1R.
+# serverOnly is the LinuxPTP 4.x name for the vendor example's masterOnly.
+# Fixed master on the dedicated E1R link. Only phc2sys disciplines the PHC;
+# ptp4l distributes it and responds to the sensor's peer-delay requests.
+serverOnly              1
+BMCA                    noop
+asCapable               true
+inhibit_announce        1
+inhibit_delay_req       1
 
 [{{ ptp_grandmaster_interface }}]

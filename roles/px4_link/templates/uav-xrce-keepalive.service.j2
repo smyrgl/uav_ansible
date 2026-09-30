@@ -1,0 +1,25 @@
+[Unit]
+Description=uav_ansible FMU Ethernet transmit keepalive (ICMP echo to PX4 at {{ (1000 / px4_link_keepalive_interval_ms) | round | int }} Hz)
+After=network-online.target uav-xrce-agent.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Why (bench, 2026-09-30, fmu-v6x, PX4 1.17): NuttX queues the XRCE client's
+# UDP sends in write buffers that the STM32H7 Ethernet driver drains only on a
+# device poll, and the driver drops its "Tx available" notification whenever
+# the poll work item is busy, so queued data waits for the next inbound frame
+# (each echo reply's TX-complete interrupt polls the queue). Quiet link: ~10
+# bursts/s, gaps to 450 ms, vehicle_attitude at 8.5 Hz. 50 Hz of pings: 25
+# bursts/s, worst gap 34 ms. roles/px4_link/README.md has the details.
+ExecStart=/usr/bin/ping -n -q -i {{ '%.3f' | format(px4_link_keepalive_interval_ms / 1000) }} {{ px4_ip }}
+DynamicUser=yes
+# Raw ICMP without relying on the ping_group_range sysctl or file capabilities
+# (NoNewPrivileges, implied by DynamicUser, ignores the latter).
+CapabilityBoundingSet=CAP_NET_RAW
+AmbientCapabilities=CAP_NET_RAW
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

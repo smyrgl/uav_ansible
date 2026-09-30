@@ -1,37 +1,86 @@
 ---
-# Micro XRCE-DDS Agent — the PX4 <-> ROS 2 bridge over Ethernet/UDP (not serial).
-- name: Install build dependencies
+# PX4 1.17 uses the XRCE 2.x client. Build against Jazzy's Fast DDS 2.14,
+# separately from any /usr/local Fast DDS 3.x installation (e.g. RealSense).
+- name: Install XRCE agent build dependencies
   ansible.builtin.apt:
     name:
       - cmake
       - g++
       - git
-      - python3-pip
+      - libspdlog-dev
+      - "ros-{{ ros_distro }}-fastrtps"
+      - "ros-{{ ros_distro }}-fastcdr"
     state: present
 
-- name: Clone Micro-XRCE-DDS-Agent (pinned)
+- name: Create versioned XRCE workspace
+  ansible.builtin.file:
+    path: /opt/uav/xrce-agent
+    state: directory
+    mode: '0755'
+
+- name: Fetch pinned Micro XRCE-DDS Agent
   ansible.builtin.git:
     repo: "{{ xrce_agent_repo }}"
-    dest: /opt/Micro-XRCE-DDS-Agent
-    version: "{{ xrce_agent_version | default('HEAD', true) }}"
-  # TODO: pin xrce_agent_version to a release tag in group_vars/all.yml.
+    dest: "{{ xrce_agent_source }}"
+    version: "{{ xrce_agent_version }}"
 
-- name: Build + install the agent
-  ansible.builtin.shell:
-    cmd: |
-      set -e
-      mkdir -p build && cd build
-      cmake .. -DCMAKE_BUILD_TYPE=Release
-      make -j"$(nproc)"
-      make install
-      ldconfig
-    chdir: /opt/Micro-XRCE-DDS-Agent
-    creates: /usr/local/bin/MicroXRCEAgent
+- name: Configure XRCE agent with Jazzy dependencies
+  ansible.builtin.command:
+    argv:
+      - cmake
+      - -S
+      - "{{ xrce_agent_source }}"
+      - -B
+      - "{{ xrce_agent_source }}/build"
+      - -DCMAKE_BUILD_TYPE=Release
+      - "-DCMAKE_INSTALL_PREFIX={{ xrce_agent_prefix }}"
+      - "-DCMAKE_PREFIX_PATH=/opt/ros/{{ ros_distro }}"
+      - "-Dfastrtps_DIR=/opt/ros/{{ ros_distro }}/share/fastrtps/cmake"
+      - "-Dfastcdr_DIR=/opt/ros/{{ ros_distro }}/lib/cmake/fastcdr"
+      - "-DCMAKE_INSTALL_RPATH={{ xrce_agent_prefix }}/lib;/opt/ros/{{ ros_distro }}/lib"
+      - -DUAGENT_SUPERBUILD=OFF
+      - -DUAGENT_USE_SYSTEM_FASTDDS=ON
+      - -DUAGENT_USE_SYSTEM_FASTCDR=ON
+      - -DUAGENT_USE_SYSTEM_LOGGER=ON
+      - -DUAGENT_CED_PROFILE=OFF
+      - -DUAGENT_P2P_PROFILE=OFF
+  changed_when: false
+
+- name: Build XRCE agent
+  ansible.builtin.command:
+    argv:
+      - cmake
+      - --build
+      - "{{ xrce_agent_source }}/build"
+      - --parallel
+      - "{{ xrce_agent_build_jobs | string }}"
+  register: xrce_build
+  changed_when: "'Building ' in xrce_build.stdout or 'Linking ' in xrce_build.stdout"
+
+- name: Install XRCE agent in versioned prefix
+  ansible.builtin.command:
+    argv:
+      - cmake
+      - --install
+      - "{{ xrce_agent_source }}/build"
+  register: xrce_install
+  changed_when: "'-- Installing:' in xrce_install.stdout"
+  notify: Restart UAV XRCE agent
+
+- name: Verify agent can load its libraries before changing the service
+  ansible.builtin.command: "{{ xrce_agent_prefix }}/bin/MicroXRCEAgent --help"
+  environment:
+    LD_LIBRARY_PATH: "{{ xrce_agent_prefix }}/lib:/opt/ros/{{ ros_distro }}/lib"
+  register: xrce_help
+  # This upstream CLI returns 1 for --help; require the expected output too.
+  failed_when: xrce_help.rc not in [0, 1] or "Usage:" not in xrce_help.stdout
+  changed_when: false
 
 - name: Install MicroXRCEAgent systemd unit
   ansible.builtin.copy:
     dest: /etc/systemd/system/uav-xrce-agent.service
-    mode: "0644"
+    mode: '0644'
+    backup: true
     content: |
       [Unit]
       Description=uav_ansible Micro XRCE-DDS Agent (PX4 link, UDP)
@@ -39,12 +88,13 @@
       Wants=network-online.target
       [Service]
       Type=simple
-      ExecStart=/usr/local/bin/MicroXRCEAgent {{ xrce_agent_transport }} -p {{ xrce_agent_port }}
+      Environment=LD_LIBRARY_PATH={{ xrce_agent_prefix }}/lib:/opt/ros/{{ ros_distro }}/lib
+      ExecStart={{ xrce_agent_prefix }}/bin/MicroXRCEAgent {{ xrce_agent_transport }} -p {{ xrce_agent_port }}
       Restart=on-failure
       RestartSec=2
       [Install]
       WantedBy=multi-user.target
-  notify: Reload systemd
+  notify: Restart UAV XRCE agent
 
 - name: Enable the XRCE-DDS agent
   ansible.builtin.systemd:
@@ -52,3 +102,29 @@
     enabled: true
     state: started
     daemon_reload: true
+
+# --- FMU Ethernet transmit keepalive (see group_vars px4_link_keepalive_*) ---
+- name: Install the FMU transmit keepalive unit
+  ansible.builtin.template:
+    src: uav-xrce-keepalive.service.j2
+    dest: /etc/systemd/system/uav-xrce-keepalive.service
+    mode: '0644'
+  when: px4_link_keepalive_interval_ms | int > 0
+  notify: Restart XRCE keepalive
+
+- name: Enable the FMU transmit keepalive
+  ansible.builtin.systemd:
+    name: uav-xrce-keepalive.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: px4_link_keepalive_interval_ms | int > 0
+  ignore_errors: "{{ ansible_check_mode }}"   # check mode never wrote the unit
+
+- name: Remove the FMU transmit keepalive when disabled
+  ansible.builtin.systemd:
+    name: uav-xrce-keepalive.service
+    enabled: false
+    state: stopped
+  when: px4_link_keepalive_interval_ms | int <= 0
+  failed_when: false

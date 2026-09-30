@@ -1,5 +1,6 @@
+# Managed by uav_ansible.
 [Unit]
-Description=uav_ansible GNSS serial broker (single-port tee + RTCM inject)
+Description=uav_ansible GNSS fan-out (read-only: {{ gnss_serial }} -> localhost:{{ gnss_broker_port }})
 After=network.target
 
 [Service]
@@ -8,8 +9,27 @@ Environment=SERIAL_DEV={{ gnss_serial }}
 Environment=SERIAL_BAUD={{ gnss_baud }}
 Environment=PORT={{ gnss_broker_port }}
 ExecStart=/usr/bin/python3 /usr/local/bin/uav-gnss-broker.py
-Restart=on-failure
+Restart=always
 RestartSec=2
+
+# It reads one tty and serves localhost TCP; nothing else. A transient user in
+# dialout (DynamicUser implies ProtectSystem=strict, PrivateTmp, NoNewPrivileges),
+# no capabilities, and the device cgroup admits only serial ports. Not
+# PrivateDevices: that hides the real /dev, and the port with it.
+DynamicUser=yes
+SupplementaryGroups=dialout
+DevicePolicy=closed
+DeviceAllow=char-ttyACM rw
+DeviceAllow=char-ttyUSB rw
+CapabilityBoundingSet=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
 
 [Install]
 WantedBy=multi-user.target

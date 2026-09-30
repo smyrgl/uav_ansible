@@ -1,0 +1,91 @@
+---
+# nvblox (Isaac ROS 4.6) on the X950: D555 depth + colour and Avia LiDAR fused
+# into one GPU TSDF. User-facing knobs are mirrored in group_vars/all.yml; the
+# long tail lives here. Parameter names match `ros2 param dump /nvblox_node`
+# of the installed 4.6.0 binary (2026-09-27), nothing else is declared.
+nvblox_state: absent            # present | absent (retired POC; see README)
+nvblox_service_user: "{{ uav_ros_user | default('uav-ros') }}"
+nvblox_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+nvblox_config_path: /etc/uav/ros/nvblox.yaml
+nvblox_state_dir: /var/lib/uav-ros/nvblox          # save_ply / save_map outputs
+nvblox_node_name: nvblox_node
+nvblox_node_executable: "/opt/ros/{{ ros_distro }}/lib/nvblox_ros/nvblox_node"
+
+# --- frames -------------------------------------------------------------------
+nvblox_global_frame: odom          # map is built here; TF must reach every sensor frame
+nvblox_pose_frame: base_link       # map clearing + visualisation attachment frame
+# BENCH ONLY: publish a static identity odom->base_link so nvblox has a pose.
+# Replace with a real odometry publisher (PX4 EKF2 bridge, cuVSLAM) before flight.
+nvblox_bench_static_odom: true
+
+# --- inputs -------------------------------------------------------------------
+nvblox_d555_serial: "261622302751"
+nvblox_depth_image_topic: "/realsense/D555_{{ nvblox_d555_serial }}_Depth"
+# Frame-validated CameraInfo relay (roles/foxglove): the native topics interleave
+# depth and colour intrinsics, which would pair a colour K with a depth image.
+nvblox_depth_camera_info_topic: /d555/depth/camera_info
+nvblox_color_source_topic: "/realsense/D555_{{ nvblox_d555_serial }}_Color"
+nvblox_color_camera_info_source_topic: /d555/color/camera_info
+nvblox_color_rect_namespace: /d555/color/rect
+nvblox_color_image_topic: "{{ nvblox_color_rect_namespace }}/image"
+nvblox_color_camera_info_topic: "{{ nvblox_color_rect_namespace }}/camera_info"
+nvblox_color_max_rate_hz: 5.0      # YUY2->rgb8 + undistort only as fast as nvblox colours
+nvblox_pointcloud_topic: /avia/points
+nvblox_use_depth: true
+nvblox_use_color: true
+nvblox_use_lidar: true
+nvblox_input_qos: SENSOR_DATA      # the D555 and the Avia publish best effort
+
+# --- map ----------------------------------------------------------------------
+nvblox_voxel_size_m: 0.05
+nvblox_mapping_type: static_tsdf
+nvblox_esdf_mode: "3d"             # a UAV plans in 3D; "2d" gives the nav2-style slice
+nvblox_map_clearing_radius_m: 15.0 # blocks farther than this from base_link are freed
+nvblox_decay_tsdf_rate_hz: 0.0     # 0 = never forget; >0 fades unobserved geometry
+
+# --- Avia as an nvblox "LiDAR" -------------------------------------------------
+# nvblox's LiDAR is a 360 deg x vfov equiangular grid. The Avia fills a ~70x77 deg
+# patch of it; every point must fall inside the vertical FOV or nvblox rejects
+# the whole cloud (measured +-37.5 deg, spec 77.2 deg total -> 80 deg margin).
+# Angular pixel size sets the range at which the nearest-pixel fallback (0.5
+# voxel off-ray tolerance) still accepts voxels: 0.40 deg/px is good to ~5 m at
+# 5 cm voxels; use 1800 x 400 (0.20 deg/px) or 10 cm voxels for outdoor ranges.
+nvblox_lidar_width: 900            # 360/900 = 0.40 deg per column; must be even
+nvblox_lidar_height: 200           # 80 deg / 0.40 deg = 200 rows
+nvblox_lidar_vertical_fov_deg: 80.0
+nvblox_lidar_min_valid_range_m: 0.1
+
+# --- integration --------------------------------------------------------------
+nvblox_depth_max_integration_distance_m: 6.0   # D555 stereo depth trust horizon
+nvblox_lidar_max_integration_distance_m: 20.0  # Avia (450 m spec; bench room ~4 m)
+nvblox_truncation_distance_vox: 4.0
+nvblox_max_weight: 5.0
+nvblox_weighting_mode: inverse_square_tsdf_distance_penalty
+nvblox_raycast_subsampling_factor: 4
+nvblox_esdf_max_distance_m: 3.0    # planner clearance horizon
+nvblox_esdf_min_weight: 0.1
+nvblox_mesh_min_weight: 0.1
+
+# --- rates (nvblox compares MESSAGE stamps, so keep limits above sensor rates
+#     when every frame should integrate: 10 Hz clouds vs a 10 Hz limit drop half)
+nvblox_integrate_depth_rate_hz: 15.0   # D555 depth arrives at ~21 Hz -> every 2nd frame
+nvblox_integrate_color_rate_hz: 2.0
+nvblox_integrate_lidar_rate_hz: 20.0   # Avia clouds at 10 Hz -> all of them
+nvblox_update_mesh_rate_hz: 2.0
+nvblox_update_esdf_rate_hz: 2.0
+nvblox_publish_layer_rate_hz: 2.0
+nvblox_publish_debug_vis_rate_hz: 1.0
+nvblox_print_statistics_period_ms: 30000
+
+# --- visualisation (Foxglove renders the layer Marker cube lists natively) -----
+nvblox_layer_visualization_exclusion_radius_m: 15.0
+nvblox_layer_visualization_exclusion_height_m: 3.0
+nvblox_layer_streamer_bandwidth_limit_mbps: 20.0
+nvblox_max_back_projection_distance_m: 6.0
+
+# --- CUDA JIT cache -----------------------------------------------------------
+# The Isaac ROS 4.6 Jetson debs embed sm_75 SASS + PTX only; the Orin (sm_87)
+# JIT-compiles every kernel on first use (~90 s of initialisation, more at the
+# first integration). The cache must be persistent, writable and big enough.
+nvblox_cuda_cache_path: /var/lib/uav-ros/.nv/ComputeCache
+nvblox_cuda_cache_max_bytes: 1073741824

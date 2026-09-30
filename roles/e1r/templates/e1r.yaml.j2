@@ -1,0 +1,9 @@
+e1r_driver:
+  ros__parameters:
+    frame_id: "{{ e1r_frame_id }}"
+    lidar_ip: "{{ e1r_lidar_ip }}"
+    msop_port: {{ e1r_msop_port }}
+    difop_port: {{ e1r_difop_port }}
+    clock_status_path: "{{ e1r_clock_status_path }}"
+    difop_timeout_sec: {{ e1r_difop_timeout_sec | float }}
+    timestamp_tolerance_sec: {{ e1r_timestamp_tolerance_sec | float }}

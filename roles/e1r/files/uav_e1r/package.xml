@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>uav_e1r</name>
+  <version>0.1.0</version>
+  <description>E1R ROS 2 adapter around the pinned RoboSense decoder with verified gPTP to UTC timing.</description>
+  <!-- Placeholder contact for this local deployment package. -->
+  <maintainer email="maintainer@example.com">Local UAV package maintainer</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
+  <depend>diagnostic_msgs</depend>
+  <depend>nlohmann_json</depend>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

@@ -1,0 +1,36 @@
+---
+- name: Restart PTP status
+  ansible.builtin.systemd_service:
+    name: uav-ptp-status.service
+    state: restarted
+    daemon_reload: true
+
+# Listed before the restarts: notified handlers run in file order.
+- name: Apply DDS sysctl
+  ansible.builtin.command: sysctl -p /etc/sysctl.d/60-uav-dds.conf
+  changed_when: true
+
+- name: Discover installed ROS services
+  ansible.builtin.service_facts:
+  listen: Restart ROS inspection services
+
+- name: Restart running ROS inspection services
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    state: restarted
+    daemon_reload: true
+  loop:
+    - uav-description.service
+    - uav-e1r.service
+    - uav-avia.service
+    - uav-hflow.service
+    - uav-ekf-odom.service
+    - uav-ekf-map.service
+    - uav-navsat.service
+    - uav-gnss-ros.service
+    - uav-px4-bridge.service
+    - uav-foxglove.service
+    - uav-d555-depth-throttle.service
+    - uav-ros-health.service
+  when: item in ansible_facts.services and ansible_facts.services[item].state == 'running'
+  listen: Restart ROS inspection services

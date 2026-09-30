@@ -1,0 +1,11 @@
+#!/bin/bash
+set -e
+source /opt/ros/{{ ros_distro }}/setup.bash
+source {{ uav_ros_workspace }}/install/setup.bash
+# PX4's message types, for the H-Flow topics (the /fmu/ topics stay hidden by the whitelist).
+[ -f /opt/uav/px4_msgs/install/local_setup.bash ] && source /opt/uav/px4_msgs/install/local_setup.bash
+exec /opt/ros/{{ ros_distro }}/lib/foxglove_bridge/foxglove_bridge \
+  --ros-args --params-file /etc/uav/ros/foxglove.yaml \
+  --remap /realsense/D555_261622302751_Color/camera_info:=/d555/color/camera_info \
+  --remap /realsense/D555_261622302751_Depth/camera_info:=/d555/depth/camera_info
+

@@ -1,0 +1,28 @@
+---
+ros_health_user: uav-ros
+ros_health_workspace: /opt/uav/ros
+ros_health_environment: /etc/uav/ros/environment
+ros_health_config: /etc/uav/ros/health.yaml
+ros_health_d555_serial: "261622302751"
+ros_health_d555_color_topic: /realsense/D555_261622302751_Color
+ros_health_d555_depth_topic: /realsense/D555_261622302751_Depth
+ros_health_d555_camera_info_suffix: /camera_info   # watched instead of the images (bandwidth)
+ros_health_receipt_timeout_sec: 2.0
+ros_health_startup_grace_sec: 10.0
+ros_health_min_rate_hz: 15.0
+ros_health_rate_window_sec: 5.0
+ros_health_clock_tolerance_sec: 2.0
+ros_health_venv: /opt/uav/health-venv
+ros_health_pymavlink_version: "2.4.49"
+ros_health_avia_topic: /avia/points
+ros_health_e1r_topic: /e1r/points
+ros_health_mavlink_endpoint: tcp:127.0.0.1:5760
+ros_health_mavlink_source_system: 254
+ros_health_hflow_flow_topic: /hflow/sensor_optical_flow   # from uav-hflow (CAN listener)
+ros_health_hflow_range_topic: /hflow/range
+ros_health_hflow_min_quality: 20
+ros_health_gnss_broker_port: 28785
+ros_health_ptp_status_path: /run/uav/time/ptp-status.json
+# Official release/1.17, matching the Pixhawk firmware's message generation.
+ros_health_px4_workspace: /opt/uav/px4_msgs
+ros_health_px4_msgs_revision: 86d8239e962f6939e05c3737784f60c02fa884db

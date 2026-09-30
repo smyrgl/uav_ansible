@@ -1,4 +1,19 @@
 ---
+# Handlers run in file order; both of these listen for "Apply netplan".
+# NetworkManager reads netplan's udev hint (NM_UNMANAGED=1) only when a device
+# appears, so at runtime it keeps configuring the interfaces networkd is about
+# to own. Release them first (runtime only: from the next boot the udev hint
+# holds). A device that isn't present is skipped.
+- name: Release netplan's interfaces from NetworkManager
+  ansible.builtin.shell:
+    cmd: |
+      systemctl is-active --quiet NetworkManager || exit 0
+      for dev in {{ lan_interface }} {{ ptp_interface }}{{ (' ' ~ wifi_interface) if wifi_enabled else '' }}; do
+        nmcli device set "$dev" managed no 2>/dev/null || true
+      done
+  changed_when: true
+  listen: Apply netplan
+
 - name: Apply netplan
   ansible.builtin.command:
     cmd: netplan apply

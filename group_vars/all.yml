@@ -69,7 +69,8 @@ dev_tools_packages:
 # networking  (two L2 segments — NEVER bridged; see README)
 # =============================================================================
 netplan_renderer: "networkd"
-netplan_file: "/etc/netplan/60-uav.yaml"
+netplan_file: "/etc/netplan/60-uav.yaml"              # drone LAN + PTP segment
+netplan_uplink_file: "/etc/netplan/61-uav-uplink.yaml"  # wifi; applied first
 
 # General drone LAN (Siyi-forced subnet) on the Holybro switch / Realtek r8168.
 # The Jetson is the de-facto L3 gateway for this segment (it owns the wifi/NTRIP
@@ -137,13 +138,16 @@ kernel_dkms_drivers:
 # =============================================================================
 # device_tree  (overlays applied via the extlinux OVERLAYS key — require reboot)
 # Pins resolved from the NVIDIA Orin NX/Nano Pinmux Template v1.2 (signal names):
-#   GPIO11 (SODIMM 216) -> GPIO3_PQ.06 (soc_gpio33_pq6) -> 1PPS in    [hand overlay]
+#   GPIO07 (SODIMM 206) -> GPIO3_PG.06 (soc_gpio19_pg6) -> 1PPS in    [hand overlay]
 #   GPIO12 (SODIMM 218) -> GPIO3_PN.01 (soc_gpio39_pn1) -> PWM, hdr pin 15 [jetson-io]
+# (The PPS was planned on GPIO11 / PQ.06; the harness landed it on GPIO07.
+#  Both pads sit on the 1.8 V vddio_g4 rail at the SoC.)
 # =============================================================================
-# --- pps-gpio (GPIO11): hand-written overlay (pps-gpio node -> &gpio PQ.06) ---
-dt_pps_gpio_port: "Q"             # Tegra234 main GPIO port
-dt_pps_gpio_offset: 6             # line within the port (PQ.06)
-dt_pps_dt_pin_name: "soc_gpio33_pq6"
+# --- pps-gpio (GPIO07): hand-written overlay (pps-gpio node -> &gpio PG.06) ---
+dt_pps_sodimm_signal: "GPIO07 (SODIMM 206)"
+dt_pps_gpio_port: "G"             # Tegra234 main GPIO port
+dt_pps_gpio_offset: 6             # line within the port (PG.06)
+dt_pps_dt_pin_name: "soc_gpio19_pg6"
 # dt-bindings include dir — needed to preprocess the pps overlay's tegra234 macros.
 kernel_dt_include_dir: ""         # TODO: L4T kernel source include/ dir (has tegra234-gpio.h)
 # --- pwm (GPIO12): jetson-io-generated overlay, committed at files/pwm-hdr40.dts
@@ -156,37 +160,64 @@ dt_overlay_dtbos:
   - "{{ dt_pwm_dtbo }}"
   - "{{ dt_pps_dtbo }}"
 extlinux_conf: "/boot/extlinux/extlinux.conf"
+# The overlays live in the entry L4T itself keeps as DEFAULT: its kernel
+# postinst hook (nv-update-extlinux) resets DEFAULT to "primary" on every kernel
+# update — which is how a 39.2.0 -> 39.2.1 upgrade silently dropped overlays
+# kept in jetson-io's "JetsonIO" entry.
+dt_extlinux_label: "primary"
+dt_base_dtb: "/boot/dtb/kernel_tegra234-p3768-0000+p3767-0000-nv.dtb"
 
 # =============================================================================
-# time_sync  (gpsd -> chrony[+PPS] -> phc2sys -> ptp4l gPTP grandmaster)
+# time_sync  (GNSS SOCK + PPS -> chrony -> phc2sys -> ptp4l gPTP grandmaster)
 # =============================================================================
-pps_device: "/dev/pps0"
+pps_device: "/dev/gnss-pps"     # udev name for the pps-gpio source (device_tree
+                                # role): /dev/pps0 is the kernel's ktimer test source
 chrony_serve_subnets:           # who may pull NTP from us
   - "192.168.144.0/24"
 ptp_domain: 0
 ptp_profile: "gPTP"             # 802.1AS, for the Robosense E1R
 ptp_grandmaster_interface: "{{ ptp_interface }}"   # i226 carries the GM PHC
+# phc2sys initialises the PHC from the system clock once and then only slews
+# (i226: at most 6.25 %). A cold power-off loses this carrier's RTC, so the
+# boot clock is 1970 until chrony steps it (NTP on the bench, GNSS in the
+# field); a PHC set from that clock never catches up (observed: 56 years
+# behind, ETA ~900 years). Two guards (uav-phc2sys.service.j2):
+phc2sys_waitsync_tries: 12          # wait up to tries x 10 s for chrony to be
+phc2sys_waitsync_max_correction: 1.0  # synchronised within this many seconds
+                                    # before the PHC is initialised (non-fatal)
+phc2sys_step_threshold: 1.0         # -S: step the PHC when the system clock
+                                    # is later stepped by more than this
 
 # =============================================================================
-# gnss  (Path B: a broker owns ONE receiver serial; tees reads, relays writes)
-# Works for the Septentrio G5 (production) or a u-blox/Unicore unit (bench) —
-# gpsd auto-detects NMEA/UBX/SBF, so the time path is identical.
+# gnss  (one reader on the receiver's data port; a read-only fan-out serves it)
+# The receiver speaks SBF only: the ROS driver needs it for full covariances,
+# and the time is read from it too (uav-gnss-time: ReceiverTime -> chrony).
+# A u-blox bench unit still gets /dev/gnss and the fan-out, but no GNSS time
+# source: chrony stays on the network pool.
 # =============================================================================
-gnss_serial: "/dev/gnss"        # the broker opens this (the udev symlink below).
+gnss_serial: "/dev/gnss"        # the fan-out opens this (the udev symlink below).
                                 # For first bench bring-up before the udev rule,
                                 # set to the raw path: ls /dev/ttyACM* /dev/ttyUSB*
 gnss_baud: 115200               # ignored by USB CDC receivers (both below)
 gnss_udev_symlink: "gnss"       # udev creates /dev/gnss
 # Receivers the udev rule recognises: USB vendor ID plus the CDC interface that
 # carries the data stream. /dev/gnss points at whichever is plugged in.
-# Septentrio exposes two interfaces and the stream is on 02 (00 is silent);
-# u-blox exposes one. `lsusb` for the VID, `udevadm info` for the interface.
+# Septentrio exposes two: 02 (USB2) streams SBF out, 00 (USB1) is the command
+# port, which drone-link holds to write RTCM in. u-blox exposes one.
+# `lsusb` for the VID, `udevadm info` for the interface.
 gnss_udev_receivers:
   - { vendor: "152a", interface: "02", name: "Septentrio mosaic (production)" }
   - { vendor: "1546", interface: "00", name: "u-blox X20P / F9P (bench)" }
-gnss_broker_port: 28785         # broker's bidirectional localhost port: gpsd
-                                # and the ROS driver read the stream here;
-                                # drone-link-connect writes RTCM to it.
+gnss_broker_port: 28785         # the fan-out's localhost port, READ-ONLY:
+                                # the time feed, the ROS driver and diagnostics
+                                # read the SBF stream here; what a client sends
+                                # is discarded (RTCM goes in on USB1).
+gnss_time_sock: "/run/chrony.gnss.sock"  # chrony's SOCK refclock; chronyd
+                                # creates it (AppArmor allows /run/chrony.*.sock)
+gnss_time_offset: 0.0           # seconds added to each GNSS time sample: its
+                                # arrival latency. Calibrate once PPS is the
+                                # selected source: `chronyc sources` then shows
+                                # the GPS line's offset, which is this latency.
 # RTK corrections: drone-link, enrolled by the station's one-liner AFTER this
 # converge (README, "RTK corrections"). Deliberately not an Ansible artifact:
 # the enrollment spends a single-use token and mints a key, so a converge cannot
@@ -208,9 +239,59 @@ ros2_setup_global: true         # source /opt/ros/<distro> from /etc/profile.d
 # The agent binds all interfaces (udp4), so no bind address is needed here.
 # =============================================================================
 xrce_agent_repo: "https://github.com/eProsima/Micro-XRCE-DDS-Agent.git"
-xrce_agent_version: "v3.0.1"
+# PX4 1.17 uses XRCE client 2.x; Jazzy requires the 2.4.3 agent / Fast DDS 2.14.
+xrce_agent_version: "v2.4.3"
 xrce_agent_transport: "udp4"
 xrce_agent_port: 8888
+px4_ip: "192.168.144.2"
+# FMU Ethernet transmit keepalive (uav-xrce-keepalive): a stream of ICMP echo
+# requests to PX4. Measured 2026-09-30 on fmu-v6x: with a quiet link the XRCE
+# data leaves the FMU in ~10 bursts/s with gaps up to 450 ms (vehicle_attitude
+# arriving at 8.5 Hz, timesync RTT 371 ms); with 50 Hz of pings, 25 bursts/s
+# and a worst gap of 34 ms. Cause: NuttX queues UDP sends in write buffers that
+# the STM32H7 Ethernet driver drains only on a device poll, and its
+# "Tx available" notification is dropped whenever the poll work item is busy,
+# so queued data waits for the next inbound frame's TX-complete poll (roles/
+# px4_link/README.md). ~27 kbit/s of ICMP. 0 disables the unit.
+px4_link_keepalive_interval_ms: 20
+
+# =============================================================================
+# mavlink_router  (MAVLink hub: PX4 <-> GCS (QGC) <-> onboard apps)
+# PX4 side = the baseboard's internal UART: Pixhawk TELEM2 <-> Jetson UART1
+# (/dev/ttyTHS1). PX4 drives it with its TELEM2 MAVLink instance (stock
+# fmu-v6x: MAV_1_CONFIG=102); SER_TEL2_BAUD must equal the baud below.
+# Why the UART and not PX4's Ethernet MAVLink instance (bench, 2026-09-30):
+#   - A UDP MAVLink instance LATCHES the first peer that talks to it (3 s after
+#     the instance starts) and unicasts only to that address:port until PX4
+#     reboots. Any GCS on the drone LAN (the Siyi's) can win that race, and
+#     the router is then deaf until the next FC reboot. A UART has one peer.
+#   - PX4's Ethernet transmit path on fmu-v6x is starved: NuttX queues UDP
+#     sends in a 24-IOB pool that the XRCE-DDS client already fills, and the
+#     STM32H7 driver drains it only on a device poll (see px4_link_keepalive).
+#     MAVLink on the UART leaves that path to XRCE alone.
+# The "udp" link keeps the fixed-port server-endpoint answer to the latch race
+# (a Normal/client endpoint never binds, so each router restart would talk
+# from a new ephemeral port and PX4 would keep sending to the dead one).
+# Rule either way: nothing but this router talks to PX4 MAVLink directly.
+# With the UART in use, retire the Ethernet instance on the FC (this FC:
+# MAV_0_CONFIG=0) so it stops broadcasting and stops competing for IOBs.
+# =============================================================================
+mavlink_router_repo: "https://github.com/mavlink-router/mavlink-router.git"
+# v4 (2023-11) + 16 commits. v4 itself fails on Noble's GCC 13: src/dedup.h
+# uses uint32_t with only <memory> included, which no longer drags in <cstdint>.
+mavlink_router_version: "2362c620f483cef1edd574fb962a373a288e4b9e"
+mavlink_router_px4_link: "serial"   # "serial" = TELEM2 UART below; "udp" = PX4 Ethernet instance
+mavlink_router_px4_serial_device: "/dev/ttyTHS1"   # Jetson UART1 = Pixhawk TELEM2 (baseboard-internal)
+mavlink_router_px4_serial_baud: 921600             # = PX4 SER_TEL2_BAUD
+mavlink_router_px4_port: 14550      # udp link only: = PX4 MAV_n_REMOTE_PRT (where PX4 broadcasts)
+mavlink_router_tcp_port: 5760       # GCS: QGC -> Comm Links -> TCP -> <jethawk>:5760
+mavlink_router_onboard_port: 14540  # onboard apps listen on 127.0.0.1:14540 (MAVSDK default)
+mavlink_router_dedup_ms: 100        # udp link only: PX4 unicast + broadcast copies (main.conf.j2)
+# UDP GCS targets the router pushes to; QGC auto-connects on its default 14550.
+# For the flight GCS on the drone segment (read the handheld's own address):
+#   - { name: "siyi", address: "192.168.144.X", port: 14550 }
+# A bench laptop's DHCP address belongs in /etc/mavlink-router/config.d/, not here.
+mavlink_router_gcs_endpoints: []
 
 # =============================================================================
 # rt_tuning  (soft-RT: isolation, SCHED_FIFO, mlock, IRQ affinity, governor)
@@ -224,4 +305,170 @@ rt_memlock_unlimited: true      # raise memlock + rtprio limits for target_user
 # Parked roles (opt-in only)
 # =============================================================================
 enable_rt_kernel: false
-enable_isaac_ros: false
+
+# =============================================================================
+# D555 native ROS2 RGB -> NVENC RTSP + MAVLink Camera Protocol v2
+# =============================================================================
+mavlink_camera_root: "/home/{{ target_user }}/uav-camera"
+mavlink_camera_storage: "/home/{{ target_user }}/camera-media"
+mavlink_camera_image_topic: "/realsense/D555_261622302751_Color"
+mavlink_camera_ros_domain: 0
+mavlink_camera_lan_mtu: 9000       # D555 nativeDDS ingress only; RTP packets <=1200B
+mavlink_camera_codec: "h265"      # h264 is the compatibility alternative
+# H.265 at the D555's native colour profile (below). The UniRC 7 Pro carries
+# 65 Mbit/s and decodes 4K30; 8 Mbit/s is generous for 1280x800@30 and leaves
+# the link for telemetry. Raise for detail, lower for range.
+mavlink_camera_bitrate: 8000000
+mavlink_camera_fps: 30
+# The same NVENC access units, republished as foxglove_msgs/CompressedVideo
+# for the Foxglove dashboard (format = mavlink_camera_codec). Never point a
+# panel at the D555's own /realsense/<serial>_Color/compressed or /h264: a
+# single subscriber there throttles the imager (and so RTSP) to ~3.5 fps and
+# the camera replays stale width*height-byte buffers (measured 2026-09-30).
+mavlink_camera_video_topic: "/d555/color/video"
+mavlink_camera_video_frame_id: "camera_color_optical_frame"   # label only; the image is rotated by mavlink_camera_rotation_degrees
+# The D555 is a ROS 2 node; its stream profiles are ROS parameters
+# (`ros2 param describe /D555_<serial> RGB.Profile` lists the choices). The RGB
+# imager is 1280x800; the camera shipped streaming 896x504. A user-scope unit
+# (uav-d555-profile) sets these at boot so the camera state is declared here,
+# not left to whatever the camera remembers. Bandwidth: 1280x800 YUY2 at 30 Hz
+# is ~500 Mbit/s per subscriber, which is why the camera pipeline must be the
+# only image subscriber (health watches CameraInfo; nvblox is retired).
+d555_serial: "261622302751"
+d555_rgb_profile: "yuv, 1280, 800, 30"
+d555_depth_profile: "z16, 896, 504, 30"
+d555_profile_attempts: 30              # x 10 s: the camera may boot after the Jetson
+mavlink_camera_rtsp_port: 8554
+# Host part of the advertised stream URI (VIDEO_STREAM_INFORMATION). The server
+# binds every interface, so the name lets one URI work on the house Wi-Fi and
+# on the drone LAN, provided the GCS resolves it (home DNS / mDNS `.local`).
+# A GCS on the Siyi link has no resolver: set the LAN address there
+# (lan_address without its prefix) or add a hosts entry on that device.
+mavlink_camera_rtsp_host: "{{ system_hostname }}"
+mavlink_camera_system_id: 1
+mavlink_camera_component_id: 100
+mavlink_camera_rotation_degrees: 180
+
+# =============================================================================
+# px4_bridge  (uORB -> ROS-native ENU/FLU), gnss_ros (Septentrio ROS 2 driver
+# on the SBF fan-out), localization (robot_localization, informational).
+# PX4's own EKF output is republished for comparison, never fused; GNSS comes
+# from the Jetson's receiver (full covariances), never from PX4.
+# =============================================================================
+px4_bridge_prefix: "/px4"
+px4_bridge_imu_frame: "fmu_housing_link"   # URDF frame of the Pixhawk housing (not IMU-calibrated)
+px4_bridge_odom_frame: "px4_local"         # PX4 EKF2's own local frame, distinct from our odom/map
+gnss_ros_namespace: "/gnss"
+gnss_ros_frame_id: "gnss_main_link"
+gnss_ros_aux1_frame_id: "gnss_aux_link"
+localization_imu_topic: "/px4/imu/data"
+localization_gps_topic: "/gnss/navsatfix"
+
+# =============================================================================
+# ROS inspection services (systemd system units, unprivileged runtime account)
+# =============================================================================
+uav_ros_user: "uav-ros"
+uav_ros_workspace: "/opt/uav/ros"
+uav_ros_environment_file: "/etc/uav/ros/environment"
+uav_ros_domain: 0
+# DDS socket receive buffers. The D555 delivers ~200 Mbit/s per image
+# subscription in 9 kB datagrams; the kernel default (net.core.rmem_max
+# 212992) is 1.8 ms of that, and every scheduling hiccup dropped fragments
+# (nvblox: 8.4 k dropped datagrams in one boot). Cyclone asks for the size
+# below (best effort: it settles for the kernel ceiling, so services never
+# fail on a box without the sysctl); the sysctl lets it have it.
+dds_socket_rcvbuf: "16MB"
+dds_rmem_max: 33554432
+# Every interface, like the router's TCP port: Foxglove on the house Wi-Fi
+# connects to ws://jethawk:8765 and a GCS on the Siyi link to the drone-LAN
+# address, with no host route or tunnel. The bridge has no authentication:
+# it is reachable by whoever can reach the Jetson. Set the drone-LAN address
+# here to confine it to that segment again.
+foxglove_bind_address: "0.0.0.0"
+foxglove_port: 8765
+# Per-client send queue (messages). Must exceed the number of meshes in the
+# URDF (42) plus the images a layout streams while a model loads; the SDK
+# disconnects a client whose queue cannot take a fetch-asset response. Larger
+# values delay health messages behind queued images on a saturated link.
+foxglove_message_backlog_size: 128
+# Dashboard depth: the D555 has no compressed depth, so a topic_tools relay
+# republishes the single raw copy at this rate for Foxglove (colour uses the
+# camera's own H.264 stream).
+foxglove_depth_throttle_hz: 2.0
+# The airframe description (Blender + LinkForge authoring, exported ROS
+# package) lives in this repository: x950_description/ at the root.
+robot_description_source_dir: "{{ playbook_dir }}/x950_description"
+
+# =============================================================================
+# hflow  (Holybro H-Flow on the FC's CAN2 bus, which the baseboard also wires
+# to the Jetson's can0). The Jetson is a LISTEN-ONLY observer: it never ACKs
+# or transmits, so it cannot disturb the flight-critical DroneCAN bus that PX4
+# (node 10) and the H-Flow (node 124) share. The observer decodes the flow and
+# range messages with pydronecan and republishes PX4's own message types (what
+# PX4 builds from the same frames) plus a sensor_msgs/Range companion.
+# =============================================================================
+hflow_can_interface: "can0"
+hflow_can_bitrate: 1000000          # = PX4 UAVCAN_BITRATE
+hflow_node_id: 124                  # DroneCAN source node accepted (0 = any)
+hflow_dronecan_version: "1.0.27"
+hflow_topic_prefix: "/hflow"
+hflow_flow_frame: "hflow_nominal_frd_frame"      # PX4/DroneCAN sensor axes (URDF)
+hflow_range_frame: "hflow_nominal_range_frame"   # +x along the beam (URDF)
+hflow_range_min_m: 0.08
+hflow_range_max_m: 30.0
+
+# =============================================================================
+# isaac_ros  (NVIDIA Isaac ROS apt repository + pinned perception packages)
+# Isaac ROS 4.6 ships native Jazzy debs for JetPack 7.2 (noble-jetpack); there
+# is no Docker in this path. Three pins make it reproducible: the release is the
+# repository path, the signing key is checked by fingerprint before the keyring
+# is trusted, and the package version is installed as pkg=version.
+# =============================================================================
+# Retired 2026-09-30 with the nvblox POC: both roles now enforce "absent"
+# (packages, apt source, units and helpers removed). Set present to bring the
+# POC back; the code and its findings stay in roles/nvblox/README.md.
+isaac_ros_state: "absent"
+nvblox_state: "absent"
+isaac_ros_release: "release-4.6"
+isaac_ros_apt_suite: "noble-jetpack"
+isaac_ros_key_fingerprints:
+  - "428F5D2ACFBC9AA1F8EAC84658F4DA023E691207"   # Isaac ROS Buildfarm Repository Signing (2026-07-10)
+  - "9EEB7195A4BD947C572666F9BBE5EA6DE681BCAB"   # Alexander Poddubny, Isaac ROS Buildfarm (2023-09-05)
+isaac_ros_package_version: "4.6.0-0noble.20260818193828000"
+isaac_ros_packages:
+  - "ros-{{ ros_distro }}-nvblox-ros"
+  - "ros-{{ ros_distro }}-nvblox-msgs"
+
+# =============================================================================
+# nvblox  (Isaac ROS 3D reconstruction: D555 depth + colour and Avia LiDAR
+# fused into one GPU TSDF; coloured surface voxels + 3D ESDF for Foxglove and
+# for a future planner). Long-tail tunables: roles/nvblox/defaults/main.yml.
+#
+# POSE SOURCE IS A BENCH STAND-IN: uav-bench-odom publishes a static identity
+# odom->base_link. nvblox therefore maps a static scene from a static aircraft.
+# Replace it with real odometry (PX4 EKF2 bridge or cuVSLAM) before flight and
+# set nvblox_bench_static_odom to false; nothing else in the config changes.
+#
+# Time bases: the D555 stamps in device uptime, the Avia in host receipt time,
+# nvblox output in ROS time. With an all-static TF tree that is harmless; the
+# moment odom->base_link moves, every sensor stamp must be in ROS/UTC time.
+# =============================================================================
+nvblox_bench_static_odom: true
+nvblox_d555_serial: "261622302751"
+nvblox_use_color: true
+nvblox_use_lidar: true
+nvblox_voxel_size_m: 0.05
+nvblox_esdf_mode: "3d"
+nvblox_map_clearing_radius_m: 15.0
+# Avia through nvblox's spinning-LiDAR model: a 360 deg x vfov equiangular grid
+# of which the Avia fills a ~70x77 deg patch. Every point must fall inside the
+# vertical FOV or the whole cloud is rejected (measured +-37.5 deg, spec 77.2
+# deg total). The nearest-pixel fallback accepts a voxel only within 0.5 voxel
+# of the pixel-centre ray, so the angular pixel must stay finer than about
+# voxel/(sqrt(2) R): 0.40 deg/px is right to ~5 m at 5 cm voxels; for outdoor
+# ranges use width 1800/height 400 (0.20 deg/px) or 10 cm voxels.
+nvblox_lidar_width: 900                   # must be even
+nvblox_lidar_height: 200                  # = vfov / (360 / width)
+nvblox_lidar_vertical_fov_deg: 80.0
+nvblox_depth_max_integration_distance_m: 6.0    # D555 stereo depth trust horizon
+nvblox_lidar_max_integration_distance_m: 20.0   # Avia (450 m spec; bench room ~4 m)

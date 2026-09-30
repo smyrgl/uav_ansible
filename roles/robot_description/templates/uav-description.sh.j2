@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+source /opt/ros/{{ ros_distro }}/setup.bash
+source {{ uav_ros_workspace }}/install/setup.bash
+exec ros2 launch x950_description headless.launch.py \
+  config_file:=/etc/uav/ros/description.yaml
+

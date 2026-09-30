@@ -1,0 +1,90 @@
+---
+- name: Install the ROS Foxglove bridge
+  ansible.builtin.apt:
+    name:
+      - "ros-{{ ros_distro }}-foxglove-bridge"
+      - "ros-{{ ros_distro }}-rclpy"
+      - "ros-{{ ros_distro }}-sensor-msgs"
+      - "ros-{{ ros_distro }}-topic-tools"      # depth relay (throttle) for the dashboard
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create Foxglove configuration and executable directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - /etc/uav/ros
+    - /usr/local/libexec
+    - /usr/local/lib/uav
+
+- name: Install D555 CameraInfo frame-name adapter
+  ansible.builtin.copy:
+    src: d555_frame_adapter.py
+    dest: /usr/local/lib/uav/d555_frame_adapter.py
+    mode: "0755"
+  notify: Restart D555 frame adapter
+
+- name: Install persistent D555 CameraInfo adapter service
+  ansible.builtin.template:
+    src: uav-d555-frames.service.j2
+    dest: /etc/systemd/system/uav-d555-frames.service
+    mode: "0644"
+  notify: Restart D555 frame adapter
+
+- name: Enable D555 CameraInfo adapter at boot
+  ansible.builtin.systemd_service:
+    name: uav-d555-frames.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Install the dashboard depth relay ({{ foxglove_depth_throttle_hz }} Hz)
+  ansible.builtin.template:
+    src: uav-d555-depth-throttle.service.j2
+    dest: /etc/systemd/system/uav-d555-depth-throttle.service
+    mode: "0644"
+  notify: Restart depth relay
+
+- name: Enable the dashboard depth relay at boot
+  ansible.builtin.systemd_service:
+    name: uav-d555-depth-throttle.service
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Configure Foxglove (bind address, whitelists, capabilities)
+  ansible.builtin.template:
+    src: foxglove.yaml.j2
+    dest: /etc/uav/ros/foxglove.yaml
+    mode: "0644"
+  notify: Restart uav-foxglove
+
+- name: Install the starter Foxglove bench layout
+  ansible.builtin.copy:
+    src: x950-bench-layout.json
+    dest: /etc/uav/ros/x950-bench-layout.json
+    mode: "0644"
+
+- name: Install the Foxglove launcher
+  ansible.builtin.template:
+    src: uav-foxglove.sh.j2
+    dest: /usr/local/libexec/uav-foxglove
+    mode: "0755"
+  notify: Restart uav-foxglove
+
+- name: Install the Foxglove system service
+  ansible.builtin.template:
+    src: uav-foxglove.service.j2
+    dest: /etc/systemd/system/uav-foxglove.service
+    mode: "0644"
+  notify: Restart uav-foxglove
+
+- name: Enable Foxglove at boot
+  ansible.builtin.systemd:
+    name: uav-foxglove.service
+    enabled: true
+    state: started
+    daemon_reload: true

@@ -1,0 +1,32 @@
+# Managed by uav_ansible (localization). REP-105 odom layer: continuous
+# sources only (IMU now; visual/LiDAR/flow odometry later), publishes
+# odom -> base_link. Never fed an absolute (GNSS) position: odom must not jump.
+/**:
+  ros__parameters:
+    world_frame: odom
+    frequency: {{ localization_frequency_hz | float }}
+    sensor_timeout: 0.5
+    two_d_mode: false
+    transform_time_offset: 0.0
+    transform_timeout: 0.0
+    print_diagnostics: true
+    publish_tf: true
+    publish_acceleration: false
+    map_frame: map
+    odom_frame: odom
+    base_link_frame: base_link
+    # IMU: orientation and angular velocity only. PX4's sensor_combined is raw
+    # (not bias-corrected); with no translational source its integrated
+    # acceleration drifted 250 m in a minute. Enable the last three once a
+    # position source is fused and the IMU covariances are trusted.
+    imu0: {{ localization_imu_topic | to_json }}
+    imu0_config: [false, false, false,
+                  true,  true,  true,
+                  false, false, false,
+                  true,  true,  true,
+                  false, false, false]
+    imu0_differential: false
+    imu0_relative: false
+    imu0_queue_size: 50
+    imu0_remove_gravitational_acceleration: true
+    use_control: false

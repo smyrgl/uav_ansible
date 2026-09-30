@@ -1,4 +1,13 @@
 ---
-- name: Reload systemd
+- name: Restart UAV XRCE agent
   ansible.builtin.systemd:
+    name: uav-xrce-agent.service
+    state: restarted
     daemon_reload: true
+
+- name: Restart XRCE keepalive
+  ansible.builtin.systemd:
+    name: uav-xrce-keepalive.service
+    state: restarted
+    daemon_reload: true
+  ignore_errors: "{{ ansible_check_mode }}"   # check mode never wrote the unit

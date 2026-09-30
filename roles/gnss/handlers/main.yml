@@ -16,7 +16,13 @@
     state: restarted
     daemon_reload: true
 
-- name: Restart gpsd
+- name: Restart gnss time feed
   ansible.builtin.systemd:
-    name: gpsd
+    name: uav-gnss-time.service
     state: restarted
+    daemon_reload: true
+
+- name: Load cdc_acm now
+  community.general.modprobe:
+    name: cdc_acm
+    state: present

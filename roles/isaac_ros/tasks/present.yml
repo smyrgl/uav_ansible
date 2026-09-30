@@ -1,0 +1,96 @@
+---
+# NVIDIA Isaac ROS ships native Jazzy debs for JetPack 7.2 from its own apt
+# repository (the old "Docker only" assumption is gone). Three things are pinned
+# so a converge is reproducible: the release (repository path), the signing key
+# (fingerprints, checked before the keyring is trusted) and the package version.
+- name: Install repository tooling
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create a scratch directory for the repository key
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: .isaac-ros-key
+  register: isaac_ros_scratch
+  changed_when: false
+
+- name: Download the Isaac ROS repository signing key
+  ansible.builtin.get_url:
+    url: "{{ isaac_ros_key_url }}"
+    dest: "{{ isaac_ros_scratch.path }}/repos.key"
+    mode: "0644"
+  changed_when: false
+
+- name: Read the fingerprints carried by the downloaded key
+  ansible.builtin.command:
+    argv:
+      - gpg
+      - --batch
+      - --no-default-keyring
+      - --show-keys
+      - --with-colons
+      - "{{ isaac_ros_scratch.path }}/repos.key"
+  environment:
+    GNUPGHOME: "{{ isaac_ros_scratch.path }}"
+  register: isaac_ros_key_listing
+  changed_when: false
+
+- name: Refuse a key that does not carry the pinned fingerprints
+  ansible.builtin.assert:
+    that: >-
+      isaac_ros_key_fingerprints | difference(
+        isaac_ros_key_listing.stdout_lines | select('match', '^fpr:')
+        | map('regex_replace', '^fpr:+([0-9A-F]+):*$', '\\1') | list
+      ) | length == 0
+    fail_msg: >-
+      {{ isaac_ros_key_url }} does not carry every fingerprint in
+      isaac_ros_key_fingerprints. Verify NVIDIA's key out of band before
+      updating the pin.
+    quiet: true
+
+- name: Dearmor the verified key
+  ansible.builtin.command:
+    argv:
+      - gpg
+      - --batch
+      - --yes
+      - --dearmor
+      - -o
+      - "{{ isaac_ros_scratch.path }}/nvidia-isaac-ros.gpg"
+      - "{{ isaac_ros_scratch.path }}/repos.key"
+  environment:
+    GNUPGHOME: "{{ isaac_ros_scratch.path }}"
+  changed_when: false
+
+- name: Install the keyring
+  ansible.builtin.copy:
+    src: "{{ isaac_ros_scratch.path }}/nvidia-isaac-ros.gpg"
+    dest: "{{ isaac_ros_keyring }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0644"
+
+- name: Remove the scratch directory
+  ansible.builtin.file:
+    path: "{{ isaac_ros_scratch.path }}"
+    state: absent
+  changed_when: false
+
+- name: Configure the Isaac ROS apt source
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by={{ isaac_ros_keyring }}] {{ isaac_ros_apt_url }} {{ isaac_ros_apt_suite }} main"
+    filename: nvidia-isaac-ros
+    state: present
+    update_cache: true
+
+- name: Install the pinned Isaac ROS packages
+  ansible.builtin.apt:
+    name: "{{ isaac_ros_packages | map('regex_replace', '$', '=' ~ isaac_ros_package_version) | list }}"
+    state: present

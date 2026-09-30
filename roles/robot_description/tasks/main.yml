@@ -1,0 +1,111 @@
+---
+- name: Check the description source package on the controller
+  ansible.builtin.stat:
+    path: "{{ robot_description_source_dir }}/urdf/x950.urdf.xacro"
+  delegate_to: localhost
+  become: false
+  register: x950_source_xacro
+
+- name: Require an exported X950 description package
+  ansible.builtin.assert:
+    that: x950_source_xacro.stat.exists
+    fail_msg: >-
+      Set robot_description_source_dir to the exported x950_description package
+      on the Ansible controller before deploying the description.
+
+- name: Install headless description dependencies
+  ansible.builtin.apt:
+    name:
+      - "ros-{{ ros_distro }}-robot-state-publisher"
+      - "ros-{{ ros_distro }}-xacro"
+      - "ros-{{ ros_distro }}-ament-cmake"
+      - "ros-{{ ros_distro }}-launch-ros"
+      - python3-colcon-common-extensions
+      - python3-yaml
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create description workspace and runtime directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ uav_ros_workspace }}/src/x950_description"
+    - /etc/uav/ros
+    - /usr/local/libexec
+
+# Do not copy the Blender project, scripts, or intermediate CAD exports.
+- name: Copy the exported description package runtime files
+  ansible.builtin.copy:
+    src: "{{ robot_description_source_dir }}/{{ item }}"
+    dest: "{{ uav_ros_workspace }}/src/x950_description/"
+    mode: preserve
+  loop:
+    - CMakeLists.txt
+    - package.xml
+    - README.md
+    - config
+    - docs
+    - launch
+    - meshes
+    - rviz
+    - urdf
+  register: x950_runtime_sources
+
+- name: Install the headless description launch file
+  ansible.builtin.copy:
+    src: headless.launch.py
+    dest: "{{ uav_ros_workspace }}/src/x950_description/launch/headless.launch.py"
+    mode: "0644"
+  register: x950_headless_launch
+
+- name: Check for the installed description
+  ansible.builtin.stat:
+    path: "{{ uav_ros_workspace }}/install/share/x950_description/launch/headless.launch.py"
+  register: x950_installed
+
+# This role and the E1R role build selected packages sequentially in the same
+# merge-install workspace. Do not run two deployments of this workspace at once.
+- name: Build and install the description package
+  ansible.builtin.shell:
+    cmd: |
+      set -e
+      source /opt/ros/{{ ros_distro }}/setup.bash
+      colcon build --merge-install --packages-select x950_description
+    chdir: "{{ uav_ros_workspace }}"
+    executable: /bin/bash
+  when: >-
+    x950_runtime_sources is changed or x950_headless_launch is changed
+    or not x950_installed.stat.exists
+  notify: Restart uav-description
+
+- name: Configure nominal description frame aliases and pose overrides
+  ansible.builtin.template:
+    src: description.yaml.j2
+    dest: /etc/uav/ros/description.yaml
+    mode: "0644"
+  notify: Restart uav-description
+
+- name: Install the description launcher
+  ansible.builtin.template:
+    src: uav-description.sh.j2
+    dest: /usr/local/libexec/uav-description
+    mode: "0755"
+  notify: Restart uav-description
+
+- name: Install the description system service
+  ansible.builtin.template:
+    src: uav-description.service.j2
+    dest: /etc/systemd/system/uav-description.service
+    mode: "0644"
+  notify: Restart uav-description
+
+- name: Enable the description publisher at boot
+  ansible.builtin.systemd:
+    name: uav-description.service
+    enabled: true
+    state: started
+    daemon_reload: true
+

@@ -1,0 +1,16 @@
+# Managed by uav_ansible (hflow).
+uav_hflow:
+  ros__parameters:
+    can_interface: {{ hflow_can_interface | to_json }}
+    can_bitrate: {{ hflow_can_bitrate | int }}
+    node_id: {{ hflow_node_id | int }}
+    topic_prefix: {{ hflow_topic_prefix | to_json }}
+    flow_frame_id: {{ hflow_flow_frame | to_json }}
+    range_frame_id: {{ hflow_range_frame | to_json }}
+    range_min_m: {{ hflow_range_min_m | float }}
+    range_max_m: {{ hflow_range_max_m | float }}
+    range_h_fov_rad: {{ (hflow_range_h_fov_deg | float) * 0.017453292519943295 }}
+    range_v_fov_rad: {{ (hflow_range_v_fov_deg | float) * 0.017453292519943295 }}
+    max_flow_rate_rad_s: {{ hflow_max_flow_rate_rad_s | float }}
+    distance_max_age_sec: {{ hflow_distance_max_age_sec | float }}
+    stale_sec: {{ hflow_stale_sec | float }}

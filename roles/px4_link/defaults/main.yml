@@ -1,0 +1,4 @@
+---
+xrce_agent_prefix: "/opt/uav/xrce-agent/{{ xrce_agent_version }}"
+xrce_agent_source: "/opt/uav/xrce-agent/src-{{ xrce_agent_version }}"
+xrce_agent_build_jobs: 4

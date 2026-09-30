@@ -4,21 +4,29 @@
 #include <dt-bindings/gpio/tegra234-gpio.h>
 #include <dt-bindings/gpio/gpio.h>   /* GPIO_ACTIVE_HIGH */
 
-/* PPS input — Mosaic 1PPS -> /dev/pps0
+/* PPS input — mosaic 1PPS -> pps-gpio -> {{ pps_device }} (udev name, 99-gnss-pps.rules)
  * Resolved from NVIDIA Orin NX/Nano Pinmux Template v1.2:
- *   SODIMM signal GPIO11 (pin 216) -> SOC ball GP66 -> GPIO3_PQ.06 ({{ dt_pps_dt_pin_name }})
+ *   SODIMM signal {{ dt_pps_sodimm_signal }} -> GPIO3_P{{ dt_pps_gpio_port }}.0{{ dt_pps_gpio_offset }} ({{ dt_pps_dt_pin_name }})
  * Main GPIO controller label is &gpio (gpio@2200000); port {{ dt_pps_gpio_port }} is a main port.
  */
 / {
     overlay-name = "uav-pps-gpio";
+    /* Name the board, as jetson-io's overlays do: L4T's UEFI matches an
+     * overlay to the board by compatible. Read from the running device tree. */
+    compatible = "{{ dt_board_compatible }}";
 
     fragment@0 {
         target-path = "/";
         __overlay__ {
+            /* The kernel names this source "pps.-1" after the node, and
+             * 99-gnss-pps.rules finds it by that name: rename both together. */
             pps {
                 compatible = "pps-gpio";
                 gpios = <&gpio TEGRA234_MAIN_GPIO({{ dt_pps_gpio_port }}, {{ dt_pps_gpio_offset }}) GPIO_ACTIVE_HIGH>;
-                assert-rising-edge;   /* Mosaic PPS is a rising-edge pulse */
+                /* Rising edge asserts (the default; the binding only has
+                 * assert-falling-edge): mosaic PPS is Low2High. No clear-edge
+                 * capture: this kernel's pps-gpio takes that from platform
+                 * data only, never from the device tree. */
                 status = "okay";
             };
         };

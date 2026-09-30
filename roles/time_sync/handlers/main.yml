@@ -4,9 +4,13 @@
     daemon_reload: true
 
 - name: Restart chrony
+  # daemon_reload here, not via "Reload systemd": handler names are play-global
+  # and the last role's copy of that one runs after this, so a new drop-in
+  # would not be loaded yet.
   ansible.builtin.systemd:
     name: chrony
     state: restarted
+    daemon_reload: true
 
 - name: Restart ptp4l
   ansible.builtin.systemd:

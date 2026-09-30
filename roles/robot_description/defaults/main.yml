@@ -1,0 +1,12 @@
+---
+uav_ros_workspace: /opt/uav/ros
+uav_ros_user: uav-ros
+uav_ros_environment_file: /etc/uav/ros/environment
+# Path on the Ansible controller; runtime files only are copied to the Jetson.
+robot_description_source_dir: "{{ playbook_dir }}/../Printables/x950_description"
+robot_description_xacro_mappings: {}
+robot_description_native_d555_aliases: true
+
+# Nominal Avia ranging origin: front housing plane and manual height above base.
+robot_description_avia_lidar_xyz: [0.0525, 0.0, 0.0324]
+robot_description_avia_lidar_rpy: [0.0, 0.0, 0.0]

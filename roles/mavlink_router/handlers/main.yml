@@ -1,0 +1,6 @@
+---
+- name: Restart mavlink-router
+  ansible.builtin.systemd:
+    name: uav-mavlink-router.service
+    state: restarted
+    daemon_reload: true

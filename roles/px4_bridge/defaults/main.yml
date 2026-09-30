@@ -1,0 +1,12 @@
+---
+px4_bridge_user: "{{ uav_ros_user | default('uav-ros') }}"
+px4_bridge_workspace: "{{ uav_ros_workspace | default('/opt/uav/ros') }}"
+px4_bridge_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+px4_bridge_px4_msgs_workspace: "{{ ros_health_px4_workspace | default('/opt/uav/px4_msgs') }}"
+px4_bridge_config: /etc/uav/ros/px4_bridge.yaml
+px4_bridge_prefix: /px4
+px4_bridge_imu_frame: fmu_housing_link
+px4_bridge_odom_frame: px4_local   # EKF2's local frame; not our odom, no TF published
+px4_bridge_base_frame: base_link
+px4_bridge_gyro_stddev_rad_s: 0.01
+px4_bridge_accel_stddev_m_s2: 0.1

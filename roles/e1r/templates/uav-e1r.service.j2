@@ -1,0 +1,28 @@
+[Unit]
+Description=E1R LiDAR ROS 2 driver with verified gPTP to UTC timestamps
+After=network-online.target uav-ptp-status.service
+Wants=network-online.target uav-ptp-status.service
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ e1r_service_user }}
+Group={{ e1r_service_group }}
+EnvironmentFile=/etc/uav/ros/environment
+StateDirectory=uav-e1r
+WorkingDirectory={{ e1r_workspace }}
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ e1r_workspace }}/install/setup.bash && exec {{ e1r_workspace }}/install/lib/uav_e1r/e1r_node --ros-args --params-file /etc/uav/ros/e1r.yaml'
+Restart=on-failure
+RestartSec=3
+KillSignal=SIGINT
+TimeoutStopSec=15
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/uav-ros
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

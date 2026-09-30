@@ -1,0 +1,88 @@
+---
+- name: Install minimal E1R ROS decoder build dependencies
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - cmake
+      - git
+      - python3-colcon-common-extensions
+      - nlohmann-json3-dev
+      - "ros-{{ ros_distro }}-ament-cmake"
+      - "ros-{{ ros_distro }}-rclcpp"
+      - "ros-{{ ros_distro }}-sensor-msgs"
+      - "ros-{{ ros_distro }}-std-msgs"
+      - "ros-{{ ros_distro }}-diagnostic-msgs"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Prepare E1R source and pinned vendor directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - "{{ e1r_workspace }}/src"
+    - "{{ e1r_workspace }}/vendor"
+
+- name: Fetch exact official RoboSense decoder revision
+  ansible.builtin.git:
+    repo: "{{ e1r_driver_repository }}"
+    dest: "{{ e1r_workspace }}/vendor/rs_driver"
+    version: "{{ e1r_driver_revision }}"
+    update: true
+  register: e1r_vendor_source
+  notify: Restart E1R ROS driver
+
+- name: Install E1R ROS adapter source
+  ansible.builtin.copy:
+    src: uav_e1r
+    dest: "{{ e1r_workspace }}/src/"
+    owner: root
+    group: root
+    mode: preserve
+  register: e1r_adapter_source
+  notify: Restart E1R ROS driver
+
+- name: Check whether the E1R executable has been built
+  ansible.builtin.stat:
+    path: "{{ e1r_workspace }}/install/lib/uav_e1r/e1r_node"
+  register: e1r_executable
+
+- name: Build E1R decoder adapter and verify the time contract
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    colcon build --merge-install --packages-select uav_e1r --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+    ctest --test-dir build/uav_e1r --output-on-failure
+  args:
+    executable: /bin/bash
+    chdir: "{{ e1r_workspace }}"
+  when: e1r_vendor_source is changed or e1r_adapter_source is changed or not e1r_executable.stat.exists
+  notify: Restart E1R ROS driver
+
+- name: Configure E1R ROS adapter
+  ansible.builtin.template:
+    src: e1r.yaml.j2
+    dest: /etc/uav/ros/e1r.yaml
+    mode: "0644"
+  notify: Restart E1R ROS driver
+
+- name: Install persistent E1R service
+  ansible.builtin.template:
+    src: uav-e1r.service.j2
+    dest: /etc/systemd/system/uav-e1r.service
+    mode: "0644"
+  notify: Restart E1R ROS driver
+
+- name: Apply E1R changes before ensuring service is started
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable E1R driver at boot
+  ansible.builtin.systemd_service:
+    name: uav-e1r.service
+    daemon_reload: true
+    enabled: true
+    state: started

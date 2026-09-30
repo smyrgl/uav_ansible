@@ -1,0 +1,6 @@
+---
+- name: Restart ROS sensor health
+  ansible.builtin.systemd_service:
+    name: uav-ros-health.service
+    daemon_reload: true
+    state: restarted

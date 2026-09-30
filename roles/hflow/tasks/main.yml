@@ -1,0 +1,104 @@
+---
+# Holybro H-Flow (DroneCAN node on the FC's CAN2 bus) read on the Jetson's
+# can0 in listen-only mode and republished as PX4's own message types.
+- name: Install CAN tooling and ROS dependencies
+  ansible.builtin.apt:
+    name:
+      - can-utils
+      - python3-venv
+      - python3-colcon-common-extensions
+      - "ros-{{ ros_distro }}-rclpy"
+      - "ros-{{ ros_distro }}-sensor-msgs"
+      - "ros-{{ ros_distro }}-diagnostic-msgs"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# systemd-networkd owns the link (netplan cannot describe CAN). The file lives
+# beside netplan's generated ones and is applied by the handler without a
+# reboot; at boot networkd brings can0 up before the observer starts.
+- name: Configure the CAN interface at boot (1 Mbit/s, listen-only)
+  ansible.builtin.template:
+    src: 70-uav-can0.network.j2
+    dest: "/etc/systemd/network/70-uav-{{ hflow_can_interface }}.network"
+    mode: "0644"
+  notify:
+    - Reconfigure the CAN interface
+    - Restart H-Flow observer
+
+# networkd only reads a new .network file on reload. The handler covers a
+# changed file; this covers a link left unmanaged by an interrupted run.
+- name: Ensure networkd manages the CAN interface now
+  ansible.builtin.shell: |
+    set -e
+    if ! networkctl status {{ hflow_can_interface }} 2>/dev/null | grep -qE 'Network File: /etc/systemd/network/70-uav-{{ hflow_can_interface }}.network'; then
+      networkctl reload; networkctl reconfigure {{ hflow_can_interface }}; echo RECONFIGURED
+    fi
+  register: hflow_link_adopted
+  changed_when: "'RECONFIGURED' in hflow_link_adopted.stdout"
+  notify: Restart H-Flow observer
+
+- name: Install the pinned DroneCAN decoder in its own runtime
+  ansible.builtin.pip:
+    name: "dronecan=={{ hflow_dronecan_version }}"
+    virtualenv: "{{ hflow_venv }}"
+    virtualenv_command: /usr/bin/python3 -m venv
+    virtualenv_site_packages: true
+  notify: Restart H-Flow observer
+
+- name: Install the H-Flow observer package
+  ansible.builtin.copy:
+    src: uav_hflow
+    dest: "{{ hflow_workspace }}/src/"
+    owner: root
+    group: root
+    mode: preserve
+  register: hflow_source
+  notify: Restart H-Flow observer
+
+- name: Run the observer's pure mapping tests on the target
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, -m, unittest, -q, test_mapping]
+    chdir: "{{ hflow_workspace }}/src/uav_hflow/test"
+  environment:
+    PYTHONPATH: "{{ hflow_workspace }}/src/uav_hflow"
+  changed_when: false
+
+- name: Check the installed observer executable
+  ansible.builtin.stat:
+    path: "{{ hflow_workspace }}/install/lib/uav_hflow/hflow_node"
+  register: hflow_executable
+
+# Same merge-install workspace as the other ROS packages: never run two
+# deployments of this workspace at once.
+- name: Build the H-Flow observer package
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    /usr/bin/colcon build --packages-select uav_hflow --merge-install
+  args:
+    executable: /bin/bash
+    chdir: "{{ hflow_workspace }}"
+  when: hflow_source is changed or not hflow_executable.stat.exists
+  notify: Restart H-Flow observer
+
+- name: Configure the H-Flow observer
+  ansible.builtin.template:
+    src: hflow.yaml.j2
+    dest: "{{ hflow_config }}"
+    mode: "0644"
+  notify: Restart H-Flow observer
+
+- name: Install the H-Flow observer service
+  ansible.builtin.template:
+    src: uav-hflow.service.j2
+    dest: /etc/systemd/system/uav-hflow.service
+    mode: "0644"
+  notify: Restart H-Flow observer
+
+- name: Enable the H-Flow observer at boot
+  ansible.builtin.systemd_service:
+    name: uav-hflow.service
+    enabled: true
+    state: started
+    daemon_reload: true

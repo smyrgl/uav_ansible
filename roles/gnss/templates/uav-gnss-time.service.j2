@@ -1,0 +1,35 @@
+# Managed by uav_ansible.
+[Unit]
+Description=uav_ansible GNSS time feed (SBF ReceiverTime -> chrony {{ gnss_time_sock }})
+Wants=uav-gnss-broker.service
+After=uav-gnss-broker.service chrony.service
+
+[Service]
+Type=simple
+Environment=PORT={{ gnss_broker_port }}
+Environment=CHRONY_SOCK={{ gnss_time_sock }}
+ExecStart=/usr/bin/python3 /usr/local/bin/uav-gnss-time.py
+Restart=always
+RestartSec=2
+
+# Root only for its uid: chronyd creates the socket as root, mode 0755, before
+# dropping privileges, and never chmods it, so writing to it takes the owner's
+# uid. It needs no capability for that (the owner's w bit is enough), so it
+# gets none, and no devices, and a read-only filesystem (connecting to a socket
+# is not a write to the filesystem it lives on).
+CapabilityBoundingSet=
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictNamespaces=yes
+LockPersonality=yes
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

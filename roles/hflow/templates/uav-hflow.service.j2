@@ -1,0 +1,28 @@
+[Unit]
+Description=UAV H-Flow DroneCAN observer ({{ hflow_can_interface }}, listen-only) -> ROS 2
+After=network-online.target systemd-networkd.service
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ hflow_user }}
+Group={{ hflow_user }}
+EnvironmentFile={{ hflow_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+# px4_msgs overlay: the topics use PX4's own message types.
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ hflow_workspace }}/install/local_setup.bash && source {{ hflow_px4_msgs_workspace }}/install/local_setup.bash && exec {{ hflow_venv }}/bin/python {{ hflow_workspace }}/install/lib/uav_hflow/hflow_node --ros-args --params-file {{ hflow_config }}'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=20
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

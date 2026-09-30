@@ -1,0 +1,117 @@
+# Managed by uav_ansible (roles/nvblox). Isaac ROS nvblox 4.6.0 node parameters.
+# Only parameters this binary declares are set (ros2 param dump, 2026-09-27);
+# enum strings are the ones mapper_initialization.cpp parses.
+/**:
+  ros__parameters:
+    cuda_stream_type: 1                     # blocking async stream
+    voxel_size: {{ nvblox_voxel_size_m | float }}
+    num_cameras: 1
+    global_frame: {{ nvblox_global_frame | to_json }}
+    pose_frame: {{ nvblox_pose_frame | to_json }}
+    use_tf_transforms: true
+    use_topic_transforms: false
+    mapping_type: {{ nvblox_mapping_type | to_json }}
+    esdf_mode: {{ nvblox_esdf_mode | to_json }}
+    publish_esdf_distance_slice: {{ 'true' if nvblox_esdf_mode == '2d' else 'false' }}
+    output_pessimistic_distance_map: false
+
+    # Inputs. Every sensor here publishes best effort; SYSTEM_DEFAULT (reliable)
+    # would never match a publisher.
+    use_depth: {{ nvblox_use_depth | bool | lower }}
+    use_color: {{ nvblox_use_color | bool | lower }}
+    use_lidar: {{ nvblox_use_lidar | bool | lower }}
+    use_segmentation: false
+    input_qos: {{ nvblox_input_qos | to_json }}
+    maximum_input_queue_length: 10
+    tick_period_ms: 10
+
+    # Processing rates. These compare message stamps (device time for the
+    # D555, host receipt time for the Avia), not wall time.
+    integrate_depth_rate_hz: {{ nvblox_integrate_depth_rate_hz | float }}
+    integrate_color_rate_hz: {{ nvblox_integrate_color_rate_hz | float }}
+    integrate_lidar_rate_hz: {{ nvblox_integrate_lidar_rate_hz | float }}
+    update_mesh_rate_hz: {{ nvblox_update_mesh_rate_hz | float }}
+    update_esdf_rate_hz: {{ nvblox_update_esdf_rate_hz | float }}
+    publish_layer_rate_hz: {{ nvblox_publish_layer_rate_hz | float }}
+    publish_debug_vis_rate_hz: {{ nvblox_publish_debug_vis_rate_hz | float }}
+    decay_tsdf_rate_hz: {{ nvblox_decay_tsdf_rate_hz | float }}
+    decay_dynamic_occupancy_rate_hz: 0.0    # no dynamic mapper in static_tsdf
+    clear_map_outside_radius_rate_hz: 1.0
+    map_clearing_radius_m: {{ nvblox_map_clearing_radius_m | float }}
+    map_clearing_frame_id: {{ nvblox_pose_frame | to_json }}
+    after_shutdown_map_save_path: ""
+
+    # Avia through nvblox's spinning-LiDAR model (see defaults/main.yml).
+    lidar_width: {{ nvblox_lidar_width | int }}
+    lidar_height: {{ nvblox_lidar_height | int }}
+    lidar_vertical_fov_rad: {{ (nvblox_lidar_vertical_fov_deg | float) * 3.141592653589793 / 180.0 }}
+    lidar_min_valid_range_m: {{ nvblox_lidar_min_valid_range_m | float }}
+    use_non_equal_vertical_fov_lidar_params: false
+    # Motion compensation needs a per-point "t"/"time"/"timestamp" field and
+    # aborts the process (glog CHECK) without one. /avia/points has none yet.
+    use_lidar_motion_compensation: false
+    pointcloud2_timestamps_are_relative: true
+
+    # Journal statistics (rates/delays every print period; timings are verbose).
+    print_rates_to_console: true
+    print_delays_to_console: true
+    print_queue_drops_to_console: true
+    print_timings_to_console: false
+    print_statistics_on_console_period_ms: {{ nvblox_print_statistics_period_ms | int }}
+
+    # Visualisation. The *_layer_marker topics are visualization_msgs/Marker
+    # cube lists, which Foxglove renders; undo_gamma is meant for exactly that.
+    esdf_slice_bounds_visualization_attachment_frame_id: {{ nvblox_pose_frame | to_json }}
+    esdf_slice_bounds_visualization_side_length: 10.0
+    workspace_height_bounds_visualization_attachment_frame_id: {{ nvblox_pose_frame | to_json }}
+    workspace_height_bounds_visualization_side_length: 10.0
+    ground_plane_visualization_attachment_frame_id: {{ nvblox_pose_frame | to_json }}
+    ground_plane_visualization_side_length: 10.0
+    layer_visualization_min_tsdf_weight: 0.1
+    layer_visualization_exclusion_height_m: {{ nvblox_layer_visualization_exclusion_height_m | float }}
+    layer_visualization_exclusion_radius_m: {{ nvblox_layer_visualization_exclusion_radius_m | float }}
+    layer_visualization_undo_gamma_correction: true
+    layer_streamer_bandwidth_limit_mbps: {{ nvblox_layer_streamer_bandwidth_limit_mbps | float }}
+    max_back_projection_distance: {{ nvblox_max_back_projection_distance_m | float }}
+    back_projection_subsampling: 4
+    esdf_and_gradients_unobserved_value: -1000.0
+    distance_map_unknown_value_optimistic: 1000.0
+    distance_map_unknown_value_pessimistic: -1000.0
+
+    multi_mapper:
+      connected_mask_component_size_threshold: 2000
+      remove_small_connected_components: true
+      experimental_use_ground_plane_estimation: false
+
+    static_mapper:
+      do_depth_preprocessing: false
+      depth_preprocessing_num_dilations: 3
+      # projective integrators (camera depth / LiDAR range / colour)
+      projective_integrator_max_integration_distance_m: {{ nvblox_depth_max_integration_distance_m | float }}
+      lidar_projective_integrator_max_integration_distance_m: {{ nvblox_lidar_max_integration_distance_m | float }}
+      projective_integrator_truncation_distance_vox: {{ nvblox_truncation_distance_vox | float }}
+      projective_integrator_weighting_mode: {{ nvblox_weighting_mode | to_json }}
+      projective_integrator_max_weight: {{ nvblox_max_weight | float }}
+      projective_tsdf_integrator_invalid_depth_decay_factor: -1.0
+      # view calculator
+      raycast_subsampling_factor: {{ nvblox_raycast_subsampling_factor | int }}
+      workspace_bounds_type: "unbounded"
+      # esdf integrator
+      esdf_integrator_min_weight: {{ nvblox_esdf_min_weight | float }}
+      esdf_integrator_max_site_distance_vox: 2.0
+      esdf_integrator_max_distance_m: {{ nvblox_esdf_max_distance_m | float }}
+      unobserved_esdf_policy: "ignore"
+      add_negative_truncation_band_sites: false
+      # 2d slice bounds (only used with esdf_mode "2d"; relative to odom)
+      esdf_slice_min_height: -0.5
+      esdf_slice_max_height: 0.5
+      esdf_slice_height: 0.0
+      # mesh integrator
+      mesh_integrator_min_weight: {{ nvblox_mesh_min_weight | float }}
+      mesh_integrator_weld_vertices: true
+      # tsdf decay (inactive while decay_tsdf_rate_hz is 0)
+      tsdf_decay_factor: 0.95
+      tsdf_decayed_weight_threshold: 0.001
+      tsdf_set_free_distance_on_decayed: false
+      tsdf_decayed_free_distance_vox: 4.0
+      decay_integrator_deallocate_decayed_blocks: true

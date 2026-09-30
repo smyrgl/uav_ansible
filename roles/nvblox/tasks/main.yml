@@ -1,0 +1,6 @@
+---
+# The nvblox POC (D555 depth + colour and Avia into one GPU TSDF) ran on the
+# bench in September 2026 and is retired: nvblox_state selects whether this
+# role installs it (present) or removes it (absent, the declared state).
+- name: Apply the nvblox state ({{ nvblox_state }})
+  ansible.builtin.include_tasks: "{{ nvblox_state }}.yml"

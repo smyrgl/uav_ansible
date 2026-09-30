@@ -1,0 +1,6 @@
+---
+- name: Restart Avia ROS driver
+  ansible.builtin.systemd_service:
+    name: uav-avia.service
+    state: restarted
+    daemon_reload: true

@@ -1,0 +1,19 @@
+<CycloneDDS xmlns="https://cdds.io/config">
+  <Domain Id="any">
+    <General>
+      <Interfaces><NetworkInterface name="{{ lan_interface }}"/></Interfaces>
+      <AllowMulticast>true</AllowMulticast>
+    </General>
+    <Internal>
+      <!-- The D555 delivers ~200 Mbit/s per image subscription in 9 kB
+           datagrams. The kernel default socket buffer (212992 bytes) holds
+           1.8 ms of that; every scheduling hiccup dropped fragments, and one
+           lost fragment loses the whole image (nvblox: 8.4 k dropped
+           datagrams in one boot). `max` is what Cyclone asks for and it
+           settles for the kernel ceiling (net.core.rmem_max, raised by
+           /etc/sysctl.d/60-uav-dds.conf in this role) with a warning; a
+           `min` above that ceiling makes every participant fail to start. -->
+      <SocketReceiveBufferSize max="{{ dds_socket_rcvbuf }}"/>
+    </Internal>
+  </Domain>
+</CycloneDDS>

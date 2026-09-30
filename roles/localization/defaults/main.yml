@@ -1,0 +1,14 @@
+---
+localization_user: "{{ uav_ros_user | default('uav-ros') }}"
+localization_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+localization_ekf_odom_config: /etc/uav/ros/ekf_odom.yaml
+localization_ekf_map_config: /etc/uav/ros/ekf_map.yaml
+localization_navsat_config: /etc/uav/ros/navsat.yaml
+localization_frequency_hz: 30.0
+localization_imu_topic: /px4/imu/data
+localization_gps_topic: /gnss/navsatfix
+localization_magnetic_declination_rad: 0.0   # PX4's yaw is already true-north referenced
+localization_yaw_offset_rad: 0.0             # /px4/imu/data is ENU: yaw 0 = east
+# Map origin. Empty = the first fix (map means "where the session started").
+# [lat_deg, lon_deg, yaw_rad] pins map to a physical spot across sessions.
+localization_datum: []

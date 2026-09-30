@@ -1,0 +1,7 @@
+# These aliases expose native D555 frame IDs at the model's NOMINAL poses.
+# They do not represent measured extrinsic calibration.
+native_d555_aliases: {{ robot_description_native_d555_aliases | bool | lower }}
+xacro_mappings: {{ robot_description_xacro_mappings | to_json }}
+
+avia_lidar_xyz: {{ robot_description_avia_lidar_xyz | to_json }}
+avia_lidar_rpy: {{ robot_description_avia_lidar_rpy | to_json }}

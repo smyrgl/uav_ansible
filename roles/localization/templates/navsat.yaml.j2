@@ -1,0 +1,19 @@
+# Managed by uav_ansible (localization). navsat_transform: NavSatFix + IMU
+# yaw (ENU) + the map EKF's odometry -> /odometry/gps in the map frame, and
+# the utm -> map transform. The datum is the map origin.
+/**:
+  ros__parameters:
+    frequency: 10.0
+    delay: 0.0
+    magnetic_declination_radians: {{ localization_magnetic_declination_rad | float }}
+    yaw_offset: {{ localization_yaw_offset_rad | float }}
+    zero_altitude: false
+    broadcast_cartesian_transform: true
+    publish_filtered_gps: true
+    use_odometry_yaw: false
+{% if localization_datum | length == 3 %}
+    datum: [{{ localization_datum[0] | float }}, {{ localization_datum[1] | float }}, {{ localization_datum[2] | float }}]
+    wait_for_datum: true
+{% else %}
+    wait_for_datum: false
+{% endif %}

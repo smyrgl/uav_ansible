@@ -1,0 +1,14 @@
+---
+e1r_workspace: /opt/uav/ros
+e1r_service_user: uav-ros
+e1r_service_group: uav-ros
+e1r_driver_repository: https://github.com/RoboSense-LiDAR/rs_driver.git
+e1r_driver_revision: 897b14d3bdb6186a75df27ba51b65b5bd5557723
+e1r_lidar_ip: 192.168.144.95
+e1r_msop_port: 9007
+e1r_difop_port: 9107
+e1r_frame_id: e1r_nominal_lidar_frame
+e1r_clock_status_path: /run/uav/time/ptp-status.json
+e1r_difop_timeout_sec: 1.0
+# Detect gross timestamp epoch/offset mistakes, not a clock-accuracy certificate.
+e1r_timestamp_tolerance_sec: 2.0

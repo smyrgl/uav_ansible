@@ -1,0 +1,16 @@
+[Unit]
+Description=uav_ansible MAVLink router (PX4 <-> GCS <-> onboard)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/mavlink-routerd -c /etc/mavlink-router/main.conf
+# It parses untrusted input from every interface, and needs no privilege: its
+# ports are unprivileged. dialout opens the TELEM2 UART (root:dialout 0660).
+DynamicUser=yes
+SupplementaryGroups=dialout
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

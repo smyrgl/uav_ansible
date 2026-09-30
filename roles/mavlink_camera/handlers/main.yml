@@ -1,0 +1,20 @@
+---
+- name: Restart user camera
+  become_user: "{{ target_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd[target_user][1] }}"
+  ansible.builtin.systemd_service:
+    scope: user
+    name: uav-camera.service
+    daemon_reload: true
+    state: restarted
+
+- name: Restart D555 profile setter
+  become_user: "{{ target_user }}"
+  environment:
+    XDG_RUNTIME_DIR: "/run/user/{{ ansible_facts.getent_passwd[target_user][1] }}"
+  ansible.builtin.systemd_service:
+    scope: user
+    name: uav-d555-profile.service
+    daemon_reload: true
+    state: restarted

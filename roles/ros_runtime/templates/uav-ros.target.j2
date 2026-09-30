@@ -1,0 +1,7 @@
+[Unit]
+Description=UAV ROS sensor inspection services
+Wants=uav-description.service uav-e1r.service uav-avia.service uav-foxglove.service uav-ros-health.service uav-d555-rgb.service uav-nvblox.service
+After=network-online.target
+
+[Install]
+WantedBy=multi-user.target

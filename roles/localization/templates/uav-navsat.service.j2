@@ -1,0 +1,27 @@
+[Unit]
+Description=UAV robot_localization navsat_transform (GNSS -> /odometry/gps in map; utm -> map)
+After=network-online.target uav-ekf-map.service uav-gnss-ros.service
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ localization_user }}
+Group={{ localization_user }}
+EnvironmentFile={{ localization_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && exec ros2 run robot_localization navsat_transform_node --ros-args -r __node:=navsat_transform --params-file {{ localization_navsat_config }} -r imu:={{ localization_imu_topic }} -r gps/fix:={{ localization_gps_topic }} -r odometry/filtered:=/odometry/filtered/map'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=20
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

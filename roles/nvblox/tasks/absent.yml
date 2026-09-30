@@ -1,0 +1,34 @@
+---
+# nvblox_state: absent — the POC is retired (2026-09-30). Stop and remove the
+# three units, their config and the helper programs; the state directory with
+# any saved maps (nvblox_state_dir) is left for the user to delete.
+- name: Stop and disable the nvblox units
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: false
+    state: stopped
+  loop:
+    - uav-nvblox.service
+    - uav-d555-rgb.service
+    - uav-bench-odom.service
+  failed_when: false
+
+- name: Remove the nvblox units, config and helpers
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/uav-nvblox.service
+    - /etc/systemd/system/uav-d555-rgb.service
+    - /etc/systemd/system/uav-bench-odom.service
+    - "{{ nvblox_config_path }}"
+    - /usr/local/lib/uav/d555_rgb_adapter.py
+    - /usr/local/lib/uav/test_d555_rgb_adapter.py
+    - /usr/local/lib/uav/verify_nvblox.py
+    - /var/lib/uav-ros/.nv
+  register: nvblox_removed
+
+- name: Reload systemd after removing the nvblox units
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: nvblox_removed is changed

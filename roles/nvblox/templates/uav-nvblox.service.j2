@@ -1,0 +1,38 @@
+[Unit]
+Description=Isaac ROS nvblox 3D reconstruction (D555 depth+colour and Avia LiDAR into one TSDF)
+After=network-online.target uav-description.service uav-d555-rgb.service
+Wants=network-online.target uav-description.service uav-d555-rgb.service
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ nvblox_service_user }}
+Group={{ nvblox_service_user }}
+# CUDA on Tegra needs both: /dev/nvgpu/igpu0/*, /dev/nvhost-*-gpu and /dev/nvmap are
+# root:video; the host1x/DRM render nodes /dev/dri/renderD* are root:render. Missing
+# video = "no CUDA-capable device"; missing render = CUDA error 801 "operation not
+# supported" after "Drm_NvRmHost1xOpen: DRM Device Open failed".
+SupplementaryGroups=video render
+EnvironmentFile={{ nvblox_environment_file }}
+# Isaac ROS 4.6 Jetson debs embed sm_75 SASS + PTX only: the Orin (sm_87) JIT-compiles
+# every kernel on first use. A persistent, writable, large-enough cache keeps that to
+# the first start (~90 s of layer initialisation plus the first integrations).
+Environment=CUDA_CACHE_PATH={{ nvblox_cuda_cache_path }}
+Environment=CUDA_CACHE_MAXSIZE={{ nvblox_cuda_cache_max_bytes }}
+WorkingDirectory=/var/lib/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && exec {{ nvblox_node_executable }} --ros-args -r __node:={{ nvblox_node_name }} --params-file {{ nvblox_config_path }} -r camera_0/depth/image:={{ nvblox_depth_image_topic }} -r camera_0/depth/camera_info:={{ nvblox_depth_camera_info_topic }} -r camera_0/color/image:={{ nvblox_color_image_topic }} -r camera_0/color/camera_info:={{ nvblox_color_camera_info_topic }} -r pointcloud:={{ nvblox_pointcloud_topic }}'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+StateDirectory=uav-ros uav-ros/nvblox
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target

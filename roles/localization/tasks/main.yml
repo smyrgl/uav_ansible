@@ -1,0 +1,61 @@
+---
+# robot_localization on the Jetson, REP-105 dual EKF: ekf_odom (continuous
+# sources, odom -> base_link) and ekf_map (+ GNSS via navsat_transform,
+# map -> odom). Informational until the sensor odometry sources are calibrated.
+- name: Install robot_localization
+  ansible.builtin.apt:
+    name:
+      - "ros-{{ ros_distro }}-robot-localization"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  notify: Restart localization
+
+- name: Retire the single-EKF unit of the first bench setup
+  ansible.builtin.systemd_service:
+    name: uav-ekf.service
+    enabled: false
+    state: stopped
+  failed_when: false
+
+- name: Remove the single-EKF unit file and config
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/uav-ekf.service
+    - /etc/uav/ros/ekf.yaml
+  register: localization_old_removed
+
+- name: Configure the two EKFs and navsat_transform
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    mode: "0644"
+  loop:
+    - { src: ekf_odom.yaml.j2, dest: "{{ localization_ekf_odom_config }}" }
+    - { src: ekf_map.yaml.j2, dest: "{{ localization_ekf_map_config }}" }
+    - { src: navsat.yaml.j2, dest: "{{ localization_navsat_config }}" }
+  notify: Restart localization
+
+- name: Install the localization services
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop:
+    - uav-ekf-odom.service
+    - uav-ekf-map.service
+    - uav-navsat.service
+  notify: Restart localization
+
+- name: Enable the localization services at boot
+  ansible.builtin.systemd_service:
+    name: "{{ item }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+  loop:
+    - uav-ekf-odom.service
+    - uav-ekf-map.service
+    - uav-navsat.service

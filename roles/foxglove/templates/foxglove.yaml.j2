@@ -1,0 +1,44 @@
+# Managed by uav_ansible. Foxglove bridge 3.5 parameter names.
+# address: 0.0.0.0 = every interface (house Wi-Fi and drone LAN); see group_vars.
+foxglove_bridge:
+  ros__parameters:
+    address: {{ foxglove_bind_address | to_json }}
+    port: {{ foxglove_port }}
+    use_sim_time: false
+    num_threads: {{ foxglove_num_threads }}
+    # Per-client SDK send queue, in messages. Two forces: raw images must not
+    # leave health messages seconds old (1024, the default, gave 11 s), and a
+    # URDF load must fit, because the 3D panel requests every mesh at once and
+    # the SDK closes the connection when a fetch-asset response finds the queue
+    # full (16 served exactly the first 3 of 42 meshes, then dropped the
+    # client; see README). Overflow of data messages drops the oldest.
+    message_backlog_size: {{ foxglove_message_backlog_size }}
+    # Factory optical TF remains available on ROS. Exclude it only from this
+    # nominal visualization so Foxglove cannot assign two parents to native
+    # camera_* frames. Integrate factory extrinsics before removing this filter.
+    # The separate PX4 1.17 overlay is used by the health observer. This bridge
+    # keeps raw /fmu/ topics hidden; /uav/health exposes DDS delivery status.
+    # Both exclusions affect only Foxglove; original ROS traffic is unchanged.
+    # The launcher remaps native CameraInfo subscriptions to normalized
+    # /d555 metadata. Hide those internal topics from duplicate advertisement;
+    # existing Foxglove layouts keep the native camera_info labels.
+    # The D555's own compressed streams are hidden on purpose: one subscriber
+    # throttles the imager to ~3.5 fps (RTSP included) and the firmware replays
+    # stale buffers. The dashboard video is /d555/color/video from the camera
+    # node's NVENC pass (mavlink_camera role).
+    topic_whitelist: ['^(?!/fmu/|/realsense/D555_261622302751/tf_static$|/d555/(color|depth)/camera_info$|/realsense/D555_261622302751_Color/(compressed|h264)$).*']
+    # Introspection and asset retrieval, without exposing topic publication or
+    # arbitrary parameter writes to the visualization client.
+    capabilities: ['services', 'connectionGraph', 'assets']
+    service_whitelist:
+      - '^/.+/(describe_parameters|get_parameter_types|get_parameters|list_parameters)$'
+    client_topic_whitelist: ['(?!)']
+    asset_uri_allowlist:
+      - '^package://x950_description/meshes/[A-Za-z0-9_-]+\.stl$'
+    include_hidden: false
+    publish_client_count: true
+    min_qos_depth: 1
+    max_qos_depth: 2
+    sysinfo: true
+    sysinfo_refresh_interval: 1000
+    remote_access: false

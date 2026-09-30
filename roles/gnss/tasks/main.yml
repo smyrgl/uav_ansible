@@ -1,15 +1,29 @@
 ---
-# The broker owns ONE receiver serial and tees it on one localhost port: gpsd
-# (time) and the ROS driver read the stream; drone-link-connect writes RTCM to
-# it, and the broker relays writes to the serial. Single owner => clean tee +
-# serialized writes. Works for the Septentrio G5 (production) or a u-blox unit
-# (bench) — gpsd auto-detects NMEA/UBX/SBF, so the time path is identical.
-- name: Install gpsd + broker deps
+# The receiver's SBF data port (/dev/gnss: the Septentrio's USB2) has ONE
+# reader, the fan-out (uav-gnss-broker), which re-serves every byte, read-only,
+# on tcp://127.0.0.1:{{ gnss_broker_port }} to:
+#   * uav-gnss-time: SBF ReceiverTime -> chrony's coarse GNSS time source, the
+#     one that numbers the PPS edges (time_sync role);
+#   * the Septentrio ROS driver (ROS 2 stage): PVT and attitude with their full
+#     covariances, which only SBF carries;
+#   * diagnostics.
+# Nothing here writes to the receiver. Its USB1 command port belongs to
+# drone-link, the one RTCM writer (enrolled from the station: README, "RTK
+# corrections"). No gpsd: 3.25 cannot decode SBF, and the receiver speaks
+# nothing else, so the time is read from SBF too.
+- name: Remove gpsd (no SBF decoder; uav-gnss-time replaces it)
   ansible.builtin.apt:
     name:
       - gpsd
       - gpsd-clients
-      - python3-serial
+      - gpsd-tools
+      - python3-gps
+    state: absent
+    purge: true
+
+- name: Install fan-out deps
+  ansible.builtin.apt:
+    name: python3-serial
     state: present
     update_cache: true
     cache_valid_time: 3600
@@ -21,48 +35,65 @@
     mode: "0644"
   notify: Reload udev
 
-- name: Install the GNSS serial broker
+- name: Install the GNSS fan-out
   ansible.builtin.copy:
     src: uav-gnss-broker.py
     dest: /usr/local/bin/uav-gnss-broker.py
     mode: "0755"
   notify: Restart gnss broker
 
-- name: Install the broker systemd unit
+- name: Install the fan-out systemd unit
   ansible.builtin.template:
     src: uav-gnss-broker.service.j2
     dest: /etc/systemd/system/uav-gnss-broker.service
     mode: "0644"
   notify: Restart gnss broker
 
-- name: Enable the GNSS broker
-  ansible.builtin.systemd:
-    name: uav-gnss-broker.service
-    enabled: true
-    state: started
-    daemon_reload: true
+- name: Install the GNSS time feed
+  ansible.builtin.copy:
+    src: uav-gnss-time.py
+    dest: /usr/local/bin/uav-gnss-time.py
+    mode: "0755"
+  notify: Restart gnss time feed
 
-- name: Configure gpsd (reads the broker's read-broadcast port)
+- name: Install the time feed systemd unit
   ansible.builtin.template:
-    src: gpsd.default.j2
-    dest: /etc/default/gpsd
-    owner: root
-    group: root
+    src: uav-gnss-time.service.j2
+    dest: /etc/systemd/system/uav-gnss-time.service
     mode: "0644"
-  notify: Restart gpsd
+  notify: Restart gnss time feed
 
-- name: Enable gpsd
+- name: Enable the GNSS fan-out and time feed
   ansible.builtin.systemd:
-    name: gpsd
+    name: "{{ item }}"
     enabled: true
     state: started
     daemon_reload: true
+  loop:
+    - uav-gnss-broker.service
+    - uav-gnss-time.service
+
+# The fan-out's sandbox allows the receiver's tty by device group
+# (DeviceAllow=char-ttyACM). systemd resolves that group from /proc/devices
+# when the unit starts: with the receiver unplugged at boot, cdc_acm is not yet
+# loaded, the rule resolves to nothing, and the port is EPERM once it appears
+# (seen 2026-09-30, also for drone-link's unit). Loading cdc_acm at boot makes
+# the group resolvable whether or not the receiver is present.
+- name: Load cdc_acm at boot so the tty device group resolves for the sandboxes
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/uav-gnss.conf
+    mode: "0644"
+    content: |
+      # uav_ansible (gnss): USB CDC-ACM for the Septentrio receiver; loaded at
+      # boot so DeviceAllow=char-ttyACM resolves before the receiver is plugged in.
+      cdc_acm
+  notify: Load cdc_acm now
 
 # --- ROS driver (read-only consumer, ROS2 stage) -----------------------------
 - name: Note — ROS driver
   ansible.builtin.debug:
     msg: >-
-      ROS2 stage: the Septentrio/Unicore driver reads
-      tcp://127.0.0.1:{{ gnss_broker_port }} (read-only) for NavSatFix etc. RTCM
-      arrives from drone-link-connect once the rover is enrolled from the
-      station; a standalone fix is enough for the time path.
+      ROS2 stage: point the Septentrio driver at
+      tcp://127.0.0.1:{{ gnss_broker_port }} with configure_rx false. The port
+      is read-only, so the driver must take the receiver's SBF output as it is
+      rather than configure it: its commands would be discarded.

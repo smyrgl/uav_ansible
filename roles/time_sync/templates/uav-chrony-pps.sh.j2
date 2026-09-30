@@ -1,0 +1,23 @@
+#!/bin/sh
+# Managed by uav_ansible. chrony's ExecStartPre (drop-in uav-pps.conf; runs as
+# _chrony): write the PPS refclock that chrony.conf includes, but only when the
+# PPS device exists. chronyd treats a missing refclock device as fatal, and a
+# PPS overlay that failed to apply must not also take NTP down with it: without
+# the device, chrony serves pool time and this says why. The file is always
+# written — chrony's include is fatal when it matches nothing, even as a glob.
+out=/run/chrony/uav-pps.conf
+dev={{ pps_device }}
+
+# At boot, udev may still be naming the device; give it a few seconds.
+i=0
+while [ ! -e "$dev" ] && [ "$i" -lt 20 ]; do
+    sleep 0.5
+    i=$((i + 1))
+done
+
+if [ -e "$dev" ]; then
+    echo "refclock PPS $dev lock GPS refid PPS" > "$out"
+else
+    echo "# $dev absent at chrony start: no PPS refclock" > "$out"
+    echo "uav: $dev is missing, chrony runs without PPS (is the pps-gpio overlay applied?)" >&2
+fi

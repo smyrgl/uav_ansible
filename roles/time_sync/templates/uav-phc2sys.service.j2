@@ -5,8 +5,29 @@ Wants=chrony.service
 
 [Service]
 Type=simple
-# -s CLOCK_REALTIME (source, GNSS-disciplined by chrony) -> -c PHC (slave).
-ExecStart=/usr/sbin/phc2sys -s CLOCK_REALTIME -c {{ ptp_grandmaster_interface }} -O 0 -w
+# phc2sys initialises the PHC from the system clock once and afterwards only
+# slews it (no step threshold by default; the i226 slews at most 6.25 %). A
+# cold power-off loses this carrier's RTC, so the boot clock reads 1970 until
+# chrony steps it — NTP on the bench, the GNSS SOCK source in the field — and a
+# PHC initialised from that clock never catches up (2026-09-30: 56 years
+# behind, ptp4l announcing 1970 to the E1R). Two guards, both needed:
+#  1. Wait, bounded, for chrony to report a synchronised clock before the PHC
+#     is initialised, so with a time source present the PHC is never wrong.
+#     Non-fatal (`-`): with no source yet, phc2sys starts anyway and 2 applies.
+#  2. -S: step the PHC whenever the system clock is later stepped by more than
+#     the threshold (GNSS taking over from the RTC in the field). The E1R's
+#     clock re-syncs after such a step; its driver is UTC-gated meanwhile.
+ExecStartPre=-/usr/bin/chronyc waitsync {{ phc2sys_waitsync_tries }} {{ phc2sys_waitsync_max_correction }}
+TimeoutStartSec={{ phc2sys_waitsync_tries * 10 + 60 }}
+# -s CLOCK_REALTIME (source, disciplined by chrony from GNSS or NTP) -> -c PHC.
+# -f: read ptp4l's own config. -w talks to ptp4l over its management socket,
+# and ptp4l drops management messages whose transportSpecific differs from its
+# [global] one — 0x1 for gPTP, while phc2sys sends 0 unless a config says
+# otherwise (its -t is only a log tag). Without this, -w waits forever and the
+# PHC free-runs from whatever the clock read when igc loaded.
+# Leave -O unset: -w obtains currentUtcOffset from ptp4l, so the PHC uses
+# PTP/TAI while CLOCK_REALTIME remains UTC. Forcing -O 0 breaks that offset.
+ExecStart=/usr/sbin/phc2sys -f /etc/linuxptp/ptp4l.conf -s CLOCK_REALTIME -c {{ ptp_grandmaster_interface }} -w -S {{ phc2sys_step_threshold }}
 Restart=on-failure
 RestartSec=2
 

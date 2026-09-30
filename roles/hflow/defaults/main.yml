@@ -1,0 +1,21 @@
+---
+hflow_user: "{{ uav_ros_user | default('uav-ros') }}"
+hflow_workspace: "{{ uav_ros_workspace | default('/opt/uav/ros') }}"
+hflow_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+hflow_px4_msgs_workspace: "{{ ros_health_px4_workspace | default('/opt/uav/px4_msgs') }}"
+hflow_venv: /opt/uav/hflow-venv
+hflow_config: /etc/uav/ros/hflow.yaml
+hflow_can_interface: can0
+hflow_can_bitrate: 1000000
+hflow_node_id: 124
+hflow_dronecan_version: "1.0.27"
+hflow_topic_prefix: /hflow
+hflow_flow_frame: hflow_nominal_frd_frame
+hflow_range_frame: hflow_nominal_range_frame
+hflow_range_min_m: 0.08
+hflow_range_max_m: 30.0
+hflow_range_h_fov_deg: 12.4
+hflow_range_v_fov_deg: 6.2
+hflow_max_flow_rate_rad_s: 7.4
+hflow_distance_max_age_sec: 0.5
+hflow_stale_sec: 2.0

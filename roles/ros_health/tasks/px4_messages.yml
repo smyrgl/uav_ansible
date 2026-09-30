@@ -1,0 +1,38 @@
+---
+- name: Install PX4 message build dependencies
+  ansible.builtin.apt:
+    name:
+      - git
+      - python3-colcon-common-extensions
+      - "ros-{{ ros_distro }}-rosidl-default-generators"
+      - "ros-{{ ros_distro }}-rmw-cyclonedds-cpp"
+    state: present
+
+- name: Create PX4 message workspace
+  ansible.builtin.file:
+    path: "{{ ros_health_px4_workspace }}/src"
+    state: directory
+    mode: '0755'
+
+- name: Fetch firmware-matched official PX4 messages
+  ansible.builtin.git:
+    repo: https://github.com/PX4/px4_msgs.git
+    dest: "{{ ros_health_px4_workspace }}/src/px4_msgs"
+    version: "{{ ros_health_px4_msgs_revision }}"
+  register: px4_messages_source
+
+- name: Check PX4 message installation
+  ansible.builtin.stat:
+    path: "{{ ros_health_px4_workspace }}/install/share/px4_msgs/package.xml"
+  register: px4_messages_installed
+
+- name: Build firmware-matched PX4 message definitions
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    MAKEFLAGS=-j4 colcon build --merge-install --packages-select px4_msgs --cmake-args -DBUILD_TESTING=OFF
+  args:
+    executable: /bin/bash
+    chdir: "{{ ros_health_px4_workspace }}"
+  when: px4_messages_source is changed or not px4_messages_installed.stat.exists
+  notify: Restart ROS sensor health
