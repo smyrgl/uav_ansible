@@ -26,7 +26,7 @@ E1R's strict timestamp gates or certify data for flight/fusion.
 | Avia | ROS cloud receipt, nonempty/layout/frame, SDK connection state, packet rates and timestamp policy |
 | E1R | ROS clouds, MSOP/DIFOP packet freshness, gPTP status, verified UTC offset and host PHC evidence |
 | H-FLOW | Configured PX4 optical-flow instance and downward distance instance, measurement progression, flow quality and range validity |
-| GNSS | CRC-valid SBF via the read-only broker, fresh PVT solution, chrony's selected PPS source and clock error |
+| GNSS | CRC-valid SBF via the read-only broker; PVT mode (RTK fixed/float, DGNSS, stand-alone), satellites, correction age and horizontal/vertical accuracy from PVTGeodetic; chrony's selected PPS source and clock error. Below RTK fixed is WARN unless `ros_health_gnss_require_rtk_fixed` is false |
 | PX4 / MAVLink | Heartbeats specifically from system 1/component 1 via the router; camera heartbeats do not count | Also folds the FC barometer (`SCALED_PRESSURE`, bay air temperature and static pressure) in as an informational section when PX4 streams it |
 | Jetson Companion | One summary of the `jetson_stats/*` rows published by the jetson_stats role (isaac_ros_jetson_stats on jtop): hottest thermal zone, VDD_IN draw, fan, CPU/GPU load, nvpmodel. Thermal zones drive the level; a zone past the upstream 100 °C mark is the one connected-device ERROR |
 | PX4 / DDS | Actual periodic uORB sample receipt, rates, timestamp progress and timesync evidence |

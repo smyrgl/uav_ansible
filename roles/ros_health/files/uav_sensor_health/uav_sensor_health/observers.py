@@ -19,6 +19,28 @@ import time
 from .health import Sample, check, grouped
 
 
+PVT_MODES = {0: "no PVT", 1: "stand-alone", 2: "differential", 3: "fixed location", 4: "RTK fixed",
+             5: "RTK float", 6: "SBAS aided", 7: "moving-base RTK fixed", 8: "moving-base RTK float", 10: "PPP"}
+RTK_FIXED_MODES = (4, 7)
+
+
+def parse_pvt_geodetic(block):
+    """SBF PVTGeodetic (4007), revision-2 layout: the fields the health row
+    needs. Do-Not-Use values (65535) become None. Returns (values, stamp)."""
+    mode_byte, error = block[14], block[15]
+    mode = mode_byte & 15
+    values = {"mode": mode, "mode_text": PVT_MODES.get(mode, f"mode {mode}"), "error": error,
+              "satellites": block[74], "fix_2d": bool(mode_byte & 0x80)}
+    reference_id, corr_age = struct.unpack_from("<HH", block, 76)
+    values["reference_id"] = reference_id
+    values["mean_corr_age_sec"] = None if corr_age == 65535 else round(corr_age / 100.0, 2)
+    if len(block) >= 94:
+        h_acc, v_acc = struct.unpack_from("<HH", block, 90)
+        values["h_accuracy_m"] = None if h_acc == 65535 else round(h_acc / 100.0, 2)
+        values["v_accuracy_m"] = None if v_acc == 65535 else round(v_acc / 100.0, 2)
+    return values, struct.unpack_from("<IH", block, 8)
+
+
 def sbf_blocks(buf):
     """Recover complete CRC-valid SBF blocks; bound incomplete frames to 8192 B."""
     blocks, i = [], 0
@@ -163,10 +185,7 @@ class Observers:
                             self._record("GNSS", {"source": "CRC-valid SBF via read-only broker"})
                         for bid, block in blocks:
                             if bid == 4007 and len(block) >= 80:
-                                # SBF PVTGeodetic: common time header then mode,
-                                # error; NrSV follows RxClkDrift/TimeSystem/Datum.
-                                self._record("GNSS_PVT", {"mode": block[14] & 15, "error": block[15], "satellites": block[74]},
-                                             struct.unpack_from("<IH", block, 8))
+                                self._record("GNSS_PVT", *parse_pvt_geodetic(block))
                             elif bid == 5914 and len(block) >= 24:
                                 self._record("GNSS_TIME", {"sync_level": block[21]}, struct.unpack_from("<IH", block, 8))
             except OSError as exc:
@@ -195,21 +214,41 @@ class Observers:
             self.stop.wait(2)
 
 
-def gnss_health(samples, timing, transport, now):
+def gnss_health(samples, timing, transport, now, require_rtk_fixed=True):
+    """The position section is OK only at RTK fixed when require_rtk_fixed:
+    this airframe navigates on RTK, so float, DGNSS or stand-alone is a
+    warning even though the PVT is valid."""
     receiver = samples.get("GNSS", Sample())
     pvt = samples.get("GNSS_PVT", Sample())
     live = receiver.fresh(now, 3)
     connection = True if live else False if receiver.received >= 0 else None
-    pvt_good = pvt.fresh(now, 3) and pvt.advancing(now, 3) and pvt.values.get("mode", 0) != 0 and pvt.values.get("error", 255) == 0
+    mode = pvt.values.get("mode", 0)
+    mode_text = pvt.values.get("mode_text", PVT_MODES.get(mode, f"mode {mode}"))
+    pvt_good = pvt.fresh(now, 3) and pvt.advancing(now, 3) and mode != 0 and pvt.values.get("error", 255) == 0
+    rtk_fixed = mode in RTK_FIXED_MODES
+    corr_age = pvt.values.get("mean_corr_age_sec")
+    h_acc, v_acc = pvt.values.get("h_accuracy_m"), pvt.values.get("v_accuracy_m")
+    if pvt_good:
+        parts = [mode_text, f"{pvt.values.get('satellites', '?')} SVs",
+                 "no corrections" if corr_age is None else f"corrections {corr_age:.1f} s old"]
+        if h_acc is not None and v_acc is not None:
+            parts.append(f"H {h_acc:.2f} m V {v_acc:.2f} m")
+        position_text = "; ".join(parts)
+    else:
+        position_text = "Missing, stale or invalid PVT solution"
+    position_ok = pvt_good and (rtk_fixed or not require_rtk_fixed)
     clock = timing.get("checks", {}).get("PPS", check(False, "No chrony evidence"))
     if now - timing.get("received", -100) > 6:
         clock = check(False, "Chrony observation stale")
     message = "Receiver data live" if live else "GNSS data connection lost" if connection is False else "Unknown; no receiver evidence"
-    message += "; PVT valid" if pvt_good else "; position fix unavailable"
+    message += f"; {mode_text}" if pvt_good else "; position fix unavailable"
+    if pvt_good and require_rtk_fixed and not rtk_fixed:
+        message += " (RTK fixed required)"
     if clock.level == 0:
         message += "; PPS locked"
+    metrics = {key: ("n/a" if value is None else value) for key, value in pvt.metrics(now).items()}
     return grouped(connection, message, {
         "Receiver": check(live, transport, **receiver.metrics(now)),
-        "Position": check(pvt_good, "Fresh receiver PVT solution" if pvt_good else "Missing, stale or invalid PVT solution", **pvt.metrics(now)),
+        "Position": check(position_ok, position_text, **metrics),
         "Timing": clock,
     })

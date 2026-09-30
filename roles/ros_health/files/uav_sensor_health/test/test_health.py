@@ -4,7 +4,7 @@ import unittest
 
 from uav_sensor_health.core import Assessment, ERROR, OK, WARN
 from uav_sensor_health.health import Sample, check, grouped, lidar_health, px4_health, hflow_health, jetson_health, jetson_identity
-from uav_sensor_health.observers import sbf_blocks, chrony_assessment, ptp_assessment, gnss_health
+from uav_sensor_health.observers import sbf_blocks, chrony_assessment, ptp_assessment, gnss_health, parse_pvt_geodetic
 
 
 def sample(values, now=20, stamp=None):
@@ -243,3 +243,49 @@ class PX4BarometerTests(unittest.TestCase):
         stale = px4_health({**hb, "SCALED_PRESSURE": sample({"press_abs": 1013.25, "temperature": 2134}, now=10)},
                            {"connected": True, "message": "ok"}, 20, 0)
         self.assertEqual(stale.values["Barometer/status"], "WARN")
+
+
+def pvt_block(mode=4, error=0, sats=9, corr_age=120, h=12, v=20, reference_id=42):
+    block = bytearray(96)
+    block[:2] = b"$@"
+    struct.pack_into("<HH", block, 4, 4007, 96)
+    struct.pack_into("<IH", block, 8, 123000, 2380)
+    block[14], block[15], block[74] = mode, error, sats
+    struct.pack_into("<HH", block, 76, reference_id, corr_age)
+    struct.pack_into("<HH", block, 90, h, v)
+    struct.pack_into("<H", block, 2, binascii.crc_hqx(block[4:], 0))
+    return bytes(block)
+
+
+class GnssRtkTests(unittest.TestCase):
+    timing = {"received": 20, "checks": {"PPS": check(True, "PPS locked")}}
+
+    def test_parse_pvt_geodetic(self):
+        values, stamp = parse_pvt_geodetic(pvt_block(mode=5, corr_age=123, h=36, v=50))
+        self.assertEqual((values["mode"], values["mode_text"], values["satellites"]), (5, "RTK float", 9))
+        self.assertEqual((values["mean_corr_age_sec"], values["h_accuracy_m"], values["v_accuracy_m"], values["reference_id"]),
+                         (1.23, 0.36, 0.5, 42))
+        self.assertEqual(stamp, (123000, 2380))
+        self.assertIsNone(parse_pvt_geodetic(pvt_block(corr_age=65535))[0]["mean_corr_age_sec"])
+        found, _ = sbf_blocks(pvt_block())
+        self.assertEqual(found[0][0], 4007)
+
+    def health(self, mode, require=True, **kw):
+        values, _ = parse_pvt_geodetic(pvt_block(mode=mode, **kw))
+        return gnss_health({"GNSS": sample({}), "GNSS_PVT": sample(values)}, self.timing, "broker", 20, require)
+
+    def test_rtk_fixed_is_ok_and_anything_less_warns(self):
+        fixed = self.health(4)
+        self.assertEqual(fixed.level, OK)
+        self.assertEqual(fixed.message, "Receiver data live; RTK fixed; PPS locked")
+        self.assertEqual(fixed.values["Position/message"], "RTK fixed; 9 SVs; corrections 1.2 s old; H 0.12 m V 0.20 m")
+        flt = self.health(5)
+        self.assertEqual(flt.level, WARN)
+        self.assertEqual(flt.message, "Receiver data live; RTK float (RTK fixed required); PPS locked")
+        self.assertEqual(flt.values["Position/status"], "WARN")
+        alone = self.health(1, corr_age=65535)
+        self.assertEqual(alone.level, WARN)
+        self.assertIn("stand-alone; 9 SVs; no corrections", alone.values["Position/message"])
+        self.assertEqual(alone.values["Position/mean_corr_age_sec"], "n/a")
+        self.assertEqual(self.health(5, require=False).level, OK)
+        self.assertEqual(self.health(7).level, OK)   # moving-base RTK fixed counts as fixed

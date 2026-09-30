@@ -22,6 +22,9 @@ ros_health_hflow_flow_topic: /hflow/sensor_optical_flow   # from uav-hflow (CAN 
 ros_health_hflow_range_topic: /hflow/range
 ros_health_hflow_min_quality: 20
 ros_health_gnss_broker_port: 28785
+# This airframe navigates on RTK: anything below RTK fixed is a WARN on the
+# GNSS row (float, DGNSS, stand-alone). Set false for a non-RTK build.
+ros_health_gnss_require_rtk_fixed: true
 ros_health_ptp_status_path: /run/uav/time/ptp-status.json
 # Official release/1.17, matching the Pixhawk firmware's message generation.
 ros_health_px4_workspace: /opt/uav/px4_msgs

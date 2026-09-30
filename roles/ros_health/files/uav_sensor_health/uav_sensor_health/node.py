@@ -38,6 +38,7 @@ class SensorHealth(Node):
             "hflow_flow_topic": "/hflow/sensor_optical_flow", "hflow_range_topic": "/hflow/range",
             "hflow_min_quality": 20,
             "gnss_broker_port": 28785, "ptp_status_path": "/run/uav/time/ptp-status.json",
+            "gnss_require_rtk_fixed": True,
         }
         self.declare_parameters("", list(defaults.items()))
         self.params = params = {key: self.get_parameter(key).value for key in defaults}
@@ -176,7 +177,7 @@ class SensorHealth(Node):
         results.extend([
             ("H-FLOW Landing Sensor", str(self.drivers.get("hflow/driver", Sample()).values.get("hardware_id", "H-Flow DroneCAN")),
              hflow_health(self.hflow["flow"], self.hflow["range"], self.drivers.get("hflow/driver", Sample()), now, self.params["hflow_min_quality"])),
-            ("GNSS Receiver", "Septentrio", gnss_health(samples, timing, gnss_transport, now)),
+            ("GNSS Receiver", "Septentrio", gnss_health(samples, timing, gnss_transport, now, bool(self.params["gnss_require_rtk_fixed"]))),
             ("Hadron Thermal Camera", "Hadron 640R+", grouped(None, "Not integrated; runtime health unknown", {
                 "Integration": check(False, "No thermal driver/health source configured")})),
             ("PX4 / MAVLink", "MAVLink 1/1", px4_health(samples, transport, now, self.started, self.params["startup_grace_sec"])),

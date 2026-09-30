@@ -17,4 +17,5 @@ uav_sensor_health:
     hflow_range_topic: {{ ros_health_hflow_range_topic | to_json }}
     hflow_min_quality: {{ ros_health_hflow_min_quality | int }}
     gnss_broker_port: {{ ros_health_gnss_broker_port | int }}
+    gnss_require_rtk_fixed: {{ ros_health_gnss_require_rtk_fixed | bool | lower }}
     ptp_status_path: {{ ros_health_ptp_status_path | to_json }}
