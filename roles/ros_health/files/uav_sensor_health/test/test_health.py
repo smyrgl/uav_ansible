@@ -3,7 +3,7 @@ import struct
 import unittest
 
 from uav_sensor_health.core import Assessment, ERROR, OK, WARN
-from uav_sensor_health.health import Sample, check, grouped, lidar_health, px4_health, hflow_health
+from uav_sensor_health.health import Sample, check, grouped, lidar_health, px4_health, hflow_health, jetson_health, jetson_identity
 from uav_sensor_health.observers import sbf_blocks, chrony_assessment, ptp_assessment, gnss_health
 
 
@@ -172,3 +172,74 @@ class TestClockEvidence(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+
+def jetson_rows(now, tj="62.00C", tj_level=OK):
+    return {
+        "jetson_stats/board/Status": (now, OK, "NV Power[0] MAXN - JC inactive", {"NV Power-Mode": "MAXN", "jetson_clocks": "inactive"}, "aarch64"),
+        "jetson_stats/board/Config": (now, OK, "NVIDIA Jetson Orin NX - Jetpack 7.2", {"Module": "NVIDIA Jetson Orin NX (16GB ram)", "Jetpack": "7.2"}, "aarch64"),
+        "jetson_stats/temp/CPU": (now, OK, "52.50C", {}, "aarch64"),
+        "jetson_stats/temp/tj": (now, tj_level, tj, {}, "aarch64"),
+        "jetson_stats/temp/CV0": (now, OK, "Offline", {}, "aarch64"),
+        "jetson_stats/power/VDD_IN": (now, OK, "18.4W", {"Power": "18.4W", "Average": "17.9W"}, "aarch64"),
+        "jetson_stats/power/VDD_CPU_GPU_CV": (now, OK, "4200mW", {"Power": "4200mW"}, "aarch64"),
+        "jetson_stats/cpu/0": (now, OK, " 41.00%", {}, "aarch64"),
+        "jetson_stats/cpu/1": (now, OK, " 21.00%", {}, "aarch64"),
+        "jetson_stats/cpu/2": (now, OK, "OFF", {}, "aarch64"),
+        "jetson_stats/gpu/gpu": (now, OK, " 12.00%", {}, "aarch64"),
+        "jetson_stats/fan/pwmfan": (now, OK, " 40%", {"Profile": "quiet", "RPM 0": "2100RPM"}, "aarch64"),
+        "jetson_stats/mem/RAM": (now, OK, "21% - 9.8G lfb", {}, "aarch64"),
+    }
+
+
+class JetsonHealthTests(unittest.TestCase):
+    def test_summary_row_from_jetson_stats(self):
+        result = jetson_health(jetson_rows(100.0), 100.4)
+        self.assertEqual(result.level, OK)
+        self.assertEqual(result.message, "tj 62.0 C, VDD_IN 18.4 W, fan 40%, CPU 31 % x2, GPU 12 %, MAXN")
+        self.assertEqual(result.values["Thermal/tj_c"], 62.0)
+        self.assertEqual(result.values["Thermal/CPU_c"], 52.5)
+        self.assertNotIn("Thermal/CV0_c", result.values)          # offline zones are skipped
+        self.assertEqual(result.values["Power/VDD_CPU_GPU_CV"], "4200mW")
+        self.assertEqual(result.values["Board/Module"], "NVIDIA Jetson Orin NX (16GB ram)")
+        self.assertEqual(jetson_identity(jetson_rows(1.0)), "NVIDIA Jetson Orin NX (16GB ram)")
+
+    def test_hottest_zone_without_tj_and_upstream_warn(self):
+        rows = jetson_rows(50.0); del rows["jetson_stats/temp/tj"]
+        rows["jetson_stats/temp/CPU"] = (50.0, WARN, "86.00C", {}, "aarch64")
+        result = jetson_health(rows, 50.0)
+        self.assertEqual(result.level, WARN)
+        self.assertTrue(result.message.startswith("CPU 86.0 C"))
+        self.assertIn("Thermal", result.values["Attention"])
+
+    def test_bogus_upstream_threshold_does_not_alarm(self):
+        rows = jetson_rows(10.0)
+        rows["jetson_stats/temp/nvme Sensor 2"] = (10.0, ERROR, "65.85C more than -256.00C", {}, "aarch64")
+        result = jetson_health(rows, 10.0)
+        self.assertEqual(result.level, OK)
+        self.assertAlmostEqual(result.values["Thermal/nvme Sensor 2_c"], 65.85, places=1)
+        self.assertNotIn("CRITICAL", result.message)
+
+    def test_critical_temperature_is_error_and_stale_rows_are_warn(self):
+        rows = jetson_rows(100.0, tj="101.00C more than 100.00C", tj_level=ERROR)
+        self.assertEqual(jetson_health(rows, 100.5).level, ERROR)
+        self.assertIn("THERMAL CRITICAL", jetson_health(rows, 100.5).message)
+        stale = jetson_health(rows, 120.0)
+        self.assertEqual(stale.level, WARN)
+        self.assertIn("stale for 20 s", stale.message)
+        self.assertEqual(jetson_health({}, 1.0).level, WARN)
+        self.assertEqual(jetson_identity({}), "Jetson")
+
+
+class PX4BarometerTests(unittest.TestCase):
+    def test_barometer_section_is_optional_then_informational(self):
+        hb = {"HEARTBEAT": sample({"type": 2}, now=20)}
+        without = px4_health(hb, {"connected": True, "message": "ok"}, 20, 0)
+        self.assertNotIn("Barometer/status", without.values)
+        with_baro = px4_health({**hb, "SCALED_PRESSURE": sample({"press_abs": 1013.25, "temperature": 2134, "time_boot_ms": 5}, now=20)},
+                               {"connected": True, "message": "ok"}, 20, 0)
+        self.assertEqual(with_baro.level, OK)
+        self.assertEqual(with_baro.values["Barometer/message"], "FC baro 21.3 C, 1013.2 hPa")
+        stale = px4_health({**hb, "SCALED_PRESSURE": sample({"press_abs": 1013.25, "temperature": 2134}, now=10)},
+                           {"connected": True, "message": "ok"}, 20, 0)
+        self.assertEqual(stale.values["Barometer/status"], "WARN")

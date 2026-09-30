@@ -1,0 +1,13 @@
+---
+jetson_stats_user: "{{ uav_ros_user | default('uav-ros') }}"
+jetson_stats_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+jetson_stats_workspace: "{{ uav_ros_workspace | default('/opt/uav/ros') }}"
+jetson_stats_interval_sec: 1.0
+# The jtop client library, pinned to the running jtop.service version (the jtop
+# role installs the same pin). jetson-stats 7.x lives in a per-user venv, so the
+# ROS node gets its own.
+jetson_stats_version: "7.2.1"
+jetson_stats_venv: /opt/uav/jtop-venv
+# Vendored from NVIDIA-ISAAC-ROS/isaac_ros_jetson, branch release-4.6 (Jazzy),
+# commit b282ff3415ddcdcbec5701a523de7042933b43f4 ("Isaac ROS 4.6", 2026-08-19), MIT.
+jetson_stats_upstream_commit: b282ff3415ddcdcbec5701a523de7042933b43f4

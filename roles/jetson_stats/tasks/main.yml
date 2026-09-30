@@ -1,0 +1,81 @@
+---
+# NVIDIA's isaac_ros_jetson_stats: jtop -> /diagnostics (CPU, GPU, engines,
+# memory, thermal zones, power rails, fan, board). Built from vendored source
+# in the inspection workspace; the jtop service itself comes from the jtop role.
+# Its diagnostic_aggregator launch is not used: Foxglove and the health node
+# read /diagnostics directly.
+- name: Install ROS build dependencies
+  ansible.builtin.apt:
+    name:
+      - python3-colcon-common-extensions
+      - python3-venv
+      - "ros-{{ ros_distro }}-rclpy"
+      - "ros-{{ ros_distro }}-diagnostic-msgs"
+      - "ros-{{ ros_distro }}-rosidl-default-generators"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# jetson-stats 7.x installs into a per-user venv (~/.local/share/jtop) and the
+# service runs from there, so no system interpreter can `import jtop`. The node
+# gets its own pinned client runtime; client and service versions must match.
+- name: Install the jtop client library in its own runtime
+  ansible.builtin.pip:
+    name: "jetson-stats=={{ jetson_stats_version }}"
+    virtualenv: "{{ jetson_stats_venv }}"
+    virtualenv_command: /usr/bin/python3 -m venv
+    virtualenv_site_packages: true
+  notify: Restart jetson stats
+
+# jetson-stats creates the jtop group; only members may talk to jtop.service.
+- name: Let the ROS service user talk to the jtop service
+  ansible.builtin.user:
+    name: "{{ jetson_stats_user }}"
+    groups: jtop
+    append: true
+  notify: Restart jetson stats
+
+- name: Install the vendored isaac_ros_jetson packages
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "{{ jetson_stats_workspace }}/src/"
+    owner: root
+    group: root
+    mode: preserve
+  loop:
+    - isaac_ros_jetson_stats_services
+    - isaac_ros_jetson_stats
+  register: jetson_stats_source
+  notify: Restart jetson stats
+
+- name: Check the installed jtop node executable
+  ansible.builtin.stat:
+    path: "{{ jetson_stats_workspace }}/install/lib/isaac_ros_jetson_stats/jtop"
+  register: jetson_stats_executable
+
+# The vendored services CMakeLists has upstream's isaac_ros_common version-info
+# block removed, so no Isaac ROS installation is needed to build these.
+- name: Build the jetson stats packages
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    /usr/bin/colcon build --packages-select isaac_ros_jetson_stats_services isaac_ros_jetson_stats --merge-install
+  args:
+    executable: /bin/bash
+    chdir: "{{ jetson_stats_workspace }}"
+  when: jetson_stats_source is changed or not jetson_stats_executable.stat.exists
+  notify: Restart jetson stats
+
+- name: Install the jetson stats service
+  ansible.builtin.template:
+    src: uav-jetson-stats.service.j2
+    dest: /etc/systemd/system/uav-jetson-stats.service
+    mode: "0644"
+  notify: Restart jetson stats
+
+- name: Enable the jetson stats service at boot
+  ansible.builtin.systemd_service:
+    name: uav-jetson-stats.service
+    enabled: true
+    state: started
+    daemon_reload: true

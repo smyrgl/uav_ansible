@@ -104,7 +104,7 @@ class Observers:
                 self.sock = sock
             def write(self, data):
                 self.sock.sendall(data)
-        wanted = {"HEARTBEAT", "GPS_RAW_INT"}   # H-Flow is observed on CAN, not via MAVLink
+        wanted = {"HEARTBEAT", "GPS_RAW_INT", "SCALED_PRESSURE"}   # H-Flow is observed on CAN; SCALED_PRESSURE = FC baro (bay air)
         while not self.stop.is_set():
             link = None
             try:

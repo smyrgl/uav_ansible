@@ -63,6 +63,8 @@
       tags: ['ros_health', 'ros_inspection']
     - role: foxglove
       tags: ['foxglove', 'ros_inspection']
+    - role: jetson_stats         # jtop -> /diagnostics (vendored isaac_ros_jetson_stats)
+      tags: ['jetson_stats', 'ros_inspection']
     - role: px4_bridge           # uORB -> ROS-native ENU/FLU (needs the px4_msgs overlay from ros_health)
       tags: ['px4_bridge', 'ros_inspection']
     - role: gnss_ros             # Septentrio ROS 2 driver on the read-only SBF fan-out

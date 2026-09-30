@@ -16,7 +16,7 @@ from px4_msgs import msg as px4_messages
 from .dds import TOPICS, topic_name, dds_health
 
 from .core import ImageMetadata, StreamMonitor, OK
-from .health import Sample, check, grouped, lidar_health, px4_health, hflow_health
+from .health import Sample, check, grouped, lidar_health, px4_health, hflow_health, jetson_health, jetson_identity
 from .observers import Observers, gnss_health
 
 
@@ -46,6 +46,7 @@ class SensorHealth(Node):
         self.monitors, self.topics, self.subs = {}, {}, []
         self.clouds = {kind: Sample() for kind in ("avia", "e1r")}
         self.drivers = {}
+        self.jetson = {}   # isaac_ros_jetson_stats rows: name -> (received, level, message, values, hardware_id)
         self.dds_samples, self.dds_topics = {}, {}
         qos = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=1,
                          reliability=ReliabilityPolicy.BEST_EFFORT,
@@ -123,9 +124,13 @@ class SensorHealth(Node):
 
     def _diagnostics(self, msg):
         for status in msg.status:
+            level = status.level[0] if isinstance(status.level, bytes) else int(status.level)
+            if status.name.startswith("jetson_stats/"):
+                self.jetson[status.name] = (time.monotonic(), level, status.message,
+                                            {v.key: v.value for v in status.values}, status.hardware_id)
+                continue
             if status.name not in ("avia/driver", "avia/clock", "e1r/driver", "hflow/driver"):
                 continue  # including our own summaries: no feedback loop
-            level = status.level[0] if isinstance(status.level, bytes) else int(status.level)
             self.drivers.setdefault(status.name, Sample()).observe(time.monotonic(), {
                 **{v.key: v.value for v in status.values}, "level": level,
                 "message": status.message, "hardware_id": status.hardware_id})
@@ -175,6 +180,7 @@ class SensorHealth(Node):
             ("Hadron Thermal Camera", "Hadron 640R+", grouped(None, "Not integrated; runtime health unknown", {
                 "Integration": check(False, "No thermal driver/health source configured")})),
             ("PX4 / MAVLink", "MAVLink 1/1", px4_health(samples, transport, now, self.started, self.params["startup_grace_sec"])),
+            ("Jetson Companion", jetson_identity(self.jetson), jetson_health(self.jetson, now)),
         ])
         results.append(("PX4 / DDS", "PX4 1.17", dds_health(
             self.dds_samples, self.dds_topics, now, self.started, self.params["startup_grace_sec"],

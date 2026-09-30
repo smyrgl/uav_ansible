@@ -3,12 +3,36 @@
 # PEP 668 marks the system Python "externally managed", so a plain `pip install`
 # is refused. Install deliberately with --break-system-packages into the system
 # location so the bundled systemd service is registered.
-- name: Install jetson-stats (jtop)
+- name: Read the installed jtop version
+  ansible.builtin.command: /usr/local/bin/jtop --version
+  register: jtop_installed
+  changed_when: false
+  failed_when: false
+
+# The upstream non-root installer keeps jetson-stats in the installing user's
+# ~/.local/share/jtop venv and points jtop.service at it. Upgrade in place when
+# that layout exists; otherwise install system-wide (PEP 668 needs the flag).
+- name: Detect the non-root installer's venv
+  ansible.builtin.stat:
+    path: "/home/{{ target_user }}/.local/share/jtop/bin/pip"
+  register: jtop_user_venv
+
+- name: Install jetson-stats in the non-root installer's venv
+  become_user: "{{ target_user }}"
   ansible.builtin.pip:
-    name: "jetson-stats{{ ('==' + jetson_stats_version) if jetson_stats_version else '' }}"
+    name: "jetson-stats=={{ jetson_stats_version }}"
+    virtualenv: "/home/{{ target_user }}/.local/share/jtop"
+  when: jtop_user_venv.stat.exists and jetson_stats_version not in (jtop_installed.stdout | default(''))
+  notify: Restart jtop
+
+- name: Install jetson-stats (jtop) system-wide
+  ansible.builtin.pip:
+    name: "jetson-stats=={{ jetson_stats_version }}"
     state: present
     extra_args: "--break-system-packages"
     executable: pip3
+  when: not jtop_user_venv.stat.exists and jetson_stats_version not in (jtop_installed.stdout | default(''))
+  notify: Restart jtop
 
 - name: Ensure jtop.service is enabled and running
   ansible.builtin.systemd:

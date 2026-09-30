@@ -130,3 +130,16 @@
   delay: 2
   changed_when: false
   when: wifi_enabled and lan_cutover is changed
+
+# --- mDNS ---------------------------------------------------------------------
+# jethawk.local must resolve to IPv4. With AAAA records published, macOS
+# prefers the ULA IPv6 address the router hands out, which defeats host-key
+# pinning by address and every IPv4-only tool on the bench.
+- name: Publish mDNS over IPv4 only
+  ansible.builtin.lineinfile:
+    path: /etc/avahi/avahi-daemon.conf
+    regexp: '^#?\s*use-ipv6='
+    line: use-ipv6=no
+    insertafter: '^\[server\]'
+  notify: Restart avahi
+  tags: [mdns]

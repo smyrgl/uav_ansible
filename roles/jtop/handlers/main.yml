@@ -1,0 +1,6 @@
+---
+- name: Restart jtop
+  ansible.builtin.systemd:
+    name: jtop.service
+    state: restarted
+    daemon_reload: true

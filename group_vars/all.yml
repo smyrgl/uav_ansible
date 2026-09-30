@@ -92,13 +92,16 @@ ptp_address: "192.168.145.1/30"
 # Depends on the dongle's DKMS driver (kernel_modules) being loaded first.
 wifi_enabled: true
 wifi_interface: "wlx7419f815e6a9"  # rtl8852cu dongle — confirmed via ip -br link
+# Address: DHCP with a fixed lease on the UniFi gateway (74:19:f8:15:e6:a9 ->
+# 192.168.1.42), so the name `jethawk` stays in the gateway DNS and the address
+# never moves; a netplan static here would race the DHCP pool instead.
 wifi_ssid: "{{ vault_wifi_ssid | default('TODO') }}"
 wifi_password: "{{ vault_wifi_password | default('CHANGEME') }}"
 
 # =============================================================================
 # jtop
 # =============================================================================
-jetson_stats_version: "7.1.5"
+jetson_stats_version: "7.2.1"   # jtop service and the ROS client library must match
 
 # =============================================================================
 # kernel_modules  (AUDIT FIRST — only build what's genuinely missing)
@@ -397,6 +400,9 @@ foxglove_message_backlog_size: 128
 foxglove_depth_throttle_hz: 2.0
 # The airframe description (Blender + LinkForge authoring, exported ROS
 # package) lives in this repository: x950_description/ at the root.
+# Jetson platform stats (isaac_ros_jetson_stats on jtop) -> /diagnostics
+jetson_stats_interval_sec: 1.0
+
 robot_description_source_dir: "{{ playbook_dir }}/x950_description"
 
 # =============================================================================

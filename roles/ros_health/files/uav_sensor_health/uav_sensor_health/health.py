@@ -7,6 +7,7 @@ timing limitations are WARN. These are observability rules, not fusion gates.
 from collections import deque
 from dataclasses import dataclass, field
 import math
+import re
 
 from .core import Assessment, OK, WARN, ERROR
 
@@ -120,11 +121,20 @@ def px4_health(samples, transport, now, started, grace=10.0):
     live = heartbeat.fresh(now, 3)
     # A router TCP connection or camera heartbeat does NOT prove PX4 is present.
     connected = True if live else None if now - started < grace else False
-    return grouped(connected, "Autopilot heartbeat live" if live else "No PX4 heartbeat through MAVLink router", {
+    sections = {
         "MAVLink": check(live, "PX4 1/1 heartbeat received" if live else "PX4 link unavailable; camera traffic does not count",
                          **heartbeat.metrics(now)),
         "Router": check(transport.get("connected", False), transport.get("message", "Starting observer")),
-    })
+    }
+    # FC barometer (SCALED_PRESSURE): bay air temperature and static pressure.
+    # Informational: absent from the stream is not a fault, stale is.
+    baro = samples.get("SCALED_PRESSURE")
+    if baro is not None:
+        temp_c, press = number(baro.values, "temperature") / 100.0, number(baro.values, "press_abs")
+        sections["Barometer"] = check(baro.fresh(now, 5), f"FC baro {temp_c:.1f} C, {press:.1f} hPa" if baro.fresh(now, 5)
+                                      else "SCALED_PRESSURE stale", temperature_c=round(temp_c, 2), pressure_hpa=round(press, 2),
+                                      **baro.metrics(now))
+    return grouped(connected, "Autopilot heartbeat live" if live else "No PX4 heartbeat through MAVLink router", sections)
 
 
 def hflow_health(flow, distance, driver, now, quality_min=20):
@@ -164,3 +174,111 @@ def hflow_health(flow, distance, driver, now, quality_min=20):
         "Timing": check(False, "Host receipt timestamps; the H-Flow sends no DroneCAN time (no bus time sync)"),
         "Identity": check(True, str(driver.values.get("hardware_id", "H-Flow DroneCAN node")) + "; observed by uav-hflow on the FC's CAN2 bus, the same frames PX4 fuses"),
     })
+
+
+def _parse_number(text, default=None):
+    found = re.search(r"[-+]?\d+(?:\.\d+)?", str(text))
+    return float(found.group()) if found else default
+
+
+def jetson_identity(entries):
+    """Module name from jetson_stats/board/Config, for the row's source id."""
+    config = entries.get("jetson_stats/board/Config")
+    if config:
+        values = config[3]
+        return str(values.get("Module") or values.get("Model") or config[4] or "Jetson")
+    return "Jetson"
+
+
+def jetson_health(entries, now, timeout=5.0, temp_warn=84.0, temp_crit=100.0):
+    """Fold isaac_ros_jetson_stats rows into one summary.
+
+    entries: name -> (received_mono, level, message, values, hardware_id) as
+    captured from /diagnostics. Thermal zones drive the level, judged from the
+    reported temperature against the upstream thresholds (84 C WARN, 100 C
+    ERROR) rather than the upstream level: NVMe SMART zones carry a bogus
+    -256 C critical threshold, which makes the upstream node flag them ERROR
+    at room temperature. A genuinely critical zone is the one case where a
+    connected device reports ERROR, because it is about to throttle.
+    """
+    fresh = {name: e for name, e in entries.items() if now - e[0] <= timeout}
+    if not fresh:
+        if entries:
+            age = now - max(e[0] for e in entries.values())
+            return grouped(None, f"jetson_stats rows stale for {age:.0f} s (uav-jetson-stats down?)",
+                           {"Publisher": check(False, "jetson_stats diagnostics stale")})
+        return grouped(None, "No jetson_stats rows observed", {"Publisher": check(False, "jetson_stats diagnostics never received")})
+
+    def group(prefix):
+        return {name[len(prefix):]: e for name, e in fresh.items() if name.startswith(prefix)}
+
+    def levels_ok(rows):
+        return all(e[1] == OK for e in rows.values())
+
+    temps_raw = group("jetson_stats/temp/")
+    temps = {zone: _parse_number(e[2]) for zone, e in temps_raw.items() if not str(e[2]).startswith("Offline")}
+    temps = {zone: t for zone, t in temps.items() if t is not None}
+    if "tj" in temps:
+        hottest = ("tj", temps["tj"])
+    elif temps:
+        hottest = max(temps.items(), key=lambda kv: kv[1])
+    else:
+        hottest = None
+    critical = any(t >= temp_crit for t in temps.values())
+    thermal = check(bool(temps) and all(t < temp_warn for t in temps.values()),
+                    ("THERMAL CRITICAL: " if critical else "") + (f"{hottest[0]} {hottest[1]:.1f} C" if hottest else "no thermal zones"),
+                    **{f"{zone}_c": round(t, 1) for zone, t in sorted(temps.items())})
+
+    power = group("jetson_stats/power/")
+    total = None
+    for rail in ("VDD_IN", "TOT", "POM_5V_IN", "VDD_GPU_SOC"):
+        if rail in power:
+            total = (rail, power[rail]); break
+    if total is None and power:
+        total = next(iter(power.items()))
+    def watts(entry):
+        text = str(entry[3].get("Power", entry[2]))
+        value = _parse_number(text)
+        return None if value is None else (value / 1000.0 if "mW" in text else value)
+    total_w = watts(total[1]) if total else None
+    power_section = check(bool(power) and levels_ok(power), f"{total[0]} {total_w:.1f} W" if total_w is not None else "no power rails",
+                          **{rail: str(e[3].get("Power", e[2])).strip() for rail, e in sorted(power.items())})
+
+    cpus = group("jetson_stats/cpu/")
+    loads = [v for v in (_parse_number(e[2]) for e in cpus.values() if not str(e[2]).strip().startswith("OFF")) if v is not None]
+    gpus = group("jetson_stats/gpu/")
+    gpu_load = next((v for v in (_parse_number(e[2]) for e in gpus.values()) if v is not None), None)
+    compute_text = ", ".join(part for part in (
+        f"CPU {sum(loads) / len(loads):.0f} % x{len(loads)}" if loads else None,
+        f"GPU {gpu_load:.0f} %" if gpu_load is not None else None) if part)
+    compute = check(bool(cpus or gpus) and levels_ok(cpus) and levels_ok(gpus), compute_text or "no load rows",
+                    **{f"cpu{n}": str(e[2]).strip() for n, e in sorted(cpus.items())},
+                    **{f"gpu_{n}": str(e[2]).strip() for n, e in gpus.items()})
+
+    memory = group("jetson_stats/mem/")
+    mem = check(levels_ok(memory), str(memory["RAM"][2]).strip() if "RAM" in memory else (
+        str(memory["ram"][2]).strip() if "ram" in memory else "no memory rows"), **{k: str(e[2]).strip() for k, e in sorted(memory.items())})
+
+    fans = group("jetson_stats/fan/")
+    fan_text = ", ".join(f"{name} {str(e[2]).strip()}" for name, e in sorted(fans.items())) or "no fan rows"
+    fan = check(levels_ok(fans), fan_text, **{f"{name}/{v}": val for name, e in fans.items() for v, val in e[3].items()})
+
+    board = fresh.get("jetson_stats/board/Status")
+    config = fresh.get("jetson_stats/board/Config")
+    board_values = {**({k: v for k, v in board[3].items()} if board else {}),
+                    **({k: config[3][k] for k in ("Model", "Module", "Jetpack", "L4T") if k in config[3]} if config else {})}
+    mode = board[3].get("NV Power-Mode") if board else None
+    board_section = check(board is not None and board[1] == OK, board[2] if board else "no board status", **board_values)
+
+    summary = ", ".join(part for part in (
+        thermal.message, power_section.message if total_w is not None else None,
+        f"fan {str(next(iter(fans.values()))[2]).strip()}" if fans else None,
+        compute_text or None, mode) if part)
+    result = grouped(True, summary, {"Thermal": thermal, "Power": power_section, "Compute": compute,
+                                     "Memory": mem, "Fan": fan, "Board": board_section})
+    if critical:
+        try:
+            result.level = ERROR
+        except Exception:
+            result = Assessment(ERROR, result.message, result.values)
+    return result

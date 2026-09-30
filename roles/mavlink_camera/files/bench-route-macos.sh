@@ -2,7 +2,7 @@
 # Mac-only, temporary host route. No subnet/default route changes.
 set -eu
 destination=192.168.144.1
-gateway=${2:-192.168.1.40}
+gateway=${2:-192.168.1.42}   # the Jetson's wifi address: a UniFi DHCP reservation, see group_vars
 case "$(uname -s)" in Darwin) ;; *) echo 'This helper is for macOS only.' >&2; exit 1;; esac
 case "${1:-status}" in
   status) /sbin/route -n get "$destination" ;;

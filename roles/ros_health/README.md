@@ -27,7 +27,8 @@ E1R's strict timestamp gates or certify data for flight/fusion.
 | E1R | ROS clouds, MSOP/DIFOP packet freshness, gPTP status, verified UTC offset and host PHC evidence |
 | H-FLOW | Configured PX4 optical-flow instance and downward distance instance, measurement progression, flow quality and range validity |
 | GNSS | CRC-valid SBF via the read-only broker, fresh PVT solution, chrony's selected PPS source and clock error |
-| PX4 / MAVLink | Heartbeats specifically from system 1/component 1 via the router; camera heartbeats do not count |
+| PX4 / MAVLink | Heartbeats specifically from system 1/component 1 via the router; camera heartbeats do not count | Also folds the FC barometer (`SCALED_PRESSURE`, bay air temperature and static pressure) in as an informational section when PX4 streams it |
+| Jetson Companion | One summary of the `jetson_stats/*` rows published by the jetson_stats role (isaac_ros_jetson_stats on jtop): hottest thermal zone, VDD_IN draw, fan, CPU/GPU load, nvpmodel. Thermal zones drive the level; a zone past the upstream 100 °C mark is the one connected-device ERROR |
 | PX4 / DDS | Actual periodic uORB sample receipt, rates, timestamp progress and timesync evidence |
 | Hadron | Explicit not-integrated/unknown until a thermal health source is configured |
 
@@ -77,7 +78,7 @@ into the live ROS domain or disconnect hardware to test diagnostics.
 
 `/uav/health` contains human-readable names: D555 Camera, Avia LiDAR, E1R
 LiDAR, H-FLOW Landing Sensor, GNSS Receiver, Hadron Thermal Camera,
-PX4 / MAVLink, and PX4 / DDS. `hardware_id` is deliberately empty because
+PX4 / MAVLink, PX4 / DDS, and Jetson Companion. `hardware_id` is deliberately empty because
 Foxglove prefixes it to every title. Technical identifiers remain under
 `Identity/source_id` in the details.
 
