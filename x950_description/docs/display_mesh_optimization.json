@@ -1,0 +1,161 @@
+{
+  "status": "complete",
+  "total_display_triangles": 357973,
+  "frames_unchanged": true,
+  "source_files_unchanged": true,
+  "sampled_validation_only": true,
+  "objects": [
+    {
+      "object": "e1r_sensor_visual",
+      "status": "passed",
+      "before": 223214,
+      "after": 17856,
+      "bbox_max_error_m": 4.277750849723816e-05,
+      "sampled_surface_max_error_m": 0.00022520869970321655
+    },
+    {
+      "object": "d555_sensor_visual",
+      "status": "passed",
+      "before": 202874,
+      "after": 32458,
+      "bbox_max_error_m": 2.195686101913452e-05,
+      "sampled_surface_max_error_m": 0.0002267764793941751
+    },
+    {
+      "object": "avia_sensor_visual",
+      "status": "passed",
+      "before": 67543,
+      "after": 8105,
+      "bbox_max_error_m": 8.553266525268555e-06,
+      "sampled_surface_max_error_m": 0.0003401310823392123
+    },
+    {
+      "object": "x950_body_visual",
+      "status": "passed",
+      "before": 96646,
+      "after": 28993,
+      "bbox_max_error_m": 0.0001131594181060791,
+      "sampled_surface_max_error_m": 0.0004974901676177979
+    },
+    {
+      "object": "x950_avionics_bay_cover_visual",
+      "status": "passed",
+      "before": 19502,
+      "after": 14626,
+      "bbox_max_error_m": 3.826618194580078e-05,
+      "sampled_surface_max_error_m": 0.0001014174340525642
+    },
+    {
+      "object": "x950_radio_antenna_port_visual",
+      "status": "passed",
+      "before": 20663,
+      "after": 8265,
+      "bbox_max_error_m": 7.300823926925659e-05,
+      "sampled_surface_max_error_m": 0.00011303278733976185
+    },
+    {
+      "object": "x950_radio_antenna_starboard_visual",
+      "status": "passed",
+      "before": 20663,
+      "after": 8265,
+      "bbox_max_error_m": 7.300823926925659e-05,
+      "sampled_surface_max_error_m": 0.00011302533675916493
+    },
+    {
+      "object": "gnss_main_bracket_visual",
+      "status": "passed",
+      "before": 18966,
+      "after": 4740,
+      "bbox_max_error_m": 3.0338764190673828e-05,
+      "sampled_surface_max_error_m": 7.189099414972588e-05
+    },
+    {
+      "object": "gnss_aux_bracket_visual",
+      "status": "passed",
+      "before": 18966,
+      "after": 4740,
+      "bbox_max_error_m": 1.4036893844604492e-05,
+      "sampled_surface_max_error_m": 7.190883479779586e-05
+    },
+    {
+      "object": "x950_landing_leg_starboard_visual",
+      "status": "passed",
+      "before": 15848,
+      "after": 7924,
+      "bbox_max_error_m": 3.746151924133301e-05,
+      "sampled_surface_max_error_m": 0.00010087635018862784
+    },
+    {
+      "object": "x950_landing_leg_port_visual",
+      "status": "passed",
+      "before": 15848,
+      "after": 7924,
+      "bbox_max_error_m": 3.746151924133301e-05,
+      "sampled_surface_max_error_m": 0.00010087981354445219
+    },
+    {
+      "object": "avia_bracket_visual",
+      "status": "passed",
+      "before": 11260,
+      "after": 3940,
+      "bbox_max_error_m": 0.0,
+      "sampled_surface_max_error_m": 5.5364358559018e-05
+    },
+    {
+      "object": "x950_battery_bay_port_tab_visual",
+      "status": "passed",
+      "before": 10060,
+      "after": 3018,
+      "bbox_max_error_m": 4.9561262130737305e-05,
+      "sampled_surface_max_error_m": 0.0001511760347057134
+    },
+    {
+      "object": "x950_batterh_bay_starboard_tab_visual",
+      "status": "passed",
+      "before": 10060,
+      "after": 3018,
+      "bbox_max_error_m": 8.991360664367676e-05,
+      "sampled_surface_max_error_m": 0.00015282251115422696
+    },
+    {
+      "object": "e1r_bracket_v01_visual",
+      "status": "passed",
+      "before": 10038,
+      "after": 3512,
+      "bbox_max_error_m": 8.687376976013184e-06,
+      "sampled_surface_max_error_m": 4.741775774164125e-05
+    },
+    {
+      "object": "x950_m1_motor_visual",
+      "status": "passed",
+      "before": 42644,
+      "after": 17057,
+      "bbox_max_error_m": 4.5552849769592285e-05,
+      "sampled_surface_max_error_m": 0.00022304955928120762
+    },
+    {
+      "object": "x950_m2_motor_visual",
+      "status": "passed",
+      "before": 42644,
+      "after": 17057,
+      "bbox_max_error_m": 2.5480985641479492e-05,
+      "sampled_surface_max_error_m": 0.00019002900808118284
+    },
+    {
+      "object": "x950_m3_motor_visual",
+      "status": "passed",
+      "before": 42644,
+      "after": 17057,
+      "bbox_max_error_m": 2.5480985641479492e-05,
+      "sampled_surface_max_error_m": 0.00019865365175064653
+    },
+    {
+      "object": "x950_m4_motor_visual",
+      "status": "passed",
+      "before": 42644,
+      "after": 17057,
+      "bbox_max_error_m": 4.5552849769592285e-05,
+      "sampled_surface_max_error_m": 0.00018742955580819398
+    }
+  ]
+}

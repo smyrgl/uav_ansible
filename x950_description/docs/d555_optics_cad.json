@@ -1,0 +1,276 @@
+{
+  "schema_version": 1,
+  "source": "D555/D555_SOLID_SOC.STEP",
+  "source_sha256": "b82df75dc3c2c50a38ee81e8a748a96744fbb90676474ec5da96454b84973009",
+  "scope": "Direct mechanical geometry query only; not calibrated optical extrinsics",
+  "source_units": "mm",
+  "source_frame": "X width, Y upright sensor height, Z depth; housing front Z=0 and rear Z=-48",
+  "local_frame_conversion": "d555_link xyz[m] = (Z_step, X_step, Y_step) / 1000; datum is housing front-face centre",
+  "method": [
+    "STEPControl_Reader assembly import with OCP/Open CASCADE",
+    "BRepAdaptor_Surface and BRepAdaptor_Curve axis/radius inspection",
+    "IntCurvesFace_ShapeIntersector at three lens-axis X/Y positions, tolerance 1e-7 mm",
+    "Direct raw STEP entity references and line numbers"
+  ],
+  "geometric_camera_axes": [
+    {
+      "step_x_mm": -47.5,
+      "step_y_mm": 0.0,
+      "axis_direction_step": [
+        0,
+        0,
+        1
+      ],
+      "mechanical_lip_center_step_mm": [
+        -47.5,
+        0,
+        -1.45
+      ],
+      "mechanical_lip_radius_mm": 4.350000333,
+      "mechanical_lip_circle_entity": 105571,
+      "mechanical_lip_point_entity": 123917,
+      "protective_cover_outer_center_step_mm": [
+        -47.5,
+        0,
+        -0.103
+      ],
+      "protective_cover_inner_center_step_mm": [
+        -47.5,
+        0,
+        -0.678
+      ],
+      "modeled_lens_front_axis_intersection_step_mm": [
+        -47.5,
+        0,
+        -1.555081811
+      ],
+      "protective_cover_outer_center_d555_link_m": [
+        -0.000103,
+        -0.0475,
+        0
+      ],
+      "modeled_lens_front_axis_intersection_d555_link_m": [
+        -0.001555081811,
+        -0.0475,
+        0
+      ],
+      "nominal_role": "Outer camera axis; IR1/IR2 assignment requires external sensor-layout reference"
+    },
+    {
+      "step_x_mm": -11.5,
+      "step_y_mm": 0.0,
+      "axis_direction_step": [
+        0,
+        0,
+        1
+      ],
+      "mechanical_lip_center_step_mm": [
+        -11.5,
+        0,
+        -1.45
+      ],
+      "mechanical_lip_radius_mm": 4.350000333,
+      "mechanical_lip_circle_entity": 363584,
+      "mechanical_lip_point_entity": 300496,
+      "protective_cover_outer_center_step_mm": [
+        -11.5,
+        0,
+        -0.103
+      ],
+      "protective_cover_inner_center_step_mm": [
+        -11.5,
+        0,
+        -0.678
+      ],
+      "modeled_lens_front_axis_intersection_step_mm": [
+        -11.5,
+        0,
+        -1.555081811
+      ],
+      "protective_cover_outer_center_d555_link_m": [
+        -0.000103,
+        -0.0115,
+        0
+      ],
+      "modeled_lens_front_axis_intersection_d555_link_m": [
+        -0.001555081811,
+        -0.0115,
+        0
+      ],
+      "nominal_role": "Middle camera axis; RGB assignment requires external sensor-layout reference"
+    },
+    {
+      "step_x_mm": 47.5,
+      "step_y_mm": 0.0,
+      "axis_direction_step": [
+        0,
+        0,
+        1
+      ],
+      "mechanical_lip_center_step_mm": [
+        47.5,
+        0,
+        -1.45
+      ],
+      "mechanical_lip_radius_mm": 4.350000333,
+      "mechanical_lip_circle_entity": 267046,
+      "mechanical_lip_point_entity": 128359,
+      "protective_cover_outer_center_step_mm": [
+        47.5,
+        0,
+        -0.103
+      ],
+      "protective_cover_inner_center_step_mm": [
+        47.5,
+        0,
+        -0.678
+      ],
+      "modeled_lens_front_axis_intersection_step_mm": [
+        47.5,
+        0,
+        -1.555081811
+      ],
+      "protective_cover_outer_center_d555_link_m": [
+        -0.000103,
+        0.0475,
+        0
+      ],
+      "modeled_lens_front_axis_intersection_d555_link_m": [
+        -0.001555081811,
+        0.0475,
+        0
+      ],
+      "nominal_role": "Outer camera axis; IR1/IR2 assignment requires external sensor-layout reference"
+    }
+  ],
+  "axis_distances_mm": {
+    "outer_to_outer": 95.0,
+    "negative_outer_to_middle": 36.0,
+    "middle_to_positive_outer": 59.0
+  },
+  "front_housing_apertures": {
+    "source_solid_index_zero_based": 4,
+    "brep_entity": 51103,
+    "name": "AM0600216-1/MEC060414-1-solid1",
+    "camera_centers_x_mm": [
+      -47.5,
+      -11.5,
+      47.5
+    ],
+    "camera_centers_y_mm": 0.0,
+    "front_ring_z_mm": -0.805,
+    "front_ring_radius_mm": 6.1,
+    "rear_ring_z_mm": -2.0,
+    "rear_ring_radius_mm": 6.14173
+  },
+  "front_cover": {
+    "source_solid_index_zero_based": 3,
+    "brep_entity": 355894,
+    "name": "AM0600216-1/AM0600217-1/MEC060411-1-solid1",
+    "bbox_mm": [
+      [
+        -75.250005791,
+        -12.550004558,
+        -0.678000159
+      ],
+      [
+        75.249996832,
+        12.550004737,
+        -0.102999841
+      ]
+    ],
+    "axis_intersection_z_mm": [
+      -0.103,
+      -0.678
+    ],
+    "thickness_mm": 0.575,
+    "material": "not established by this geometric query"
+  },
+  "optical_module": {
+    "source_solid_index_zero_based": 12,
+    "brep_entity": 337951,
+    "name": "NONE (BREP_WITH_VOIDS)",
+    "bbox_mm": [
+      [
+        -59.75,
+        -8.7,
+        -11.92
+      ],
+      [
+        59.75,
+        8.7,
+        -1.45
+      ]
+    ],
+    "camera_axis_intersection_z_mm": [
+      -1.555081811,
+      -11.44
+    ]
+  },
+  "other_optical_feature": {
+    "step_axis_x_mm": 10.0,
+    "step_axis_y_mm": 0.0,
+    "front_lip_z_mm": -3.91,
+    "front_lip_radius_mm": 3.9,
+    "modeled_front_axis_intersection_z_mm": -4.024221,
+    "candidate_role": "Projector-like feature; role not identified by CAD names",
+    "not_one_of_three_matching_camera_lenses": true
+  },
+  "raw_step_evidence": {
+    "51103": {
+      "line": 54095,
+      "record_start": "#51103 = MANIFOLD_SOLID_BREP ( 'AM0600216-1/MEC060414-1-solid1', #368370 ) ;"
+    },
+    "105571": {
+      "line": 114356,
+      "record_start": "#105571 = CIRCLE ( 'NONE', #302166, 4.350000332976833306 ) ;"
+    },
+    "123917": {
+      "line": 133948,
+      "record_start": "#123917 = CARTESIAN_POINT ( 'NONE',  ( -47.50000000000000000, -3.329089269879514923E-07, -1.449999999982747756 ) ) ;"
+    },
+    "128359": {
+      "line": 138623,
+      "record_start": "#128359 = CARTESIAN_POINT ( 'NONE',  ( 47.50000000000000000, -3.329089530088034731E-07, -1.449999999982725996 ) ) ;"
+    },
+    "174181": {
+      "line": 187277,
+      "record_start": "#174181 = AXIS2_PLACEMENT_3D ( 'NONE', #300496, #280483, #177320 ) ;"
+    },
+    "267046": {
+      "line": 286866,
+      "record_start": "#267046 = CIRCLE ( 'NONE', #336928, 4.350000332976833306 ) ;"
+    },
+    "300496": {
+      "line": 322380,
+      "record_start": "#300496 = CARTESIAN_POINT ( 'NONE',  ( -11.50000000000000000, -3.329089295900369710E-07, -1.449999999982745980 ) ) ;"
+    },
+    "302166": {
+      "line": 324180,
+      "record_start": "#302166 = AXIS2_PLACEMENT_3D ( 'NONE', #123917, #396223, #121765 ) ;"
+    },
+    "336928": {
+      "line": 361031,
+      "record_start": "#336928 = AXIS2_PLACEMENT_3D ( 'NONE', #128359, #429272, #91098 ) ;"
+    },
+    "337951": {
+      "line": 362095,
+      "record_start": "#337951 = BREP_WITH_VOIDS ( 'NONE', #94978, ( #114412, #133275, #399082, #9822, #229998, #184364, #329197, #152089, #106527, #307834, #275594, #321201 ) );"
+    },
+    "355894": {
+      "line": 381107,
+      "record_start": "#355894 = MANIFOLD_SOLID_BREP ( 'AM0600216-1/AM0600217-1/MEC060411-1-solid1', #3721 ) ;"
+    },
+    "363584": {
+      "line": 389251,
+      "record_start": "#363584 = CIRCLE ( 'NONE', #174181, 4.350000332976835082 ) ;"
+    }
+  },
+  "limitations": [
+    "The CAD names do not identify left/right infrared or RGB semantic roles. Match the physical axes against authoritative D455/D555 layout before assigning names.",
+    "The three modeled camera lenses use matching geometry; color versus monochrome identity cannot be inferred from that geometry alone.",
+    "Protective-cover surface, modeled lens vertex, and mechanical ring are not imager planes or effective optical projection centres.",
+    "No calibrated entrance-pupil offset, imager depth, stereo extrinsics, or lens distortion is established by this query.",
+    "Any D455-derived optical frames remain provisional until device calibration/driver TF data supplies D555 extrinsics."
+  ]
+}

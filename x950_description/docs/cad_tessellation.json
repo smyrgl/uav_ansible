@@ -1,0 +1,1144 @@
+{
+  "schema_version": 1,
+  "coordinate_units": "mm",
+  "linear_deflection_mm": 0.15,
+  "angular_deflection_rad": 0.35,
+  "relative_deflection": false,
+  "scope": "Physical sensor geometry only; no optical or FOV construction shapes",
+  "sensors": {
+    "avia": {
+      "source": "Avia/Livox_Avia_shell_FOV.stp",
+      "source_sha256": "a1254e83f44ed1a16f47a70995a206ff5f9c6a73c1bb701bb9e8b1e937f87745",
+      "output": "cad_source_meshes/source_avia.stl",
+      "output_units": "mm",
+      "transformation": "None; STEP assembly locations applied by STEPControl",
+      "kept_solid_count": 2,
+      "documented_source_solid_count": 1,
+      "solid_count_note": "STEP importer split the Avia housing and M12 connector into separate solids",
+      "brep_bbox_mm": [
+        [
+          19.7999999,
+          15.9,
+          -69.1000001
+        ],
+        [
+          110.8000001,
+          80.7,
+          6.45002361
+        ]
+      ],
+      "inventory": [
+        {
+          "kind": "solid",
+          "index": 1,
+          "bbox_mm": [
+            [
+              19.7999999,
+              15.9,
+              -69.1000001
+            ],
+            [
+              110.8000001,
+              80.7,
+              -2.85
+            ]
+          ],
+          "dimensions_mm": [
+            91.0000002,
+            64.8,
+            66.25000010000001
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 2,
+          "bbox_mm": [
+            [
+              91.299984132,
+              41.7999999,
+              -2.850600646
+            ],
+            [
+              103.300009168,
+              53.800001009,
+              6.45002361
+            ]
+          ],
+          "dimensions_mm": [
+            12.000025035999997,
+            12.000001108999996,
+            9.300624255999999
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 3,
+          "bbox_mm": [
+            [
+              -1096.83,
+              -662.002509349,
+              -696.969365238
+            ],
+            [
+              26.3000001,
+              758.602509349,
+              619.967783833
+            ]
+          ],
+          "dimensions_mm": [
+            1123.1300001,
+            1420.605018698,
+            1316.937149071
+          ],
+          "kept": false,
+          "reason": "Avia FOV volume; not physical geometry"
+        }
+      ],
+      "stl": {
+        "triangle_count": 67543,
+        "raw_triangle_count": 67595,
+        "bbox_mm": [
+          [
+            19.799999237060547,
+            15.899999618530273,
+            -69.0999984741211
+          ],
+          [
+            110.80000305175781,
+            80.69999694824219,
+            6.450023651123047
+          ]
+        ],
+        "discarded_zero_area_triangles": 52,
+        "zero_area_triangles": 0,
+        "byte_count": 3377234,
+        "sha256": "c3f023ecc61aa03ee13fec0fb8ea8b17c62217a829c43ee1ec180e7c34158c2a"
+      }
+    },
+    "d555": {
+      "source": "D555/D555_SOLID_SOC.STEP",
+      "source_sha256": "b82df75dc3c2c50a38ee81e8a748a96744fbb90676474ec5da96454b84973009",
+      "output": "cad_source_meshes/source_d555.stl",
+      "output_units": "mm",
+      "transformation": "None; STEP assembly locations applied by STEPControl",
+      "kept_solid_count": 14,
+      "documented_source_solid_count": 14,
+      "solid_count_note": "Imported count matches source record",
+      "brep_bbox_mm": [
+        [
+          -83.550669164,
+          -20.860669237,
+          -47.999998774
+        ],
+        [
+          83.550669164,
+          20.850684078,
+          3.924e-06
+        ]
+      ],
+      "inventory": [
+        {
+          "kind": "solid",
+          "index": 1,
+          "bbox_mm": [
+            [
+              -83.549867732,
+              -20.860669237,
+              -47.999998774
+            ],
+            [
+              83.549867732,
+              20.849882646,
+              -20.510259282
+            ]
+          ],
+          "dimensions_mm": [
+            167.099735464,
+            41.710551883,
+            27.489739491999998
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 2,
+          "bbox_mm": [
+            [
+              -61.14812606,
+              -20.850669137,
+              -41.245129052
+            ],
+            [
+              -30.84812606,
+              7.469330963,
+              -22.005129052
+            ]
+          ],
+          "dimensions_mm": [
+            30.300000000000004,
+            28.3200001,
+            19.240000000000002
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 3,
+          "bbox_mm": [
+            [
+              -60.49812606,
+              -12.200669137,
+              -38.925129052
+            ],
+            [
+              -31.49812606,
+              -11.450669137,
+              -23.085129052
+            ]
+          ],
+          "dimensions_mm": [
+            28.999999999999996,
+            0.75,
+            15.840000000000003
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 4,
+          "bbox_mm": [
+            [
+              -75.250005791,
+              -12.550004558,
+              -0.678000159
+            ],
+            [
+              75.249996832,
+              12.550004737,
+              -0.102999841
+            ]
+          ],
+          "dimensions_mm": [
+            150.500002623,
+            25.100009295,
+            0.575000318
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 5,
+          "bbox_mm": [
+            [
+              -83.550669164,
+              -20.850677941,
+              -20.510259482
+            ],
+            [
+              83.550669164,
+              20.850684078,
+              3.924e-06
+            ]
+          ],
+          "dimensions_mm": [
+            167.101338328,
+            41.701362019,
+            20.510263406
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 6,
+          "bbox_mm": [
+            [
+              -36.74812616,
+              -20.850669237,
+              -38.255129152
+            ],
+            [
+              -31.24812596,
+              -6.850669037,
+              -32.755128952
+            ]
+          ],
+          "dimensions_mm": [
+            5.500000199999999,
+            14.000000200000002,
+            5.500000200000002
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 7,
+          "bbox_mm": [
+            [
+              -60.74812616,
+              -20.850669237,
+              -29.255129152
+            ],
+            [
+              -55.24812596,
+              -6.850669037,
+              -23.755128952
+            ]
+          ],
+          "dimensions_mm": [
+            5.500000199999995,
+            14.000000200000002,
+            5.500000199999999
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 8,
+          "bbox_mm": [
+            [
+              -61.52312616,
+              -20.850669237,
+              -40.130129152
+            ],
+            [
+              -30.47312596,
+              -14.850669037,
+              -21.880128952
+            ]
+          ],
+          "dimensions_mm": [
+            31.050000199999996,
+            6.000000200000002,
+            18.250000200000002
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 9,
+          "bbox_mm": [
+            [
+              44.599807623,
+              -20.150669137,
+              -31.498709016
+            ],
+            [
+              56.199807613,
+              -19.150669137,
+              -25.438377984
+            ]
+          ],
+          "dimensions_mm": [
+            11.59999999,
+            1.0,
+            6.060331032000001
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 10,
+          "bbox_mm": [
+            [
+              40.10229236,
+              -20.850669237,
+              -31.53908797
+            ],
+            [
+              60.697570086,
+              -18.050669137,
+              -25.39940139
+            ]
+          ],
+          "dimensions_mm": [
+            20.595277726,
+            2.800000100000002,
+            6.139686579999999
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 11,
+          "bbox_mm": [
+            [
+              40.799810177,
+              -20.850669237,
+              -30.568092806
+            ],
+            [
+              44.999805087,
+              -17.350669037,
+              -26.368097897
+            ]
+          ],
+          "dimensions_mm": [
+            4.199994910000001,
+            3.5000002000000023,
+            4.199994909000001
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 12,
+          "bbox_mm": [
+            [
+              55.79981015,
+              -20.850669237,
+              -30.568989103
+            ],
+            [
+              59.99980506,
+              -17.350669037,
+              -26.368994193
+            ]
+          ],
+          "dimensions_mm": [
+            4.199994910000001,
+            3.5000002000000023,
+            4.199994910000001
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 13,
+          "bbox_mm": [
+            [
+              -59.75,
+              -8.7000001,
+              -11.9200001
+            ],
+            [
+              59.75,
+              8.7,
+              -1.4499999
+            ]
+          ],
+          "dimensions_mm": [
+            119.5,
+            17.4000001,
+            10.4700002
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 14,
+          "bbox_mm": [
+            [
+              -34.299997712,
+              -19.700736922,
+              -30.5685435
+            ],
+            [
+              70.700002288,
+              12.989263082,
+              -13.9464435
+            ]
+          ],
+          "dimensions_mm": [
+            105.0,
+            32.690000004,
+            16.6221
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        }
+      ],
+      "stl": {
+        "triangle_count": 202874,
+        "raw_triangle_count": 202980,
+        "bbox_mm": [
+          [
+            -83.54692077636719,
+            -20.86067008972168,
+            -48.0
+          ],
+          [
+            83.54692077636719,
+            20.850677490234375,
+            1.323414267062617e-07
+          ]
+        ],
+        "discarded_zero_area_triangles": 106,
+        "zero_area_triangles": 0,
+        "byte_count": 10143784,
+        "sha256": "dbac8015fc3656f4d2c791f419c884e0bd532998fda6947d639d1f17f956834e"
+      }
+    },
+    "e1r": {
+      "source": "E1R/E1R 3D\u6570\u6a21.STEP",
+      "source_sha256": "304380efb350492652b7242f61b12f7d3f921f417f4f65cd2f41f4b7f44175aa",
+      "output": "cad_source_meshes/source_e1r.stl",
+      "output_units": "mm",
+      "transformation": "None; STEP assembly locations applied by STEPControl",
+      "kept_solid_count": 23,
+      "documented_source_solid_count": 25,
+      "solid_count_note": "25 source solids include 2 CAD datum markers; retained 23 physical solids",
+      "brep_bbox_mm": [
+        [
+          -47.500000108,
+          -58.549969506,
+          -2.2000001
+        ],
+        [
+          47.500000108,
+          28.510841936,
+          48.899900454
+        ]
+      ],
+      "inventory": [
+        {
+          "kind": "solid",
+          "index": 1,
+          "bbox_mm": [
+            [
+              -47.489341006,
+              -40.989341006,
+              17.899999885
+            ],
+            [
+              47.489341006,
+              28.510841936,
+              40.401707621
+            ]
+          ],
+          "dimensions_mm": [
+            94.978682012,
+            69.500182942,
+            22.501707736
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 2,
+          "bbox_mm": [
+            [
+              -15.2500001,
+              -29.349969406,
+              30.749900254
+            ],
+            [
+              -11.2499999,
+              -25.349969306,
+              39.349900354
+            ]
+          ],
+          "dimensions_mm": [
+            4.000000199999999,
+            4.000000100000001,
+            8.600000099999999
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 3,
+          "bbox_mm": [
+            [
+              11.2499999,
+              -29.349969506,
+              30.749900254
+            ],
+            [
+              15.2500001,
+              -25.349969306,
+              39.349900354
+            ]
+          ],
+          "dimensions_mm": [
+            4.000000199999999,
+            4.000000200000002,
+            8.600000099999999
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 4,
+          "bbox_mm": [
+            [
+              11.2499999,
+              -37.649969506,
+              30.749900254
+            ],
+            [
+              15.2500001,
+              -33.649969406,
+              39.349900354
+            ]
+          ],
+          "dimensions_mm": [
+            4.000000199999999,
+            4.000000100000001,
+            8.600000099999999
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 5,
+          "bbox_mm": [
+            [
+              -15.2500001,
+              -37.649969506,
+              30.749900254
+            ],
+            [
+              -11.2499999,
+              -33.649969306,
+              39.349900354
+            ]
+          ],
+          "dimensions_mm": [
+            4.000000199999999,
+            4.000000199999995,
+            8.600000099999999
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 6,
+          "bbox_mm": [
+            [
+              3.44938006,
+              -34.299969506,
+              42.249900254
+            ],
+            [
+              3.5000001,
+              -33.999969306,
+              42.302400454
+            ]
+          ],
+          "dimensions_mm": [
+            0.050620039999999644,
+            0.3000001999999995,
+            0.05250019999999722
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 7,
+          "bbox_mm": [
+            [
+              2.9999999,
+              -34.299969506,
+              42.249900254
+            ],
+            [
+              3.050619853,
+              -33.999969306,
+              42.302400454
+            ]
+          ],
+          "dimensions_mm": [
+            0.050619952999999995,
+            0.3000001999999995,
+            0.05250019999999722
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 8,
+          "bbox_mm": [
+            [
+              5.249380073,
+              -34.299969506,
+              42.597400254
+            ],
+            [
+              5.3000001,
+              -33.999969306,
+              42.649900454
+            ]
+          ],
+          "dimensions_mm": [
+            0.0506200269999999,
+            0.3000001999999995,
+            0.05250019999999722
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 9,
+          "bbox_mm": [
+            [
+              4.7999999,
+              -34.299969506,
+              42.597400254
+            ],
+            [
+              4.850619927,
+              -33.999969306,
+              42.649900454
+            ]
+          ],
+          "dimensions_mm": [
+            0.0506200269999999,
+            0.3000001999999995,
+            0.05250019999999722
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 10,
+          "bbox_mm": [
+            [
+              5.24938006,
+              -34.299969506,
+              42.249900254
+            ],
+            [
+              5.3000001,
+              -33.999969306,
+              42.302400454
+            ]
+          ],
+          "dimensions_mm": [
+            0.05062004000000009,
+            0.3000001999999995,
+            0.05250019999999722
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 11,
+          "bbox_mm": [
+            [
+              4.7999999,
+              -34.299969506,
+              42.249900254
+            ],
+            [
+              4.850619853,
+              -33.999969306,
+              42.302400454
+            ]
+          ],
+          "dimensions_mm": [
+            0.050619952999999995,
+            0.3000001999999995,
+            0.05250019999999722
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 12,
+          "bbox_mm": [
+            [
+              2.9999999,
+              -34.299969506,
+              42.597400254
+            ],
+            [
+              3.050619837,
+              -33.999969306,
+              42.649900454
+            ]
+          ],
+          "dimensions_mm": [
+            0.050619937000000004,
+            0.3000001999999995,
+            0.05250019999999722
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 13,
+          "bbox_mm": [
+            [
+              -15.6000001,
+              -58.549969506,
+              22.199378808
+            ],
+            [
+              15.6000001,
+              -24.999969306,
+              48.899900454
+            ]
+          ],
+          "dimensions_mm": [
+            31.2000002,
+            33.5500002,
+            26.700521646
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 14,
+          "bbox_mm": [
+            [
+              3.449380147,
+              -34.299969506,
+              42.597400254
+            ],
+            [
+              3.5000001,
+              -33.999969306,
+              42.649900454
+            ]
+          ],
+          "dimensions_mm": [
+            0.050619952999999995,
+            0.3000001999999995,
+            0.05250019999999722
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 15,
+          "bbox_mm": [
+            [
+              -47.500000108,
+              -41.000000108,
+              -2.2000001
+            ],
+            [
+              47.500000108,
+              28.500000108,
+              17.9000001
+            ]
+          ],
+          "dimensions_mm": [
+            95.000000216,
+            69.500000216,
+            20.1000002
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 16,
+          "bbox_mm": [
+            [
+              -0.4800001,
+              -6.8500001,
+              18.3809999
+            ],
+            [
+              0.5000001,
+              -5.8499999,
+              19.3810001
+            ]
+          ],
+          "dimensions_mm": [
+            0.9800001999999999,
+            1.0000001999999997,
+            1.0000002000000023
+          ],
+          "kept": false,
+          "reason": "E1R CAD centre of mass marker; not physical geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 17,
+          "bbox_mm": [
+            [
+              -0.4800001,
+              -0.5000001,
+              5.0878999
+            ],
+            [
+              0.5000001,
+              0.5000001,
+              6.0879001
+            ]
+          ],
+          "dimensions_mm": [
+            0.9800001999999999,
+            1.0000002,
+            1.0000001999999997
+          ],
+          "kept": false,
+          "reason": "E1R CAD optical centre marker; not physical geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 18,
+          "bbox_mm": [
+            [
+              -2.8,
+              12.65,
+              36.210350397
+            ],
+            [
+              2.8,
+              18.25,
+              36.510350397
+            ]
+          ],
+          "dimensions_mm": [
+            5.6,
+            5.6,
+            0.30000000000000426
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 19,
+          "bbox_mm": [
+            [
+              -13.85,
+              -15.85,
+              -2.0
+            ],
+            [
+              13.85,
+              15.85,
+              0.0
+            ]
+          ],
+          "dimensions_mm": [
+            27.7,
+            31.7,
+            2.0
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 20,
+          "bbox_mm": [
+            [
+              -35.85,
+              -15.85,
+              -2.0
+            ],
+            [
+              -15.15,
+              15.85,
+              0.0
+            ]
+          ],
+          "dimensions_mm": [
+            20.700000000000003,
+            31.7,
+            2.0
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 21,
+          "bbox_mm": [
+            [
+              15.15,
+              -15.85,
+              -2.0
+            ],
+            [
+              35.85,
+              15.85,
+              0.0
+            ]
+          ],
+          "dimensions_mm": [
+            20.700000000000003,
+            31.7,
+            2.0
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 22,
+          "bbox_mm": [
+            [
+              -46.5,
+              23.5,
+              13.3999999
+            ],
+            [
+              -42.5,
+              27.5,
+              22.0
+            ]
+          ],
+          "dimensions_mm": [
+            4.0,
+            4.0,
+            8.6000001
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 23,
+          "bbox_mm": [
+            [
+              42.4999999,
+              23.5,
+              13.3999999
+            ],
+            [
+              46.5000001,
+              27.5,
+              22.0
+            ]
+          ],
+          "dimensions_mm": [
+            4.000000200000002,
+            4.0,
+            8.6000001
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 24,
+          "bbox_mm": [
+            [
+              42.4999999,
+              -40.0000001,
+              13.3999999
+            ],
+            [
+              46.5000001,
+              -35.9999999,
+              22.0
+            ]
+          ],
+          "dimensions_mm": [
+            4.000000200000002,
+            4.000000200000002,
+            8.6000001
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "solid",
+          "index": 25,
+          "bbox_mm": [
+            [
+              -46.5000001,
+              -40.0000001,
+              13.3999999
+            ],
+            [
+              -42.4999999,
+              -35.9999999,
+              22.0
+            ]
+          ],
+          "dimensions_mm": [
+            4.000000200000002,
+            4.000000200000002,
+            8.6000001
+          ],
+          "kept": true,
+          "reason": "Physical sensor geometry"
+        },
+        {
+          "kind": "open_shell",
+          "index": 1,
+          "bbox_mm": [
+            [
+              -53.06665353,
+              -39.802899785,
+              -23.00003008
+            ],
+            [
+              53.06665353,
+              39.802895768,
+              -1.999969824
+            ]
+          ],
+          "kept": false,
+          "reason": "Non-solid sheet/FOV construction geometry"
+        },
+        {
+          "kind": "open_shell",
+          "index": 2,
+          "bbox_mm": [
+            [
+              -87.273699255,
+              -58.996850945,
+              -22.0
+            ],
+            [
+              87.273699255,
+              58.996850945,
+              -2.0
+            ]
+          ],
+          "kept": false,
+          "reason": "Non-solid sheet/FOV construction geometry"
+        }
+      ],
+      "stl": {
+        "triangle_count": 223214,
+        "raw_triangle_count": 223426,
+        "bbox_mm": [
+          [
+            -47.5,
+            -58.54996871948242,
+            -2.200000047683716
+          ],
+          [
+            47.5,
+            28.510841369628906,
+            48.899898529052734
+          ]
+        ],
+        "discarded_zero_area_triangles": 212,
+        "zero_area_triangles": 0,
+        "byte_count": 11160784,
+        "sha256": "9a901d72d8495770453918cfe868a2a4d62afa6d2253741659b4a6e119b9968a"
+      }
+    }
+  }
+}

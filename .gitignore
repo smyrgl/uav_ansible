@@ -22,3 +22,10 @@ __pycache__/
 
 # Logs / local scratch
 *.log
+
+# Blender auto-backups and dated manual backups of the airframe model
+*.blend1
+x950_description/*_backup_*.blend
+
+# pytest
+.pytest_cache/

@@ -1,2 +1,10 @@
 # Vendored driver source tarballs are large/binary — store via git-lfs.
 roles/kernel_modules/files/*.tar.gz filter=lfs diff=lfs merge=lfs -text
+# Airframe description: Blender authoring file, CAD sources (STEP/STL/PDF) and
+# exported STL visuals are binary and large — git-lfs.
+x950_description/*.blend filter=lfs diff=lfs merge=lfs -text
+x950_description/cad_source_meshes/** filter=lfs diff=lfs merge=lfs -text
+x950_description/meshes/*.stl filter=lfs diff=lfs merge=lfs -text
+# Rendered documentation images are regenerated from the model — git-lfs.
+x950_description/docs/*.png filter=lfs diff=lfs merge=lfs -text
+x950_description/docs/*.jpg filter=lfs diff=lfs merge=lfs -text

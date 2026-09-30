@@ -1,0 +1,9 @@
+{
+  "status": "passed",
+  "engine": "Official ROS xacro",
+  "default_matches_urdf": true,
+  "pose_overrides_tested": 38,
+  "links": 29,
+  "joints": 28,
+  "robot_state_publisher_or_rviz_tested": false
+}

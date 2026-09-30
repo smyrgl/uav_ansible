@@ -1,0 +1,379 @@
+{
+  "schema_version": 1,
+  "scene": "X950_ROS_LinkForge",
+  "scope": "Visual appearance and engineering material metadata only; no density, mass or inertia assignment.",
+  "color_space": "Linear RGBA for Blender shader Base Color, material.diffuse_color and RViz export; all opaque.",
+  "materials": {
+    "paht_cf_black": {
+      "label": "PAHT-CF \u2014 matte black printed bracket",
+      "engineering_material": "PAHT-CF",
+      "material_status": "Confirmed by user: printed sensor and GNSS brackets are PAHT-CF.",
+      "appearance_status": "Matte black confirmed by user; shader roughness is an artistic approximation.",
+      "rgba": [
+        0.021,
+        0.025,
+        0.028,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.82
+    },
+    "tpu95_black": {
+      "label": "TPU95 \u2014 black battery support",
+      "engineering_material": "TPU95",
+      "material_status": "Confirmed by user: battery cradle and end block are TPU95.",
+      "appearance_status": "Black confirmed by user; exact sheen and print texture unmeasured.",
+      "rgba": [
+        0.028,
+        0.029,
+        0.03,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.76
+    },
+    "silver_plastic_wrap": {
+      "label": "Silver plastic \u2014 battery wrap",
+      "engineering_material": "Silver plastic wrap; exact polymer unknown",
+      "material_status": "Silver plastic confirmed by user; do not interpret as exposed metal or metallic foil.",
+      "appearance_status": "Silver-gray dielectric appearance; precise gloss unmeasured.",
+      "rgba": [
+        0.48,
+        0.5,
+        0.53,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.34
+    },
+    "carbon_tube": {
+      "label": "Carbon fiber \u2014 frame tube",
+      "engineering_material": "Carbon-fiber composite tube",
+      "material_status": "Carbon-fiber main frame tubes confirmed by user; this does not identify any integral fittings.",
+      "appearance_status": "Provisional graphite-black resin finish; laminate, weave, sheen and fiber directions unmeasured.",
+      "rgba": [
+        0.027,
+        0.031,
+        0.035,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.4
+    },
+    "composite_plate_graphite": {
+      "label": "Composite plate \u2014 graphite finish",
+      "engineering_material": "Composite frame panel; exact fiber/resin system unknown",
+      "material_status": "Composite frame panels confirmed by user; do not assume a particular carbon laminate or resin.",
+      "appearance_status": "Dark graphite finish guided by user-supplied manufacturer photo; plate-specific color and sheen unmeasured.",
+      "rgba": [
+        0.036,
+        0.041,
+        0.046,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.48
+    },
+    "black_fitting_provisional": {
+      "label": "Black metal fitting \u2014 provisional finish",
+      "engineering_material": "Metal assembly, exact alloy and coating unknown",
+      "material_status": "Unconfirmed: black-anodized appearance is provisional and is not an alloy or coating specification.",
+      "appearance_status": "Restrained dark satin metallic approximation for motor/fitting geometry.",
+      "rgba": [
+        0.047,
+        0.051,
+        0.057,
+        1.0
+      ],
+      "metallic": 0.62,
+      "roughness": 0.38
+    },
+    "composite_shell_graphite": {
+      "label": "Composite side panels \u2014 graphite finish",
+      "engineering_material": "Composite frame panel; exact fiber/resin system unknown",
+      "material_status": "Mixed-color composite frame panels confirmed by user; meshes may include integral fittings.",
+      "appearance_status": "Graphite side-panel color guided by user-supplied manufacturer photo; exact coating and sheen unmeasured.",
+      "rgba": [
+        0.085,
+        0.091,
+        0.1,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.46
+    },
+    "composite_cover_silver": {
+      "label": "Composite top cover \u2014 silver-gray finish",
+      "engineering_material": "Composite frame panel; exact fiber/resin system unknown",
+      "material_status": "Mixed-color composite frame panels confirmed by user; silver-gray appearance is not evidence of a metal panel.",
+      "appearance_status": "Silver-gray top-cover color guided by user-supplied manufacturer photo; exact finish and sheen unmeasured.",
+      "rgba": [
+        0.4,
+        0.42,
+        0.45,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.36
+    },
+    "avia_housing_provisional": {
+      "label": "Avia \u2014 silver metal housing",
+      "engineering_material": "Metal sensor housing; exact alloy unknown",
+      "material_status": "Silver metal housing confirmed by user; supplied sensor CAD is one mesh containing multiple physical materials.",
+      "appearance_status": "Silver confirmed by user; exact alloy, finish and sheen unmeasured. Optical windows are not independently resolved.",
+      "rgba": [
+        0.54,
+        0.56,
+        0.59,
+        1.0
+      ],
+      "metallic": 0.82,
+      "roughness": 0.42
+    },
+    "d555_housing_provisional": {
+      "label": "D555 \u2014 black metal housing",
+      "engineering_material": "Metal sensor housing; exact alloy unknown",
+      "material_status": "Black metal housing confirmed by user; supplied sensor CAD is one mesh containing multiple physical materials.",
+      "appearance_status": "Black confirmed by user; exact coating and sheen unmeasured. No glass or optical coating claim.",
+      "rgba": [
+        0.023,
+        0.025,
+        0.028,
+        1.0
+      ],
+      "metallic": 0.62,
+      "roughness": 0.42
+    },
+    "e1r_housing_provisional": {
+      "label": "E1R \u2014 neutral housing approximation",
+      "engineering_material": "Sensor housing assembly; exact material unknown",
+      "material_status": "Unconfirmed finish; supplied sensor CAD is one mesh containing multiple physical materials.",
+      "appearance_status": "Provisional medium graphite housing appearance; optical faces are not independently resolved.",
+      "rgba": [
+        0.095,
+        0.105,
+        0.115,
+        1.0
+      ],
+      "metallic": 0.15,
+      "roughness": 0.46
+    },
+    "gnss_radome_provisional": {
+      "label": "GNSS radome \u2014 black plastic",
+      "engineering_material": "Plastic radome; exact polymer unknown",
+      "material_status": "Black plastic antenna radomes confirmed by user; exact polymer and RF material properties are unknown.",
+      "appearance_status": "Black confirmed by user; exact sheen unmeasured. No RF or dielectric properties assigned.",
+      "rgba": [
+        0.025,
+        0.028,
+        0.031,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55
+    },
+    "antenna_polymer_provisional": {
+      "label": "Radio antenna \u2014 black polymer approximation",
+      "engineering_material": "Antenna housing, exact material unknown",
+      "material_status": "Unconfirmed: black polymer appearance is provisional.",
+      "appearance_status": "Provisional matte dark housing; internal conductor is not represented by this material.",
+      "rgba": [
+        0.024,
+        0.026,
+        0.029,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.66
+    },
+    "electronics_assembly_provisional": {
+      "label": "Holybro assembly \u2014 neutral mixed-material overview",
+      "engineering_material": "Mixed PCB, components, connectors, metal housings and polymer hardware",
+      "material_status": "Assembly identity is sourced from Holybro; one STL does not preserve its separate physical material regions.",
+      "appearance_status": "Provisional uniform graphite overview; do not interpret as a homogeneous metal or PCB material.",
+      "rgba": [
+        0.1,
+        0.12,
+        0.135,
+        1.0
+      ],
+      "metallic": 0.18,
+      "roughness": 0.48
+    },
+    "hadron_housing_proxy": {
+      "label": "Hadron proxy \u2014 dark housing approximation",
+      "engineering_material": "Camera housing assembly; exact material unknown",
+      "material_status": "Drawing-derived geometry proxy; neither exact construction nor finish is established.",
+      "appearance_status": "Provisional dark housing; the included rear gasket is not a separate material region.",
+      "rgba": [
+        0.055,
+        0.061,
+        0.066,
+        1.0
+      ],
+      "metallic": 0.18,
+      "roughness": 0.43
+    },
+    "hadron_optics_proxy": {
+      "label": "Hadron proxy \u2014 illustrative dark lens/barrel",
+      "engineering_material": "Illustrative optical/barrel region; material unknown",
+      "material_status": "Proxy geometry only; no glass, germanium or coating identification is claimed.",
+      "appearance_status": "Provisional dark opaque appearance for reading the two lens regions; not an optical simulation.",
+      "rgba": [
+        0.019,
+        0.025,
+        0.03,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.24
+    },
+    "unclassified_provisional": {
+      "label": "Unclassified geometry \u2014 neutral provisional finish",
+      "engineering_material": "Unknown",
+      "material_status": "Unclassified generated visual; review the assignment before claiming a specific engineering material.",
+      "appearance_status": "Provisional neutral graphite fallback.",
+      "rgba": [
+        0.16,
+        0.17,
+        0.18,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55
+    },
+    "hflow_housing_provisional": {
+      "label": "H-FLOW \u2014 black housing approximation",
+      "rgba": [
+        0.05,
+        0.052,
+        0.056,
+        1.0
+      ],
+      "metallic": 0.0,
+      "roughness": 0.55,
+      "engineering_material": "Moulded plastic housing over a PCB with optics, LED and connector; exact materials unknown",
+      "material_status": "Unconfirmed; the joined STEP assembly contains several physical materials in one visual.",
+      "appearance_status": "Provisional matte black housing; lens, ToF window, IR LED and connector are not independently resolved."
+    }
+  },
+  "rules": [
+    {
+      "patterns": [
+        "avia_bracket_visual",
+        "avia_backing_visual",
+        "d555_bracket*_visual",
+        "e1r_bracket*_visual",
+        "gnss_*_bracket_visual"
+      ],
+      "material": "paht_cf_black"
+    },
+    {
+      "patterns": [
+        "battery_cradle_visual",
+        "battery_end_block_visual"
+      ],
+      "material": "tpu95_black"
+    },
+    {
+      "patterns": [
+        "battery_pack_visual"
+      ],
+      "material": "silver_plastic_wrap"
+    },
+    {
+      "patterns": [
+        "avia_sensor_visual"
+      ],
+      "material": "avia_housing_provisional"
+    },
+    {
+      "patterns": [
+        "d555_sensor_visual"
+      ],
+      "material": "d555_housing_provisional"
+    },
+    {
+      "patterns": [
+        "e1r_sensor_visual"
+      ],
+      "material": "e1r_housing_provisional"
+    },
+    {
+      "patterns": [
+        "avionics_carrier_visual"
+      ],
+      "material": "electronics_assembly_provisional"
+    },
+    {
+      "patterns": [
+        "gnss_*_radome_visual",
+        "x950_gnss_antenna*_visual"
+      ],
+      "material": "gnss_radome_provisional"
+    },
+    {
+      "patterns": [
+        "hadron*thermal*_visual",
+        "hadron*visible*_visual",
+        "hadron*lens*_visual"
+      ],
+      "material": "hadron_optics_proxy"
+    },
+    {
+      "patterns": [
+        "hadron*body*_visual",
+        "hadron*housing*_visual",
+        "hadron*sensor*_visual"
+      ],
+      "material": "hadron_housing_proxy"
+    },
+    {
+      "patterns": [
+        "x950_m*_arm_visual",
+        "x950_strut*_visual",
+        "x950_landing_leg*_visual"
+      ],
+      "material": "carbon_tube"
+    },
+    {
+      "patterns": [
+        "x950_*plate_visual"
+      ],
+      "material": "composite_plate_graphite"
+    },
+    {
+      "patterns": [
+        "x950_*motor_visual",
+        "x950_*tab_visual",
+        "x950_*fitting*_visual"
+      ],
+      "material": "black_fitting_provisional"
+    },
+    {
+      "patterns": [
+        "x950_radio_antenna*_visual"
+      ],
+      "material": "antenna_polymer_provisional"
+    },
+    {
+      "patterns": [
+        "x950_avionics_bay_cover_visual"
+      ],
+      "material": "composite_cover_silver"
+    },
+    {
+      "patterns": [
+        "x950_*"
+      ],
+      "material": "composite_shell_graphite"
+    },
+    {
+      "patterns": [
+        "hflow_*_visual"
+      ],
+      "material": "hflow_housing_provisional"
+    }
+  ],
+  "fallback_material": "unclassified_provisional"
+}

@@ -1,0 +1,215 @@
+{
+  "schema_version": 1,
+  "object": "d555_sensor_visual",
+  "timestamp_utc": "2026-09-24T19:52:38.882812+00:00",
+  "status": "passed",
+  "source_mesh_sha256": "edccb8230ea7f25d08c39e37d14ff024b140e78f9f096d927db136eb8495a9f2",
+  "world_matrix_at_validation": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      0.15000000596046448
+    ],
+    [
+      0.0,
+      -1.0,
+      2.1456882848269743e-07,
+      0.0
+    ],
+    [
+      0.0,
+      -2.1456882848269743e-07,
+      -1.0,
+      -0.0693499967455864
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "source_preservation": "Detailed cad_source_meshes assets are untouched",
+  "target_triangle_range": [
+    12000,
+    24000
+  ],
+  "bbox_component_tolerance_m": 0.00025,
+  "sampled_surface_tolerance_m": 0.0005,
+  "maximum_samples_per_direction": 15000,
+  "validation_scope": "Actual world-vertex bounds plus bidirectional sampled nearest-surface distances; not a global Hausdorff guarantee",
+  "material_preservation": "All mesh material slots must match before acceptance",
+  "last_run_was_idempotent_noop": false,
+  "attempts": [
+    {
+      "collapse_ratio": 0.08,
+      "triangle_count": 16228,
+      "vertex_count": 7796,
+      "within_triangle_target": true,
+      "bbox_m": [
+        [
+          0.10200000554323196,
+          -0.08343583345413208,
+          -0.09013938158750534
+        ],
+        [
+          0.15010735392570496,
+          0.08344248682260513,
+          -0.04831400886178017
+        ]
+      ],
+      "bbox_absolute_delta_m": [
+        [
+          0.0,
+          0.00011108815670013428,
+          6.130337715148926e-05
+        ],
+        [
+          0.00010734796524047852,
+          0.0001044347882270813,
+          0.00017532333731651306
+        ]
+      ],
+      "source_to_reduced": {
+        "samples": 15000,
+        "maximum_m": 0.0010272751096636057,
+        "rms_m": 9.162429701856168e-05,
+        "p95_m": 0.00019353734387550503,
+        "p99_m": 0.0003151096170768142,
+        "worst_sample": {
+          "distance_m": 0.0010272751096636057,
+          "source_world_point_m": [
+            0.12254903465509415,
+            -0.04708324000239372,
+            -0.07557927072048187
+          ],
+          "nearest_world_point_m": [
+            0.12356779724359512,
+            -0.046986207365989685,
+            -0.0754898190498352
+          ],
+          "destination_triangle": 12399,
+          "sample_method": "area_stratified_barycentric"
+        }
+      },
+      "reduced_to_source": {
+        "samples": 15000,
+        "maximum_m": 0.0007661506533622742,
+        "rms_m": 8.208452941677616e-05,
+        "p95_m": 0.00017892662435770035,
+        "p99_m": 0.0002895370125770569,
+        "worst_sample": {
+          "distance_m": 0.0007661506533622742,
+          "source_world_point_m": [
+            0.12339761108160019,
+            -0.024801908060908318,
+            -0.06272324919700623
+          ],
+          "nearest_world_point_m": [
+            0.12263146042823792,
+            -0.024801908060908318,
+            -0.06272324919700623
+          ],
+          "destination_triangle": 179714,
+          "sample_method": "area_stratified_barycentric"
+        }
+      },
+      "mesh_material_slots_preserved": true,
+      "accepted": false
+    },
+    {
+      "collapse_ratio": 0.16,
+      "triangle_count": 32458,
+      "vertex_count": 15911,
+      "within_triangle_target": false,
+      "bbox_m": [
+        [
+          0.10198944061994553,
+          -0.0835685059428215,
+          -0.09019987285137177
+        ],
+        [
+          0.1500009149312973,
+          0.08356887847185135,
+          -0.04846879467368126
+        ]
+      ],
+      "bbox_absolute_delta_m": [
+        [
+          1.0564923286437988e-05,
+          2.158433198928833e-05,
+          8.121132850646973e-07
+        ],
+        [
+          9.08970832824707e-07,
+          2.195686101913452e-05,
+          2.0537525415420532e-05
+        ]
+      ],
+      "source_to_reduced": {
+        "samples": 15000,
+        "maximum_m": 0.0002267764793941751,
+        "rms_m": 2.9193650167521082e-05,
+        "p95_m": 6.211802246980369e-05,
+        "p99_m": 9.637613402446732e-05,
+        "worst_sample": {
+          "distance_m": 0.0002267764793941751,
+          "source_world_point_m": [
+            0.11508487164974213,
+            0.03943312540650368,
+            -0.04849933460354805
+          ],
+          "nearest_world_point_m": [
+            0.11508255451917648,
+            0.039434805512428284,
+            -0.04872609302401543
+          ],
+          "destination_triangle": 9180,
+          "sample_method": "stratified_vertex"
+        }
+      },
+      "reduced_to_source": {
+        "samples": 15000,
+        "maximum_m": 0.00022670486941933632,
+        "rms_m": 2.6993255566534248e-05,
+        "p95_m": 6.152663263492286e-05,
+        "p99_m": 9.238078928319737e-05,
+        "worst_sample": {
+          "distance_m": 0.00022670486941933632,
+          "source_world_point_m": [
+            0.12364540994167328,
+            -0.0042232973501086235,
+            -0.07051964104175568
+          ],
+          "nearest_world_point_m": [
+            0.12364540994167328,
+            -0.00445000221952796,
+            -0.07051964104175568
+          ],
+          "destination_triangle": 179748,
+          "sample_method": "area_stratified_barycentric"
+        }
+      },
+      "mesh_material_slots_preserved": true,
+      "accepted": true
+    }
+  ],
+  "original_triangle_count": 202874,
+  "original_bbox_m": [
+    [
+      0.10200000554323196,
+      -0.08354692161083221,
+      -0.09020068496465683
+    ],
+    [
+      0.15000000596046448,
+      0.08354692161083221,
+      -0.04848933219909668
+    ]
+  ],
+  "selected_attempt": 1,
+  "optimized_triangle_count": 32458,
+  "optimized_mesh_sha256": "917efafcdb37acfff1ba3a707978810aaf55a8a923c694e16305060e6edc1c45",
+  "warning": "Accepted result falls outside the 12000-24000 triangle target; geometric accuracy checks passed"
+}

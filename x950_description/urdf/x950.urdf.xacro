@@ -1,0 +1,641 @@
+<?xml version='1.0' encoding='utf-8'?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="x950">
+  <xacro:arg name="avia_xyz" default="0.062 -0.002525 -0.01525" />
+  <xacro:arg name="avia_rpy" default="0 0 0" />
+  <xacro:arg name="avia_mount_xyz" default="0.14766 0 0.09325" />
+  <xacro:arg name="avia_mount_rpy" default="0 0 0" />
+  <xacro:arg name="avionics_carrier_xyz" default="0.065 0 0.075" />
+  <xacro:arg name="avionics_carrier_rpy" default="0 0 0" />
+  <xacro:arg name="battery_xyz" default="0 0 0.0441" />
+  <xacro:arg name="battery_rpy" default="0 0 0" />
+  <xacro:arg name="battery_support_xyz" default="-0.02623 0 -0.01" />
+  <xacro:arg name="battery_support_rpy" default="0 0 0" />
+  <xacro:arg name="d555_xyz" default="0.045096 0 -0.04285" />
+  <xacro:arg name="d555_rpy" default="-3.141593 0 0" />
+  <xacro:arg name="d555_mount_xyz" default="0.104904 0 -0.0265" />
+  <xacro:arg name="d555_mount_rpy" default="0 0 0" />
+  <xacro:arg name="d555_nominal_camera_xyz" default="-0.00465 0.0475 0" />
+  <xacro:arg name="d555_nominal_camera_rpy" default="0 0 0" />
+  <xacro:arg name="e1r_xyz" default="0 0 -0.0604" />
+  <xacro:arg name="e1r_rpy" default="0 0 0" />
+  <xacro:arg name="e1r_mount_xyz" default="-0.084 0 -0.0245" />
+  <xacro:arg name="e1r_mount_rpy" default="0 0 0" />
+  <xacro:arg name="fmu_housing_xyz" default="0.0206 0 0.018323" />
+  <xacro:arg name="fmu_housing_rpy" default="0 0 0" />
+  <xacro:arg name="gnss_aux_xyz" default="0 0 0.03048" />
+  <xacro:arg name="gnss_aux_rpy" default="0 0 0" />
+  <xacro:arg name="gnss_aux_mount_xyz" default="-0.334278 -0.336696 0.0925" />
+  <xacro:arg name="gnss_aux_mount_rpy" default="0 0 -1.570796" />
+  <xacro:arg name="gnss_main_xyz" default="0 0 0.03048" />
+  <xacro:arg name="gnss_main_rpy" default="0 0 0" />
+  <xacro:arg name="gnss_main_mount_xyz" default="-0.334278 0.336696 0.0925" />
+  <xacro:arg name="gnss_main_mount_rpy" default="0 0 3.001966" />
+  <xacro:arg name="hadron_xyz" default="0 0 0" />
+  <xacro:arg name="hadron_rpy" default="0 0 0" />
+  <xacro:arg name="hadron_mount_xyz" default="0.164 0 0.012" />
+  <xacro:arg name="hadron_mount_rpy" default="0 0.261799 0" />
+  <xacro:arg name="hadron_nominal_thermal_optical_frame_xyz" default="0.04265 0 0.0078" />
+  <xacro:arg name="hadron_nominal_thermal_optical_frame_rpy" default="-1.570796 0 -1.570796" />
+  <xacro:arg name="hadron_nominal_visible_optical_frame_xyz" default="0.04165 0 -0.0122" />
+  <xacro:arg name="hadron_nominal_visible_optical_frame_rpy" default="-1.570796 0 -1.570796" />
+  <xacro:arg name="hflow_xyz" default="0.069648 0 -0.032184" />
+  <xacro:arg name="hflow_rpy" default="0 0 0" />
+  <xacro:arg name="hflow_nominal_flow_optical_frame_xyz" default="0.002892 -0.00795 -0.002836" />
+  <xacro:arg name="hflow_nominal_flow_optical_frame_rpy" default="3.141592 0 -1.570796" />
+  <xacro:arg name="hflow_nominal_frd_frame_xyz" default="0 0 0" />
+  <xacro:arg name="hflow_nominal_frd_frame_rpy" default="-3.141593 0 0" />
+  <xacro:arg name="hflow_nominal_range_frame_xyz" default="0.001212 0.0087 -0.008796" />
+  <xacro:arg name="hflow_nominal_range_frame_rpy" default="0 1.570796 0" />
+  <material name="X950_finish_composite_cover_silver">
+    <color rgba="0.4 0.42 0.45 1" />
+  </material>
+  <material name="X950_finish_black_fitting_provisional">
+    <color rgba="0.047 0.051 0.057 1" />
+  </material>
+  <material name="X950_finish_composite_shell_graphite">
+    <color rgba="0.085 0.091 0.1 1" />
+  </material>
+  <material name="X950_finish_composite_plate_graphite">
+    <color rgba="0.036 0.041 0.046 1" />
+  </material>
+  <material name="X950_finish_carbon_tube">
+    <color rgba="0.027 0.031 0.035 1" />
+  </material>
+  <material name="X950_finish_antenna_polymer_provisional">
+    <color rgba="0.024 0.026 0.029 1" />
+  </material>
+  <material name="X950_finish_paht_cf_black">
+    <color rgba="0.021 0.025 0.028 1" />
+  </material>
+  <material name="X950_finish_avia_housing_provisional">
+    <color rgba="0.54 0.56 0.59 1" />
+  </material>
+  <material name="X950_finish_d555_housing_provisional">
+    <color rgba="0.023 0.025 0.028 1" />
+  </material>
+  <material name="X950_finish_e1r_housing_provisional">
+    <color rgba="0.095 0.105 0.115 1" />
+  </material>
+  <material name="X950_finish_tpu95_black">
+    <color rgba="0.028 0.029 0.03 1" />
+  </material>
+  <material name="X950_finish_silver_plastic_wrap">
+    <color rgba="0.48 0.5 0.53 1" />
+  </material>
+  <material name="X950_finish_electronics_assembly_provisional">
+    <color rgba="0.1 0.12 0.135 1" />
+  </material>
+  <material name="X950_finish_gnss_radome_provisional">
+    <color rgba="0.025 0.028 0.031 1" />
+  </material>
+  <material name="X950_finish_unclassified_provisional">
+    <color rgba="0.16 0.17 0.18 1" />
+  </material>
+  <material name="X950_finish_hadron_housing_proxy">
+    <color rgba="0.055 0.061 0.066 1" />
+  </material>
+  <material name="X950_finish_hadron_optics_proxy">
+    <color rgba="0.019 0.025 0.03 1" />
+  </material>
+  <material name="X950_finish_hflow_housing_provisional">
+    <color rgba="0.05 0.052 0.056 1" />
+  </material>
+  <link name="avia_link">
+    <visual name="avia_sensor_visual">
+      <origin xyz="0.007004 0.007176 0.032401" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/avia_link_visual_avia_sensor_visual.stl" />
+      </geometry>
+      <material name="X950_finish_avia_housing_provisional" />
+    </visual>
+  </link>
+  <link name="avia_mount_link">
+    <visual name="avia_backing_visual">
+      <origin xyz="-0.0035 0 -0.00025" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/avia_mount_link_visual_avia_backing_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+    <visual name="avia_bracket_visual">
+      <origin xyz="0.04942 0 -0.012" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/avia_mount_link_visual_avia_bracket_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+  </link>
+  <link name="avionics_carrier_link">
+    <visual name="avionics_carrier_visual">
+      <origin xyz="0 -0.000253 0.019463" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/avionics_carrier_link_visual_avionics_carrier_visual.stl" />
+      </geometry>
+      <material name="X950_finish_electronics_assembly_provisional" />
+    </visual>
+  </link>
+  <link name="base_link">
+    <visual name="x950_avionics_bay_cover_visual">
+      <origin xyz="-0.006707 0 0.111334" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_avionics_bay_cover_visual.stl" />
+      </geometry>
+      <material name="X950_finish_composite_cover_silver" />
+    </visual>
+    <visual name="x950_batterh_bay_starboard_tab_visual">
+      <origin xyz="-0.167493 -0.065011 0.076014" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_batterh_bay_starboard_tab_visual.stl" />
+      </geometry>
+      <material name="X950_finish_black_fitting_provisional" />
+    </visual>
+    <visual name="x950_battery_bay_door_visual">
+      <origin xyz="-0.15521 0 0.03315" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_battery_bay_door_visual.stl" />
+      </geometry>
+      <material name="X950_finish_composite_shell_graphite" />
+    </visual>
+    <visual name="x950_battery_bay_port_tab_visual">
+      <origin xyz="-0.167473 0.064989 0.076014" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_battery_bay_port_tab_visual.stl" />
+      </geometry>
+      <material name="X950_finish_black_fitting_provisional" />
+    </visual>
+    <visual name="x950_belly_center_plate_visual">
+      <origin xyz="0 0 -0.02225" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_belly_center_plate_visual.stl" />
+      </geometry>
+      <material name="X950_finish_composite_plate_graphite" />
+    </visual>
+    <visual name="x950_belly_front_plate_visual">
+      <origin xyz="0.09 0 -0.02575" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_belly_front_plate_visual.stl" />
+      </geometry>
+      <material name="X950_finish_composite_plate_graphite" />
+    </visual>
+    <visual name="x950_belly_rear_plate_visual">
+      <origin xyz="-0.084 0 -0.02375" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_belly_rear_plate_visual.stl" />
+      </geometry>
+      <material name="X950_finish_composite_plate_graphite" />
+    </visual>
+    <visual name="x950_body_visual">
+      <origin xyz="-0.002284 0 0.045242" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_body_visual.stl" />
+      </geometry>
+      <material name="X950_finish_composite_shell_graphite" />
+    </visual>
+    <visual name="x950_front_mount_plate_visual">
+      <origin xyz="0.145691 -0.000001 0.05307" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_front_mount_plate_visual.stl" />
+      </geometry>
+      <material name="X950_finish_composite_plate_graphite" />
+    </visual>
+    <visual name="x950_gps_plate_visual">
+      <origin xyz="-0.100056 0 0.12035" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_gps_plate_visual.stl" />
+      </geometry>
+      <material name="X950_finish_composite_plate_graphite" />
+    </visual>
+    <visual name="x950_landing_leg_port_visual">
+      <origin xyz="-0.000019 0.187437 -0.247865" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_landing_leg_port_visual.stl" />
+      </geometry>
+      <material name="X950_finish_carbon_tube" />
+    </visual>
+    <visual name="x950_landing_leg_starboard_visual">
+      <origin xyz="0.000019 -0.187437 -0.247865" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_landing_leg_starboard_visual.stl" />
+      </geometry>
+      <material name="X950_finish_carbon_tube" />
+    </visual>
+    <visual name="x950_m1_arm_visual">
+      <origin xyz="0.222509 0.208914 0.01" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_m1_arm_visual.stl" />
+      </geometry>
+      <material name="X950_finish_carbon_tube" />
+    </visual>
+    <visual name="x950_m1_motor_visual">
+      <origin xyz="0.334278 0.336677 0.029398" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_m1_motor_visual.stl" />
+      </geometry>
+      <material name="X950_finish_black_fitting_provisional" />
+    </visual>
+    <visual name="x950_m2_arm_visual">
+      <origin xyz="0.222509 -0.208914 0.01" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_m2_arm_visual.stl" />
+      </geometry>
+      <material name="X950_finish_carbon_tube" />
+    </visual>
+    <visual name="x950_m2_motor_visual">
+      <origin xyz="0.334285 -0.336696 0.029398" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_m2_motor_visual.stl" />
+      </geometry>
+      <material name="X950_finish_black_fitting_provisional" />
+    </visual>
+    <visual name="x950_m3_arm_visual">
+      <origin xyz="-0.222509 -0.208914 0.09" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_m3_arm_visual.stl" />
+      </geometry>
+      <material name="X950_finish_carbon_tube" />
+    </visual>
+    <visual name="x950_m3_motor_visual">
+      <origin xyz="-0.334285 -0.336696 0.070602" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_m3_motor_visual.stl" />
+      </geometry>
+      <material name="X950_finish_black_fitting_provisional" />
+    </visual>
+    <visual name="x950_m4_arm_visual">
+      <origin xyz="-0.222509 0.208914 0.09" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_m4_arm_visual.stl" />
+      </geometry>
+      <material name="X950_finish_carbon_tube" />
+    </visual>
+    <visual name="x950_m4_motor_visual">
+      <origin xyz="-0.334278 0.336677 0.070602" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_m4_motor_visual.stl" />
+      </geometry>
+      <material name="X950_finish_black_fitting_provisional" />
+    </visual>
+    <visual name="x950_radio_antenna_port_visual">
+      <origin xyz="0.058929 0.075608 -0.077678" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_radio_antenna_port_visual.stl" />
+      </geometry>
+      <material name="X950_finish_antenna_polymer_provisional" />
+    </visual>
+    <visual name="x950_radio_antenna_starboard_visual">
+      <origin xyz="0.058929 -0.072108 -0.077678" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_radio_antenna_starboard_visual.stl" />
+      </geometry>
+      <material name="X950_finish_antenna_polymer_provisional" />
+    </visual>
+    <visual name="x950_strut_port_visual">
+      <origin xyz="0 0.125673 -0.133047" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_strut_port_visual.stl" />
+      </geometry>
+      <material name="X950_finish_carbon_tube" />
+    </visual>
+    <visual name="x950_strut_starboard_visual">
+      <origin xyz="0 -0.125673 -0.133047" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/base_link_visual_x950_strut_starboard_visual.stl" />
+      </geometry>
+      <material name="X950_finish_carbon_tube" />
+    </visual>
+  </link>
+  <link name="battery_link">
+    <visual name="battery_pack_visual">
+      <geometry>
+        <mesh filename="package://x950_description/meshes/battery_link_visual_battery_pack_visual.stl" />
+      </geometry>
+      <material name="X950_finish_silver_plastic_wrap" />
+    </visual>
+  </link>
+  <link name="battery_support_link">
+    <visual name="battery_cradle_visual">
+      <origin xyz="0.006 0 0.02568" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/battery_support_link_visual_battery_cradle_visual.stl" />
+      </geometry>
+      <material name="X950_finish_tpu95_black" />
+    </visual>
+    <visual name="battery_end_block_visual">
+      <origin xyz="-0.120465 0 0.02205" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/battery_support_link_visual_battery_end_block_visual.stl" />
+      </geometry>
+      <material name="X950_finish_tpu95_black" />
+    </visual>
+  </link>
+  <link name="d555_link">
+    <visual name="d555_sensor_visual">
+      <origin xyz="-0.024005 0 -0.000016" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/d555_link_visual_d555_sensor_visual.stl" />
+      </geometry>
+      <material name="X950_finish_d555_housing_provisional" />
+    </visual>
+  </link>
+  <link name="d555_mount_link">
+    <visual name="d555_bracket_v03_visual">
+      <origin xyz="0.003596 0 -0.02605" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/d555_mount_link_visual_d555_bracket_v03_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+  </link>
+  <link name="d555_nominal_camera_link" />
+  <link name="d555_nominal_color_frame" />
+  <link name="d555_nominal_color_optical_frame" />
+  <link name="d555_nominal_depth_frame" />
+  <link name="d555_nominal_depth_optical_frame" />
+  <link name="d555_nominal_infra1_frame" />
+  <link name="d555_nominal_infra1_optical_frame" />
+  <link name="d555_nominal_infra2_frame" />
+  <link name="d555_nominal_infra2_optical_frame" />
+  <link name="e1r_link">
+    <visual name="e1r_sensor_visual">
+      <origin xyz="0 -0.015043 0.023354" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/e1r_link_visual_e1r_sensor_visual.stl" />
+      </geometry>
+      <material name="X950_finish_e1r_housing_provisional" />
+    </visual>
+  </link>
+  <link name="e1r_mount_link">
+    <visual name="e1r_bracket_v01_visual">
+      <origin xyz="0.00005 0 -0.028504" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/e1r_mount_link_visual_e1r_bracket_v01_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+  </link>
+  <link name="e1r_nominal_lidar_frame" />
+  <link name="fmu_housing_link" />
+  <link name="gnss_aux_link">
+    <visual name="gnss_aux_radome_visual">
+      <origin xyz="0 0 0.02108" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/gnss_aux_link_visual_gnss_aux_radome_visual.stl" />
+      </geometry>
+      <material name="X950_finish_gnss_radome_provisional" />
+    </visual>
+  </link>
+  <link name="gnss_aux_mount_link">
+    <visual name="gnss_aux_bracket_visual">
+      <origin xyz="-0.000624 0.000012 0.01524" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/gnss_aux_mount_link_visual_gnss_aux_bracket_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+  </link>
+  <link name="gnss_main_link">
+    <visual name="gnss_main_radome_visual">
+      <origin xyz="0 0 0.02108" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/gnss_main_link_visual_gnss_main_radome_visual.stl" />
+      </geometry>
+      <material name="X950_finish_gnss_radome_provisional" />
+    </visual>
+  </link>
+  <link name="gnss_main_mount_link">
+    <visual name="gnss_main_bracket_visual">
+      <origin xyz="-0.000624 0.000012 0.01524" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/gnss_main_mount_link_visual_gnss_main_bracket_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+  </link>
+  <link name="hadron_link">
+    <visual name="hadron_body_visual">
+      <origin xyz="0.01985 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_link_visual_hadron_body_visual.stl" />
+      </geometry>
+      <material name="X950_finish_hadron_housing_proxy" />
+    </visual>
+    <visual name="hadron_thermal_lens_visual">
+      <origin xyz="0.040575 0 0.0078" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_link_visual_hadron_thermal_lens_visual.stl" />
+      </geometry>
+      <material name="X950_finish_hadron_optics_proxy" />
+    </visual>
+    <visual name="hadron_visible_lens_visual">
+      <origin xyz="0.040075 0 -0.0122" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_link_visual_hadron_visible_lens_visual.stl" />
+      </geometry>
+      <material name="X950_finish_hadron_optics_proxy" />
+    </visual>
+  </link>
+  <link name="hadron_mount_link">
+    <visual name="hadron_plate_v2_visual">
+      <origin xyz="-0.00512 0.000103 -0.000155" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_plate_v2_visual.stl" />
+      </geometry>
+      <material name="X950_finish_unclassified_provisional" />
+    </visual>
+    <visual name="hadron_wedge_backing_lower_visual">
+      <origin xyz="-0.024001 0 -0.016278" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_backing_lower_visual.stl" />
+      </geometry>
+      <material name="X950_finish_unclassified_provisional" />
+    </visual>
+    <visual name="hadron_wedge_backing_upper_visual">
+      <origin xyz="-0.036451 0 0.011566" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_backing_upper_visual.stl" />
+      </geometry>
+      <material name="X950_finish_unclassified_provisional" />
+    </visual>
+    <visual name="hadron_wedge_v1_visual">
+      <origin xyz="-0.016236 0.000103 0.001735" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_v1_visual.stl" />
+      </geometry>
+      <material name="X950_finish_unclassified_provisional" />
+    </visual>
+  </link>
+  <link name="hadron_nominal_thermal_optical_frame" />
+  <link name="hadron_nominal_visible_optical_frame" />
+  <link name="hflow_link">
+    <visual name="hflow_body_visual">
+      <origin xyz="0 0 -0.00176" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hflow_link_visual_hflow_body_visual.stl" />
+      </geometry>
+      <material name="X950_finish_hflow_housing_provisional" />
+    </visual>
+  </link>
+  <link name="hflow_nominal_flow_optical_frame" />
+  <link name="hflow_nominal_frd_frame" />
+  <link name="hflow_nominal_range_frame" />
+  <joint name="avia_joint" type="fixed">
+    <origin xyz="$(arg avia_xyz)" rpy="$(arg avia_rpy)" />
+    <parent link="avia_mount_link" />
+    <child link="avia_link" />
+  </joint>
+  <joint name="avia_mount_joint" type="fixed">
+    <origin xyz="$(arg avia_mount_xyz)" rpy="$(arg avia_mount_rpy)" />
+    <parent link="base_link" />
+    <child link="avia_mount_link" />
+  </joint>
+  <joint name="avionics_carrier_joint" type="fixed">
+    <origin xyz="$(arg avionics_carrier_xyz)" rpy="$(arg avionics_carrier_rpy)" />
+    <parent link="base_link" />
+    <child link="avionics_carrier_link" />
+  </joint>
+  <joint name="battery_joint" type="fixed">
+    <origin xyz="$(arg battery_xyz)" rpy="$(arg battery_rpy)" />
+    <parent link="battery_support_link" />
+    <child link="battery_link" />
+  </joint>
+  <joint name="battery_support_joint" type="fixed">
+    <origin xyz="$(arg battery_support_xyz)" rpy="$(arg battery_support_rpy)" />
+    <parent link="base_link" />
+    <child link="battery_support_link" />
+  </joint>
+  <joint name="d555_joint" type="fixed">
+    <origin xyz="$(arg d555_xyz)" rpy="$(arg d555_rpy)" />
+    <parent link="d555_mount_link" />
+    <child link="d555_link" />
+  </joint>
+  <joint name="d555_mount_joint" type="fixed">
+    <origin xyz="$(arg d555_mount_xyz)" rpy="$(arg d555_mount_rpy)" />
+    <parent link="base_link" />
+    <child link="d555_mount_link" />
+  </joint>
+  <joint name="d555_nominal_camera_joint" type="fixed">
+    <origin xyz="$(arg d555_nominal_camera_xyz)" rpy="$(arg d555_nominal_camera_rpy)" />
+    <parent link="d555_link" />
+    <child link="d555_nominal_camera_link" />
+  </joint>
+  <joint name="d555_nominal_color_joint" type="fixed">
+    <origin xyz="0 -0.059 0" rpy="0 0 0" />
+    <parent link="d555_nominal_camera_link" />
+    <child link="d555_nominal_color_frame" />
+  </joint>
+  <joint name="d555_nominal_color_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.570796 0 -1.570796" />
+    <parent link="d555_nominal_color_frame" />
+    <child link="d555_nominal_color_optical_frame" />
+  </joint>
+  <joint name="d555_nominal_depth_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="d555_nominal_camera_link" />
+    <child link="d555_nominal_depth_frame" />
+  </joint>
+  <joint name="d555_nominal_depth_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.570796 0 -1.570796" />
+    <parent link="d555_nominal_depth_frame" />
+    <child link="d555_nominal_depth_optical_frame" />
+  </joint>
+  <joint name="d555_nominal_infra1_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="d555_nominal_camera_link" />
+    <child link="d555_nominal_infra1_frame" />
+  </joint>
+  <joint name="d555_nominal_infra1_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.570796 0 -1.570796" />
+    <parent link="d555_nominal_infra1_frame" />
+    <child link="d555_nominal_infra1_optical_frame" />
+  </joint>
+  <joint name="d555_nominal_infra2_joint" type="fixed">
+    <origin xyz="0 -0.095 0" rpy="0 0 0" />
+    <parent link="d555_nominal_camera_link" />
+    <child link="d555_nominal_infra2_frame" />
+  </joint>
+  <joint name="d555_nominal_infra2_optical_joint" type="fixed">
+    <origin xyz="0 0 0" rpy="-1.570796 0 -1.570796" />
+    <parent link="d555_nominal_infra2_frame" />
+    <child link="d555_nominal_infra2_optical_frame" />
+  </joint>
+  <joint name="e1r_joint" type="fixed">
+    <origin xyz="$(arg e1r_xyz)" rpy="$(arg e1r_rpy)" />
+    <parent link="e1r_mount_link" />
+    <child link="e1r_link" />
+  </joint>
+  <joint name="e1r_mount_joint" type="fixed">
+    <origin xyz="$(arg e1r_mount_xyz)" rpy="$(arg e1r_mount_rpy)" />
+    <parent link="base_link" />
+    <child link="e1r_mount_link" />
+  </joint>
+  <joint name="e1r_nominal_lidar_frame_joint" type="fixed">
+    <origin xyz="0 0 0.005588" rpy="0 1.570796 0" />
+    <parent link="e1r_link" />
+    <child link="e1r_nominal_lidar_frame" />
+  </joint>
+  <joint name="fmu_housing_joint" type="fixed">
+    <origin xyz="$(arg fmu_housing_xyz)" rpy="$(arg fmu_housing_rpy)" />
+    <parent link="avionics_carrier_link" />
+    <child link="fmu_housing_link" />
+  </joint>
+  <joint name="gnss_aux_joint" type="fixed">
+    <origin xyz="$(arg gnss_aux_xyz)" rpy="$(arg gnss_aux_rpy)" />
+    <parent link="gnss_aux_mount_link" />
+    <child link="gnss_aux_link" />
+  </joint>
+  <joint name="gnss_aux_mount_joint" type="fixed">
+    <origin xyz="$(arg gnss_aux_mount_xyz)" rpy="$(arg gnss_aux_mount_rpy)" />
+    <parent link="base_link" />
+    <child link="gnss_aux_mount_link" />
+  </joint>
+  <joint name="gnss_main_joint" type="fixed">
+    <origin xyz="$(arg gnss_main_xyz)" rpy="$(arg gnss_main_rpy)" />
+    <parent link="gnss_main_mount_link" />
+    <child link="gnss_main_link" />
+  </joint>
+  <joint name="gnss_main_mount_joint" type="fixed">
+    <origin xyz="$(arg gnss_main_mount_xyz)" rpy="$(arg gnss_main_mount_rpy)" />
+    <parent link="base_link" />
+    <child link="gnss_main_mount_link" />
+  </joint>
+  <joint name="hadron_joint" type="fixed">
+    <origin xyz="$(arg hadron_xyz)" rpy="$(arg hadron_rpy)" />
+    <parent link="hadron_mount_link" />
+    <child link="hadron_link" />
+  </joint>
+  <joint name="hadron_mount_joint" type="fixed">
+    <origin xyz="$(arg hadron_mount_xyz)" rpy="$(arg hadron_mount_rpy)" />
+    <parent link="base_link" />
+    <child link="hadron_mount_link" />
+  </joint>
+  <joint name="hadron_nominal_thermal_optical_frame_joint" type="fixed">
+    <origin xyz="$(arg hadron_nominal_thermal_optical_frame_xyz)" rpy="$(arg hadron_nominal_thermal_optical_frame_rpy)" />
+    <parent link="hadron_link" />
+    <child link="hadron_nominal_thermal_optical_frame" />
+  </joint>
+  <joint name="hadron_nominal_visible_optical_frame_joint" type="fixed">
+    <origin xyz="$(arg hadron_nominal_visible_optical_frame_xyz)" rpy="$(arg hadron_nominal_visible_optical_frame_rpy)" />
+    <parent link="hadron_link" />
+    <child link="hadron_nominal_visible_optical_frame" />
+  </joint>
+  <joint name="hflow_joint" type="fixed">
+    <origin xyz="$(arg hflow_xyz)" rpy="$(arg hflow_rpy)" />
+    <parent link="base_link" />
+    <child link="hflow_link" />
+  </joint>
+  <joint name="hflow_nominal_flow_optical_joint" type="fixed">
+    <origin xyz="$(arg hflow_nominal_flow_optical_frame_xyz)" rpy="$(arg hflow_nominal_flow_optical_frame_rpy)" />
+    <parent link="hflow_link" />
+    <child link="hflow_nominal_flow_optical_frame" />
+  </joint>
+  <joint name="hflow_nominal_frd_joint" type="fixed">
+    <origin xyz="$(arg hflow_nominal_frd_frame_xyz)" rpy="$(arg hflow_nominal_frd_frame_rpy)" />
+    <parent link="hflow_link" />
+    <child link="hflow_nominal_frd_frame" />
+  </joint>
+  <joint name="hflow_nominal_range_joint" type="fixed">
+    <origin xyz="$(arg hflow_nominal_range_frame_xyz)" rpy="$(arg hflow_nominal_range_frame_rpy)" />
+    <parent link="hflow_link" />
+    <child link="hflow_nominal_range_frame" />
+  </joint>
+</robot>

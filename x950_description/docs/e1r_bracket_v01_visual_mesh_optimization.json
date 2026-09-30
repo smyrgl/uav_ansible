@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "object": "e1r_bracket_v01_visual",
+  "timestamp_utc": "2026-09-24T19:52:44.481333+00:00",
+  "status": "passed",
+  "source_mesh_sha256": "1dc927a3466194541266fcafcc3d96191f18be1d4203875dc920222b61dfdbf3",
+  "world_matrix_at_validation": [
+    [
+      1.0,
+      0.0,
+      0.0,
+      -0.08399999886751175
+    ],
+    [
+      0.0,
+      1.0,
+      0.0,
+      0.0
+    ],
+    [
+      0.0,
+      0.0,
+      1.0,
+      -0.02449999935925007
+    ],
+    [
+      0.0,
+      0.0,
+      0.0,
+      1.0
+    ]
+  ],
+  "source_preservation": "Detailed cad_source_meshes assets are untouched",
+  "target_triangle_range": [
+    2500,
+    6500
+  ],
+  "bbox_component_tolerance_m": 0.00025,
+  "sampled_surface_tolerance_m": 0.0005,
+  "maximum_samples_per_direction": 15000,
+  "validation_scope": "Actual world-vertex bounds plus bidirectional sampled nearest-surface distances; not a global Hausdorff guarantee",
+  "material_preservation": "All mesh material slots must match before acceptance",
+  "last_run_was_idempotent_noop": false,
+  "attempts": [
+    {
+      "collapse_ratio": 0.35,
+      "triangle_count": 3512,
+      "vertex_count": 1710,
+      "within_triangle_target": true,
+      "bbox_m": [
+        [
+          -0.13430000841617584,
+          -0.05950000137090683,
+          -0.08150868862867355
+        ],
+        [
+          -0.03359999880194664,
+          0.05950000137090683,
+          -0.024500001221895218
+        ]
+      ],
+      "bbox_absolute_delta_m": [
+        [
+          0.0,
+          0.0,
+          8.687376976013184e-06
+        ],
+        [
+          3.725290298461914e-09,
+          0.0,
+          0.0
+        ]
+      ],
+      "source_to_reduced": {
+        "samples": 15000,
+        "maximum_m": 4.741775774164125e-05,
+        "rms_m": 3.049720353970568e-06,
+        "p95_m": 7.937622285680845e-06,
+        "p99_m": 1.2727785360766575e-05,
+        "worst_sample": {
+          "distance_m": 4.741775774164125e-05,
+          "source_world_point_m": [
+            -0.052015431225299835,
+            0.05710231512784958,
+            -0.024500001221895218
+          ],
+          "nearest_world_point_m": [
+            -0.05201379209756851,
+            0.05714970454573631,
+            -0.024500001221895218
+          ],
+          "destination_triangle": 16,
+          "sample_method": "area_stratified_barycentric"
+        }
+      },
+      "reduced_to_source": {
+        "samples": 15000,
+        "maximum_m": 3.602308061090298e-05,
+        "rms_m": 2.438870203053246e-06,
+        "p95_m": 5.868231255590217e-06,
+        "p99_m": 1.043039264914114e-05,
+        "worst_sample": {
+          "distance_m": 3.602308061090298e-05,
+          "source_world_point_m": [
+            -0.05645747110247612,
+            0.05526355654001236,
+            -0.024500001221895218
+          ],
+          "nearest_world_point_m": [
+            -0.0564551055431366,
+            0.05529950186610222,
+            -0.024500001221895218
+          ],
+          "destination_triangle": 86,
+          "sample_method": "area_stratified_barycentric"
+        }
+      },
+      "mesh_material_slots_preserved": true,
+      "accepted": true
+    }
+  ],
+  "original_triangle_count": 10038,
+  "original_bbox_m": [
+    [
+      -0.13430000841617584,
+      -0.05950000137090683,
+      -0.08150000125169754
+    ],
+    [
+      -0.03360000252723694,
+      0.05950000137090683,
+      -0.024500001221895218
+    ]
+  ],
+  "selected_attempt": 0,
+  "optimized_triangle_count": 3512,
+  "optimized_mesh_sha256": "fe3df87ecb078807a3290cf8270170f316b7a4e5cdd03535d8f7845257cb2302",
+  "warning": null
+}

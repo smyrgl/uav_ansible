@@ -1,0 +1,98 @@
+{
+  "source": "Three primary sensor masses/FOV from project owner; GNSS and Hadron values from linked manufacturer documentation",
+  "units": {
+    "mass": "kg"
+  },
+  "sensors": {
+    "avia": {
+      "mass_kg": 0.498,
+      "center_of_mass": null,
+      "inertia_kg_m2": null
+    },
+    "d555": {
+      "mass_kg": 0.337,
+      "center_of_mass": null,
+      "inertia_kg_m2": null,
+      "fov": {
+        "source": "Project owner, 2026-09-24",
+        "depth": {
+          "mode": "HD 16:9",
+          "horizontal_deg": 87,
+          "vertical_deg": 58,
+          "tolerance_deg": 3
+        },
+        "rgb": {
+          "horizontal_deg": 90,
+          "vertical_deg": 65,
+          "tolerance_deg": 3
+        },
+        "optical_centers": "Guides use D455-derived optical frames: lateral spacing corroborated by D555 CAD, axial depth origin provisional."
+      },
+      "nominal_optics": {
+        "equivalence_source": "Project owner: D555 uses D455 optics and D585 vision chip",
+        "manufacturer_source": "https://github.com/realsenseai/realsense-ros/blob/9a11121700cb4780e273e34141f6402fe184321d/realsense2_description/urdf/_d455.urdf.xacro",
+        "housing_to_depth_xyz_m": [
+          -0.00465,
+          0.0475,
+          0
+        ],
+        "depth_to_infra2_xyz_m": [
+          0,
+          -0.095,
+          0
+        ],
+        "depth_to_color_xyz_m": [
+          0,
+          -0.059,
+          0
+        ],
+        "axial_depth_offset_status": "D455 estimate, not confirmed D555 zero-depth plane",
+        "lateral_status": "D555 CAD lens axes corroborate 95mm stereo baseline and59mm depth-to-RGB spacing",
+        "factory_intrinsics": "Owned by RealSense driver/device; not replaced by FOV-derived intrinsics",
+        "imu": "Not modeled from D455; shared optics does not establish D555 IMU location"
+      }
+    },
+    "e1r": {
+      "mass_kg": 0.33,
+      "cad_center_of_mass_in_e1r_link_m": [
+        0,
+        -0.00635,
+        0.01888
+      ],
+      "center_of_mass_status": "CAD marker only; not measured",
+      "inertia_kg_m2": null
+    },
+    "hadron": {
+      "model": "FLIR Hadron 640R+",
+      "part_number": "70640AS32-6PARXP",
+      "geometry_status": "Drawing-derived visual proxy, not official STEP/CAD",
+      "mass_kg": 0.056,
+      "mass_status": "Manufacturer nominal; no mounting bracket, cables or hardware",
+      "thermal_hfov_deg": 32,
+      "visible_hfov_deg": 67,
+      "thermal_resolution": [
+        640,
+        512
+      ],
+      "visible_resolution": [
+        9248,
+        6944
+      ],
+      "optical_origin_status": "Visual lens-face references only, not calibrated optical centres/entrance pupils; visible 20 mm spacing estimated from drawing",
+      "product_url": "https://oem.flir.com/products/hadron-640/?model=70640AS32-6PARXP",
+      "engineering_drawing_url": "https://flir.netx.net/file/asset/52567/original/attachment/",
+      "installation": "Upside down: thermal below visible. Front-plate pose provisional."
+    },
+    "gnss_antennas": {
+      "model": "MAN1216Q50",
+      "quantity": 2,
+      "each_mass_kg": 0.025,
+      "maximum_diameter_m": 0.05,
+      "height_m": 0.04216,
+      "phase_center": null,
+      "source": "https://cdn.sparkfun.com/assets/c/4/1/f/c/MAN1216Q50-Updated-Dec2025.pdf",
+      "geometry_status": "Overall envelope dimensioned, shoulder/taper approximated"
+    }
+  },
+  "urdf_inertials": "Omitted until complete physical properties are established. Masses are retained here and in Blender metadata."
+}

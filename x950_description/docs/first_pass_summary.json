@@ -1,0 +1,32 @@
+{
+  "scope": "First-pass ROS 2 Jazzy mechanical visualization and TF model",
+  "links": 29,
+  "fixed_joints": 28,
+  "visual_meshes": 42,
+  "triangles": 357973,
+  "pose_arguments_checked": 38,
+  "linkforge_errors": 0,
+  "linkforge_warnings": 125,
+  "geometry_validation": "passed",
+  "official_xacro_validation": "passed",
+  "max_per_visual_export_bounds_error_m": 8.420216812687897e-07,
+  "source_blend_edited": false,
+  "all_requested_components_present": true,
+  "urdf_inertials_applied": false,
+  "ros_runtime_tested": false,
+  "foxglove_runtime_tested": false,
+  "remaining_measurements": [
+    "Holybro baseboard installation pose and configured orientation",
+    "Exact Pixhawk revision and physical IMU datums",
+    "Hadron rear mounting-plane pose and calibrated optical origins",
+    "Sensor extrinsic calibration",
+    "GNSS antenna phase centers",
+    "Whole aircraft mass, CoM and physical inertias"
+  ],
+  "source_limitations": [
+    "Hadron geometry is a documented drawing-derived proxy; manufacturer STEP available on request",
+    "Antenna envelope dimensioned, shoulder/taper approximated",
+    "TPU source meshes exclude internal slicer lattice",
+    "Avionics source assembly configuration may differ from installed Orin/accessory configuration"
+  ]
+}

@@ -1,0 +1,2023 @@
+{
+  "status": "passed",
+  "timestamp_utc": "2026-09-30T07:17:29.834110+00:00",
+  "blender_version": "5.1.2",
+  "scope": "Visual geometry and fixed TF tree; not a dynamics/simulation model",
+  "physics": "Supplied sensor masses stored in config/Blender; URDF inertials omitted pending complete physical properties",
+  "excluded_validation_checks": {
+    "MassPropertiesCheck": "Physical properties are outside this first-pass model"
+  },
+  "linkforge_module": "bl_ext.blender_org.linkforge",
+  "scene_link_count": 33,
+  "scene_visual_mesh_count": 47,
+  "conversion_issues": [
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 8762 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_avionics_bay_cover_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 13 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_avionics_bay_cover_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 13890 boundary edge(s).",
+      "affected_objects": [
+        "x950_avionics_bay_cover_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 690 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_batterh_bay_starboard_tab_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 1926 boundary edge(s).",
+      "affected_objects": [
+        "x950_batterh_bay_starboard_tab_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 5982 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_battery_bay_door_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 67 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_battery_bay_door_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 6032 boundary edge(s).",
+      "affected_objects": [
+        "x950_battery_bay_door_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 680 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_battery_bay_port_tab_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 1928 boundary edge(s).",
+      "affected_objects": [
+        "x950_battery_bay_port_tab_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 1868 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_belly_center_plate_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 1868 boundary edge(s).",
+      "affected_objects": [
+        "x950_belly_center_plate_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 1320 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_belly_front_plate_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 1320 boundary edge(s).",
+      "affected_objects": [
+        "x950_belly_front_plate_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 576 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_belly_rear_plate_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 576 boundary edge(s).",
+      "affected_objects": [
+        "x950_belly_rear_plate_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 7130 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_body_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 14 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_body_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 33053 boundary edge(s).",
+      "affected_objects": [
+        "x950_body_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 6426 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_front_mount_plate_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 20 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_front_mount_plate_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 6431 boundary edge(s).",
+      "affected_objects": [
+        "x950_front_mount_plate_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 576 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_gps_plate_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 576 boundary edge(s).",
+      "affected_objects": [
+        "x950_gps_plate_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 3380 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_landing_leg_port_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 6542 boundary edge(s).",
+      "affected_objects": [
+        "x950_landing_leg_port_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 3390 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_landing_leg_starboard_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 6548 boundary edge(s).",
+      "affected_objects": [
+        "x950_landing_leg_starboard_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 2684 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_m1_arm_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 2684 boundary edge(s).",
+      "affected_objects": [
+        "x950_m1_arm_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 7854 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_m1_motor_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 299 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_m1_motor_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 20029 boundary edge(s).",
+      "affected_objects": [
+        "x950_m1_motor_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 2684 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_m2_arm_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 2684 boundary edge(s).",
+      "affected_objects": [
+        "x950_m2_arm_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 7827 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_m2_motor_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 301 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_m2_motor_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 20035 boundary edge(s).",
+      "affected_objects": [
+        "x950_m2_motor_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 2684 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_m3_arm_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 2684 boundary edge(s).",
+      "affected_objects": [
+        "x950_m3_arm_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 7820 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_m3_motor_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 301 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_m3_motor_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 20029 boundary edge(s).",
+      "affected_objects": [
+        "x950_m3_motor_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 2684 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_m4_arm_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 2684 boundary edge(s).",
+      "affected_objects": [
+        "x950_m4_arm_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 7838 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_m4_motor_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 298 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_m4_motor_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 20027 boundary edge(s).",
+      "affected_objects": [
+        "x950_m4_motor_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 4363 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_radio_antenna_port_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 1 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_radio_antenna_port_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 9061 boundary edge(s).",
+      "affected_objects": [
+        "x950_radio_antenna_port_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 4368 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_radio_antenna_starboard_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 1 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_radio_antenna_starboard_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 9071 boundary edge(s).",
+      "affected_objects": [
+        "x950_radio_antenna_starboard_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 2986 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_strut_port_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 15 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_strut_port_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 2992 boundary edge(s).",
+      "affected_objects": [
+        "x950_strut_port_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'base_link (visual)' has 2986 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "x950_strut_starboard_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'base_link (visual)' has 15 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "x950_strut_starboard_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'base_link (visual)' has 2992 boundary edge(s).",
+      "affected_objects": [
+        "x950_strut_starboard_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'avia_mount_link (visual)' has 73 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "avia_backing_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'avia_mount_link (visual)' has 23 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "avia_bracket_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'avia_link (visual)' has 3 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "avia_sensor_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'avia_link (visual)' has 21 boundary edge(s).",
+      "affected_objects": [
+        "avia_sensor_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Manifold Mesh",
+      "message": "Mesh 'avia_link (visual)' has 1 non-manifold edge(s) (shared by >2 triangles).",
+      "affected_objects": [
+        "avia_sensor_visual"
+      ],
+      "suggestion": null,
+      "code": "MESH_NON_MANIFOLD"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'd555_mount_link (visual)' has 156 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "d555_bracket_v03_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'd555_link (visual)' has 20 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "d555_sensor_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'd555_link (visual)' has 59 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "d555_sensor_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'd555_link (visual)' has 29 boundary edge(s).",
+      "affected_objects": [
+        "d555_sensor_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Manifold Mesh",
+      "message": "Mesh 'd555_link (visual)' has 55 non-manifold edge(s) (shared by >2 triangles).",
+      "affected_objects": [
+        "d555_sensor_visual"
+      ],
+      "suggestion": null,
+      "code": "MESH_NON_MANIFOLD"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'e1r_mount_link (visual)' has 14 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "e1r_bracket_v01_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'e1r_link (visual)' has 12 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "e1r_sensor_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Duplicate Faces",
+      "message": "Mesh 'e1r_link (visual)' has 8 duplicate triangle(s).",
+      "affected_objects": [
+        "e1r_sensor_visual"
+      ],
+      "suggestion": null,
+      "code": "MESH_DUPLICATE_FACE"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'e1r_link (visual)' has 42 boundary edge(s).",
+      "affected_objects": [
+        "e1r_sensor_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'avionics_carrier_link (visual)' has 86 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "avionics_carrier_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'avionics_carrier_link (visual)' has 776 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "avionics_carrier_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Duplicate Faces",
+      "message": "Mesh 'avionics_carrier_link (visual)' has 430 duplicate triangle(s).",
+      "affected_objects": [
+        "avionics_carrier_visual"
+      ],
+      "suggestion": null,
+      "code": "MESH_DUPLICATE_FACE"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'avionics_carrier_link (visual)' has 1449 boundary edge(s).",
+      "affected_objects": [
+        "avionics_carrier_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Manifold Mesh",
+      "message": "Mesh 'avionics_carrier_link (visual)' has 3943 non-manifold edge(s) (shared by >2 triangles).",
+      "affected_objects": [
+        "avionics_carrier_visual"
+      ],
+      "suggestion": null,
+      "code": "MESH_NON_MANIFOLD"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'gnss_main_mount_link (visual)' has 1 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "gnss_main_bracket_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'gnss_aux_mount_link (visual)' has 1 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "gnss_aux_bracket_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'hadron_mount_link (visual)' has 1 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "hadron_plate_v2_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'hadron_mount_link (visual)' has 22 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "hadron_wedge_backing_lower_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'hadron_mount_link (visual)' has 22 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "hadron_wedge_backing_upper_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'hadron_mount_link (visual)' has 10 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "hadron_wedge_v1_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'hadron_link (visual)' has 2 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "hadron_body_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'hflow_link (visual)' has 7754 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "hflow_body_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'hflow_link (visual)' has 12 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "hflow_body_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Non-Watertight Mesh",
+      "message": "Mesh 'hflow_link (visual)' has 19434 boundary edge(s).",
+      "affected_objects": [
+        "hflow_body_visual"
+      ],
+      "suggestion": "Ensure the mesh is closed (watertight) for accurate inertia calculation.",
+      "code": "MESH_BOUNDARY_EDGE"
+    }
+  ],
+  "validation_issues": [
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'base_link' has no collision geometry",
+      "affected_objects": [
+        "base_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'avia_mount_link' has no collision geometry",
+      "affected_objects": [
+        "avia_mount_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'avia_link' has no collision geometry",
+      "affected_objects": [
+        "avia_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_mount_link' has no collision geometry",
+      "affected_objects": [
+        "d555_mount_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_link' has no collision geometry",
+      "affected_objects": [
+        "d555_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'd555_nominal_camera_link' has no visual geometry",
+      "affected_objects": [
+        "d555_nominal_camera_link"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_nominal_camera_link' has no collision geometry",
+      "affected_objects": [
+        "d555_nominal_camera_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'd555_nominal_depth_frame' has no visual geometry",
+      "affected_objects": [
+        "d555_nominal_depth_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_nominal_depth_frame' has no collision geometry",
+      "affected_objects": [
+        "d555_nominal_depth_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'd555_nominal_depth_optical_frame' has no visual geometry",
+      "affected_objects": [
+        "d555_nominal_depth_optical_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_nominal_depth_optical_frame' has no collision geometry",
+      "affected_objects": [
+        "d555_nominal_depth_optical_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'd555_nominal_infra1_frame' has no visual geometry",
+      "affected_objects": [
+        "d555_nominal_infra1_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_nominal_infra1_frame' has no collision geometry",
+      "affected_objects": [
+        "d555_nominal_infra1_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'd555_nominal_infra1_optical_frame' has no visual geometry",
+      "affected_objects": [
+        "d555_nominal_infra1_optical_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_nominal_infra1_optical_frame' has no collision geometry",
+      "affected_objects": [
+        "d555_nominal_infra1_optical_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'd555_nominal_infra2_frame' has no visual geometry",
+      "affected_objects": [
+        "d555_nominal_infra2_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_nominal_infra2_frame' has no collision geometry",
+      "affected_objects": [
+        "d555_nominal_infra2_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'd555_nominal_infra2_optical_frame' has no visual geometry",
+      "affected_objects": [
+        "d555_nominal_infra2_optical_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_nominal_infra2_optical_frame' has no collision geometry",
+      "affected_objects": [
+        "d555_nominal_infra2_optical_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'd555_nominal_color_frame' has no visual geometry",
+      "affected_objects": [
+        "d555_nominal_color_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_nominal_color_frame' has no collision geometry",
+      "affected_objects": [
+        "d555_nominal_color_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'd555_nominal_color_optical_frame' has no visual geometry",
+      "affected_objects": [
+        "d555_nominal_color_optical_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'd555_nominal_color_optical_frame' has no collision geometry",
+      "affected_objects": [
+        "d555_nominal_color_optical_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'e1r_mount_link' has no collision geometry",
+      "affected_objects": [
+        "e1r_mount_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'e1r_link' has no collision geometry",
+      "affected_objects": [
+        "e1r_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'e1r_nominal_lidar_frame' has no visual geometry",
+      "affected_objects": [
+        "e1r_nominal_lidar_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'e1r_nominal_lidar_frame' has no collision geometry",
+      "affected_objects": [
+        "e1r_nominal_lidar_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'battery_support_link' has no collision geometry",
+      "affected_objects": [
+        "battery_support_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'battery_link' has no collision geometry",
+      "affected_objects": [
+        "battery_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'avionics_carrier_link' has no collision geometry",
+      "affected_objects": [
+        "avionics_carrier_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'fmu_housing_link' has no visual geometry",
+      "affected_objects": [
+        "fmu_housing_link"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'fmu_housing_link' has no collision geometry",
+      "affected_objects": [
+        "fmu_housing_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'gnss_main_mount_link' has no collision geometry",
+      "affected_objects": [
+        "gnss_main_mount_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'gnss_main_link' has no collision geometry",
+      "affected_objects": [
+        "gnss_main_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'gnss_aux_mount_link' has no collision geometry",
+      "affected_objects": [
+        "gnss_aux_mount_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'gnss_aux_link' has no collision geometry",
+      "affected_objects": [
+        "gnss_aux_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'hadron_mount_link' has no collision geometry",
+      "affected_objects": [
+        "hadron_mount_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'hadron_link' has no collision geometry",
+      "affected_objects": [
+        "hadron_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'hadron_nominal_thermal_optical_frame' has no visual geometry",
+      "affected_objects": [
+        "hadron_nominal_thermal_optical_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'hadron_nominal_thermal_optical_frame' has no collision geometry",
+      "affected_objects": [
+        "hadron_nominal_thermal_optical_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'hadron_nominal_visible_optical_frame' has no visual geometry",
+      "affected_objects": [
+        "hadron_nominal_visible_optical_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'hadron_nominal_visible_optical_frame' has no collision geometry",
+      "affected_objects": [
+        "hadron_nominal_visible_optical_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'hflow_link' has no collision geometry",
+      "affected_objects": [
+        "hflow_link"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'hflow_nominal_flow_optical_frame' has no visual geometry",
+      "affected_objects": [
+        "hflow_nominal_flow_optical_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'hflow_nominal_flow_optical_frame' has no collision geometry",
+      "affected_objects": [
+        "hflow_nominal_flow_optical_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'hflow_nominal_range_frame' has no visual geometry",
+      "affected_objects": [
+        "hflow_nominal_range_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'hflow_nominal_range_frame' has no collision geometry",
+      "affected_objects": [
+        "hflow_nominal_range_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No visual geometry",
+      "message": "Link 'hflow_nominal_frd_frame' has no visual geometry",
+      "affected_objects": [
+        "hflow_nominal_frd_frame"
+      ],
+      "suggestion": "Add visual geometry for better visualization in simulators",
+      "code": "NOT_FOUND"
+    },
+    {
+      "severity": "warning",
+      "title": "No collision geometry",
+      "message": "Link 'hflow_nominal_frd_frame' has no collision geometry",
+      "affected_objects": [
+        "hflow_nominal_frd_frame"
+      ],
+      "suggestion": "Add collision geometry for physics simulation",
+      "code": "NOT_FOUND"
+    }
+  ],
+  "is_valid": true,
+  "link_count": 33,
+  "joint_count": 32,
+  "visual_mesh_count": 47,
+  "mesh_files": [
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_avionics_bay_cover_visual.stl",
+      "triangles": 14626
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_batterh_bay_starboard_tab_visual.stl",
+      "triangles": 3018
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_battery_bay_door_visual.stl",
+      "triangles": 6728
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_battery_bay_port_tab_visual.stl",
+      "triangles": 3018
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_belly_center_plate_visual.stl",
+      "triangles": 1812
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_belly_front_plate_visual.stl",
+      "triangles": 1272
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_belly_rear_plate_visual.stl",
+      "triangles": 556
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_body_visual.stl",
+      "triangles": 28993
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_front_mount_plate_visual.stl",
+      "triangles": 7377
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_gps_plate_visual.stl",
+      "triangles": 556
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_landing_leg_port_visual.stl",
+      "triangles": 7924
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_landing_leg_starboard_visual.stl",
+      "triangles": 7924
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_m1_arm_visual.stl",
+      "triangles": 4148
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_m1_motor_visual.stl",
+      "triangles": 17057
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_m2_arm_visual.stl",
+      "triangles": 4148
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_m2_motor_visual.stl",
+      "triangles": 17057
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_m3_arm_visual.stl",
+      "triangles": 4148
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_m3_motor_visual.stl",
+      "triangles": 17057
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_m4_arm_visual.stl",
+      "triangles": 4148
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_m4_motor_visual.stl",
+      "triangles": 17057
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_radio_antenna_port_visual.stl",
+      "triangles": 8265
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_radio_antenna_starboard_visual.stl",
+      "triangles": 8265
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_strut_port_visual.stl",
+      "triangles": 4312
+    },
+    {
+      "link": "base_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/base_link_visual_x950_strut_starboard_visual.stl",
+      "triangles": 4312
+    },
+    {
+      "link": "avia_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/avia_mount_link_visual_avia_backing_visual.stl",
+      "triangles": 2140
+    },
+    {
+      "link": "avia_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/avia_mount_link_visual_avia_bracket_visual.stl",
+      "triangles": 3940
+    },
+    {
+      "link": "avia_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/avia_link_visual_avia_sensor_visual.stl",
+      "triangles": 8105
+    },
+    {
+      "link": "d555_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/d555_mount_link_visual_d555_bracket_v03_visual.stl",
+      "triangles": 5506
+    },
+    {
+      "link": "d555_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/d555_link_visual_d555_sensor_visual.stl",
+      "triangles": 32458
+    },
+    {
+      "link": "e1r_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/e1r_mount_link_visual_e1r_bracket_v01_visual.stl",
+      "triangles": 3512
+    },
+    {
+      "link": "e1r_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/e1r_link_visual_e1r_sensor_visual.stl",
+      "triangles": 17856
+    },
+    {
+      "link": "battery_support_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/battery_support_link_visual_battery_cradle_visual.stl",
+      "triangles": 80
+    },
+    {
+      "link": "battery_support_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/battery_support_link_visual_battery_end_block_visual.stl",
+      "triangles": 116
+    },
+    {
+      "link": "battery_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/battery_link_visual_battery_pack_visual.stl",
+      "triangles": 12
+    },
+    {
+      "link": "avionics_carrier_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/avionics_carrier_link_visual_avionics_carrier_visual.stl",
+      "triangles": 78206
+    },
+    {
+      "link": "gnss_main_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/gnss_main_mount_link_visual_gnss_main_bracket_visual.stl",
+      "triangles": 4740
+    },
+    {
+      "link": "gnss_main_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/gnss_main_link_visual_gnss_main_radome_visual.stl",
+      "triangles": 956
+    },
+    {
+      "link": "gnss_aux_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/gnss_aux_mount_link_visual_gnss_aux_bracket_visual.stl",
+      "triangles": 4740
+    },
+    {
+      "link": "gnss_aux_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/gnss_aux_link_visual_gnss_aux_radome_visual.stl",
+      "triangles": 956
+    },
+    {
+      "link": "hadron_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_plate_v2_visual.stl",
+      "triangles": 10476
+    },
+    {
+      "link": "hadron_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_backing_lower_visual.stl",
+      "triangles": 1244
+    },
+    {
+      "link": "hadron_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_backing_upper_visual.stl",
+      "triangles": 1244
+    },
+    {
+      "link": "hadron_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_v1_visual.stl",
+      "triangles": 2780
+    },
+    {
+      "link": "hadron_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_link_visual_hadron_body_visual.stl",
+      "triangles": 360
+    },
+    {
+      "link": "hadron_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_link_visual_hadron_thermal_lens_visual.stl",
+      "triangles": 256
+    },
+    {
+      "link": "hadron_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_link_visual_hadron_visible_lens_visual.stl",
+      "triangles": 256
+    },
+    {
+      "link": "hflow_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hflow_link_visual_hflow_body_visual.stl",
+      "triangles": 15890
+    }
+  ],
+  "urdf": "/Users/john/Code/Printables/x950_description/urdf/x950.urdf",
+  "xacro": "/Users/john/Code/Printables/x950_description/urdf/x950.urdf.xacro",
+  "calibration_arguments": [
+    {
+      "joint": "avia_joint",
+      "child": "avia_link",
+      "xyz": {
+        "argument": "avia_xyz",
+        "default": "0.062 -0.002525 -0.01525"
+      },
+      "rpy": {
+        "argument": "avia_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "avia_mount_joint",
+      "child": "avia_mount_link",
+      "xyz": {
+        "argument": "avia_mount_xyz",
+        "default": "0.14766 0 0.09325"
+      },
+      "rpy": {
+        "argument": "avia_mount_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "avionics_carrier_joint",
+      "child": "avionics_carrier_link",
+      "xyz": {
+        "argument": "avionics_carrier_xyz",
+        "default": "0.065 0 0.075"
+      },
+      "rpy": {
+        "argument": "avionics_carrier_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "battery_joint",
+      "child": "battery_link",
+      "xyz": {
+        "argument": "battery_xyz",
+        "default": "0 0 0.0441"
+      },
+      "rpy": {
+        "argument": "battery_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "battery_support_joint",
+      "child": "battery_support_link",
+      "xyz": {
+        "argument": "battery_support_xyz",
+        "default": "-0.02623 0 -0.01"
+      },
+      "rpy": {
+        "argument": "battery_support_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "d555_joint",
+      "child": "d555_link",
+      "xyz": {
+        "argument": "d555_xyz",
+        "default": "0.045096 0 -0.04285"
+      },
+      "rpy": {
+        "argument": "d555_rpy",
+        "default": "-3.141593 0 0"
+      }
+    },
+    {
+      "joint": "d555_mount_joint",
+      "child": "d555_mount_link",
+      "xyz": {
+        "argument": "d555_mount_xyz",
+        "default": "0.104904 0 -0.0265"
+      },
+      "rpy": {
+        "argument": "d555_mount_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "d555_nominal_camera_joint",
+      "child": "d555_nominal_camera_link",
+      "xyz": {
+        "argument": "d555_nominal_camera_xyz",
+        "default": "-0.00465 0.0475 0"
+      },
+      "rpy": {
+        "argument": "d555_nominal_camera_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "e1r_joint",
+      "child": "e1r_link",
+      "xyz": {
+        "argument": "e1r_xyz",
+        "default": "0 0 -0.0604"
+      },
+      "rpy": {
+        "argument": "e1r_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "e1r_mount_joint",
+      "child": "e1r_mount_link",
+      "xyz": {
+        "argument": "e1r_mount_xyz",
+        "default": "-0.084 0 -0.0245"
+      },
+      "rpy": {
+        "argument": "e1r_mount_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "fmu_housing_joint",
+      "child": "fmu_housing_link",
+      "xyz": {
+        "argument": "fmu_housing_xyz",
+        "default": "0.0206 0 0.018323"
+      },
+      "rpy": {
+        "argument": "fmu_housing_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "gnss_aux_joint",
+      "child": "gnss_aux_link",
+      "xyz": {
+        "argument": "gnss_aux_xyz",
+        "default": "0 0 0.03048"
+      },
+      "rpy": {
+        "argument": "gnss_aux_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "gnss_aux_mount_joint",
+      "child": "gnss_aux_mount_link",
+      "xyz": {
+        "argument": "gnss_aux_mount_xyz",
+        "default": "-0.334278 -0.336696 0.0925"
+      },
+      "rpy": {
+        "argument": "gnss_aux_mount_rpy",
+        "default": "0 0 -1.570796"
+      }
+    },
+    {
+      "joint": "gnss_main_joint",
+      "child": "gnss_main_link",
+      "xyz": {
+        "argument": "gnss_main_xyz",
+        "default": "0 0 0.03048"
+      },
+      "rpy": {
+        "argument": "gnss_main_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "gnss_main_mount_joint",
+      "child": "gnss_main_mount_link",
+      "xyz": {
+        "argument": "gnss_main_mount_xyz",
+        "default": "-0.334278 0.336696 0.0925"
+      },
+      "rpy": {
+        "argument": "gnss_main_mount_rpy",
+        "default": "0 0 3.001966"
+      }
+    },
+    {
+      "joint": "hadron_joint",
+      "child": "hadron_link",
+      "xyz": {
+        "argument": "hadron_xyz",
+        "default": "0 0 0"
+      },
+      "rpy": {
+        "argument": "hadron_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "hadron_mount_joint",
+      "child": "hadron_mount_link",
+      "xyz": {
+        "argument": "hadron_mount_xyz",
+        "default": "0.164 0 0.012"
+      },
+      "rpy": {
+        "argument": "hadron_mount_rpy",
+        "default": "0 0.261799 0"
+      }
+    },
+    {
+      "joint": "hadron_nominal_thermal_optical_frame_joint",
+      "child": "hadron_nominal_thermal_optical_frame",
+      "xyz": {
+        "argument": "hadron_nominal_thermal_optical_frame_xyz",
+        "default": "0.04265 0 0.0078"
+      },
+      "rpy": {
+        "argument": "hadron_nominal_thermal_optical_frame_rpy",
+        "default": "-1.570796 0 -1.570796"
+      }
+    },
+    {
+      "joint": "hadron_nominal_visible_optical_frame_joint",
+      "child": "hadron_nominal_visible_optical_frame",
+      "xyz": {
+        "argument": "hadron_nominal_visible_optical_frame_xyz",
+        "default": "0.04165 0 -0.0122"
+      },
+      "rpy": {
+        "argument": "hadron_nominal_visible_optical_frame_rpy",
+        "default": "-1.570796 0 -1.570796"
+      }
+    },
+    {
+      "joint": "hflow_joint",
+      "child": "hflow_link",
+      "xyz": {
+        "argument": "hflow_xyz",
+        "default": "0.069648 0 -0.032184"
+      },
+      "rpy": {
+        "argument": "hflow_rpy",
+        "default": "0 0 0"
+      }
+    },
+    {
+      "joint": "hflow_nominal_flow_optical_joint",
+      "child": "hflow_nominal_flow_optical_frame",
+      "xyz": {
+        "argument": "hflow_nominal_flow_optical_frame_xyz",
+        "default": "0.002892 -0.00795 -0.002836"
+      },
+      "rpy": {
+        "argument": "hflow_nominal_flow_optical_frame_rpy",
+        "default": "3.141592 0 -1.570796"
+      }
+    },
+    {
+      "joint": "hflow_nominal_frd_joint",
+      "child": "hflow_nominal_frd_frame",
+      "xyz": {
+        "argument": "hflow_nominal_frd_frame_xyz",
+        "default": "0 0 0"
+      },
+      "rpy": {
+        "argument": "hflow_nominal_frd_frame_rpy",
+        "default": "-3.141593 0 0"
+      }
+    },
+    {
+      "joint": "hflow_nominal_range_joint",
+      "child": "hflow_nominal_range_frame",
+      "xyz": {
+        "argument": "hflow_nominal_range_frame_xyz",
+        "default": "0.001212 0.0087 -0.008796"
+      },
+      "rpy": {
+        "argument": "hflow_nominal_range_frame_rpy",
+        "default": "0 1.570796 0"
+      }
+    }
+  ],
+  "xacro_defaults_match_urdf": true,
+  "xacro_default_check": "Independent arg substitution and native LinkForge XacroResolver",
+  "native_xacro_validation": {
+    "engine": "bl_ext.blender_org.linkforge.core.parsers.xacro_parser.XacroResolver",
+    "structural_template_cache_cleared_before_validation": true,
+    "default_expansion_matches_urdf": true,
+    "override_arguments_checked": [
+      "avia_xyz",
+      "avia_rpy",
+      "avia_mount_xyz",
+      "avia_mount_rpy",
+      "avionics_carrier_xyz",
+      "avionics_carrier_rpy",
+      "battery_xyz",
+      "battery_rpy",
+      "battery_support_xyz",
+      "battery_support_rpy",
+      "d555_xyz",
+      "d555_rpy",
+      "d555_mount_xyz",
+      "d555_mount_rpy",
+      "d555_nominal_camera_xyz",
+      "d555_nominal_camera_rpy",
+      "e1r_xyz",
+      "e1r_rpy",
+      "e1r_mount_xyz",
+      "e1r_mount_rpy",
+      "fmu_housing_xyz",
+      "fmu_housing_rpy",
+      "gnss_aux_xyz",
+      "gnss_aux_rpy",
+      "gnss_aux_mount_xyz",
+      "gnss_aux_mount_rpy",
+      "gnss_main_xyz",
+      "gnss_main_rpy",
+      "gnss_main_mount_xyz",
+      "gnss_main_mount_rpy",
+      "hadron_xyz",
+      "hadron_rpy",
+      "hadron_mount_xyz",
+      "hadron_mount_rpy",
+      "hadron_nominal_thermal_optical_frame_xyz",
+      "hadron_nominal_thermal_optical_frame_rpy",
+      "hadron_nominal_visible_optical_frame_xyz",
+      "hadron_nominal_visible_optical_frame_rpy",
+      "hflow_xyz",
+      "hflow_rpy",
+      "hflow_nominal_flow_optical_frame_xyz",
+      "hflow_nominal_flow_optical_frame_rpy",
+      "hflow_nominal_frd_frame_xyz",
+      "hflow_nominal_frd_frame_rpy",
+      "hflow_nominal_range_frame_xyz",
+      "hflow_nominal_range_frame_rpy"
+    ],
+    "official_ros_xacro_runtime_tested": false
+  },
+  "error_count": 0,
+  "warning_count": 138
+}

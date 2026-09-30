@@ -1,0 +1,267 @@
+{
+  "schema_version": 1,
+  "status": "Candidate mass properties; physical inertial elements are not yet applied to the URDF",
+  "physical_inertials_applied_to_urdf": false,
+  "units": {
+    "mass": "kg",
+    "position": "m",
+    "inertia": "kg m^2"
+  },
+  "frame": "ROS aircraft FLU: +X forward, +Y left, +Z up",
+  "known_mass_subtotal": {
+    "mass_kg": 4.331,
+    "components": [
+      "battery_link",
+      "avia_link",
+      "d555_link",
+      "e1r_link",
+      "gnss_main_link",
+      "gnss_aux_link",
+      "hadron_link"
+    ],
+    "meaning": "Accepted battery and three user-provided sensor masses plus manufacturer nominal masses for two antennas and Hadron. Not an assembled aircraft mass.",
+    "excludes": [
+      "airframe",
+      "motors and propellers",
+      "electronics",
+      "mounts and other hardware",
+      "TPU battery cradle and end block",
+      "leads and straps"
+    ]
+  },
+  "aircraft_total_mass_kg": null,
+  "aircraft_center_of_mass_m": null,
+  "unknown_total_note": "No whole-aircraft mass or assembled centre of mass is asserted",
+  "sensors": {
+    "avia_link": {
+      "mass_kg": 0.498,
+      "mass_quality": "User-provided value in this modelling session",
+      "center_of_mass_m": null,
+      "inertia_kg_m2": null
+    },
+    "d555_link": {
+      "mass_kg": 0.337,
+      "mass_quality": "User-provided value in this modelling session",
+      "center_of_mass_m": null,
+      "inertia_kg_m2": null
+    },
+    "e1r_link": {
+      "mass_kg": 0.33,
+      "mass_quality": "User-provided value in this modelling session",
+      "center_of_mass_m": null,
+      "inertia_kg_m2": null
+    },
+    "gnss_main_link": {
+      "mass_kg": 0.025,
+      "mass_quality": "Manufacturer nominal, excludes mounting hardware/cabling",
+      "source": "MAN1216Q50 manufacturer datasheet",
+      "center_of_mass_m": null,
+      "inertia_kg_m2": null
+    },
+    "gnss_aux_link": {
+      "mass_kg": 0.025,
+      "mass_quality": "Manufacturer nominal, excludes mounting hardware/cabling",
+      "source": "MAN1216Q50 manufacturer datasheet",
+      "center_of_mass_m": null,
+      "inertia_kg_m2": null
+    },
+    "hadron_link": {
+      "mass_kg": 0.056,
+      "mass_quality": "Manufacturer nominal, excludes mounting hardware/cabling",
+      "source": "FLIR Hadron family engineering datasheet R170",
+      "center_of_mass_m": null,
+      "inertia_kg_m2": null,
+      "candidate_center_of_mass": {
+        "xyz_in_hadron_link_m": [
+          0.019125,
+          0,
+          0.00098
+        ],
+        "quality": "Approximate manufacturer COG from drawing; tiny lateral offset omitted",
+        "applied_to_urdf": false
+      }
+    }
+  },
+  "battery_link": {
+    "manufacturer": "MAD Components",
+    "description": "Semi-solid 12S 20Ah pack",
+    "exact_sku": null,
+    "mass_kg": 3.06,
+    "mass_quality": "Accepted source-record value; weighing versus manufacturer-specification provenance is not stated",
+    "mass_source": {
+      "path_from_repository_root": "Battery/x950-battery-bay-inserts-handoff.md",
+      "lines": [
+        57,
+        60
+      ]
+    },
+    "box_dimensions_ros_xyz_m": [
+      0.1915,
+      0.1036,
+      0.0726
+    ],
+    "dimensions_quality": "Source record labels the dimensions as measured",
+    "parent_link": "battery_support_link",
+    "origin_in_parent_xyz_m": [
+      0.0,
+      0.0,
+      0.0441
+    ],
+    "origin_in_parent_rpy_rad": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "origin_in_aircraft_xyz_m": [
+      -0.02623,
+      0.0,
+      0.0341
+    ],
+    "origin_in_aircraft_rpy_rad": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "placement_quality": "Nominal uncompressed design envelope, including the intended TPU preloads",
+    "placement_source": {
+      "path_from_repository_root": "Battery/cradle.py",
+      "lines": [
+        25,
+        79
+      ]
+    },
+    "candidate_center_of_mass": {
+      "xyz_in_battery_link_m": [
+        0.0,
+        0.0,
+        0.0
+      ],
+      "xyz_in_aircraft_m": [
+        -0.02623,
+        0.0,
+        0.0341
+      ],
+      "method": "Geometric centre of the uniform battery box",
+      "quality": "Assumed; not a measured centre of mass",
+      "applied_to_urdf": false
+    },
+    "candidate_inertia": {
+      "reference": "About the candidate battery centre of mass, axes aligned with battery_link/ROS FLU",
+      "method": "Uniform cuboid; Ixx=m*(dy^2+dz^2)/12 and cyclic permutations",
+      "quality": "Estimate, not measured inertia",
+      "ixx": 0.0040809486,
+      "iyy": 0.01069546755,
+      "izz": 0.01208832855,
+      "ixy": 0.0,
+      "ixz": 0.0,
+      "iyz": 0.0,
+      "applied_to_urdf": false
+    }
+  },
+  "battery_support_link": {
+    "origin_in_aircraft_xyz_m": [
+      -0.02623,
+      0.0,
+      -0.01
+    ],
+    "origin_in_aircraft_rpy_rad": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "origin_meaning": "Reference point at the bay floor below the nominal battery centre; not a centre-of-mass claim",
+    "manufacture_status": "User confirms TPU lattice parts are printed",
+    "geometry_representation": "Solid STL envelopes represent the printed parts; internal lattice is not explicitly tessellated",
+    "measured_mass_kg": null,
+    "candidate_components": [
+      {
+        "name": "cradle",
+        "source_mesh": "Battery/stl/cradle.stl",
+        "estimated_printed_mass_kg": 0.205,
+        "mass_quality": "Source estimate, infill dependent, not weighed",
+        "included_in_known_subtotal": false,
+        "source_envelope_volume_cm3": 484.8483382717101,
+        "source_envelope_centroid_xyz_mm": [
+          0.0,
+          9.6848287957108,
+          8.98360494578759
+        ],
+        "candidate_centroid_in_aircraft_xyz_m": [
+          -0.00898360494578759,
+          0.0,
+          0.0096848287957108
+        ],
+        "candidate_centroid_in_support_link_xyz_m": [
+          0.01724639505421241,
+          0.0,
+          0.0196848287957108
+        ],
+        "centroid_quality": "Computed from the STL envelope, assuming uniform effective printed density; not measured",
+        "inertia_kg_m2": null,
+        "applied_to_urdf": false
+      },
+      {
+        "name": "end_block",
+        "source_mesh": "Battery/stl/end_block.stl",
+        "estimated_printed_mass_kg": 0.06,
+        "mass_quality": "Source estimate, infill dependent, not weighed",
+        "included_in_known_subtotal": false,
+        "source_envelope_volume_cm3": 145.18903423542938,
+        "source_envelope_centroid_xyz_mm": [
+          0.0,
+          12.720237667267543,
+          139.46333068144293
+        ],
+        "candidate_centroid_in_aircraft_xyz_m": [
+          -0.13946333068144293,
+          0.0,
+          0.012720237667267544
+        ],
+        "candidate_centroid_in_support_link_xyz_m": [
+          -0.11323333068144294,
+          0.0,
+          0.022720237667267544
+        ],
+        "centroid_quality": "Computed from the STL envelope, assuming uniform effective printed density; not measured",
+        "inertia_kg_m2": null,
+        "applied_to_urdf": false
+      }
+    ],
+    "mass_estimate_source": {
+      "path_from_repository_root": "Battery/bay-geometry-verified.md",
+      "lines": [
+        227,
+        237
+      ]
+    }
+  },
+  "battery_geometry_conventions": {
+    "source_units": "mm",
+    "source_axes": "+X right/starboard, +Y up, +Z aft",
+    "source_to_ros_aircraft": "(-Z, -X, Y) / 1000",
+    "source_to_sensor_bracket_aircraft_cad": "(X, Z, -Y), millimetres",
+    "source_to_original_blender": "(X, Y, Z) / 1000",
+    "nominal_free_preloads_mm": {
+      "vertical": 0.4,
+      "lateral_per_side": 0.75,
+      "end_block_bumper": 1.2,
+      "end_block_to_battery_free_gap": 0.5
+    },
+    "deformation_simulated": false,
+    "excluded_test_parts": [
+      "Battery/stl/coupon_floor.stl",
+      "Battery/stl/coupon_side.stl"
+    ]
+  },
+  "avionics_carrier_link": {
+    "mass_kg": null,
+    "reason": "Installed configuration unconfirmed; manufacturer examples 0.185kg with Jetson/heatsink/Pixhawk6X or0.190kg with SSD/WiFi; not counted",
+    "placement_quality": "User-authorized estimate in front bay",
+    "origin_in_aircraft_xyz_m": [
+      0.065,
+      0,
+      0.075
+    ],
+    "source": "docs/HOLYBRO_SOURCE.md"
+  }
+}
