@@ -10,4 +10,8 @@ gnss_ros_aux1_frame_id: gnss_aux_link      # URDF: aux antenna link (moving base
 gnss_ros_poi_frame_id: base_link
 gnss_ros_local_frame_id: odom
 gnss_ros_att_offset_heading_deg: 0.0       # the receiver's own attitude offset applies (configure_rx false)
-gnss_ros_use_gnss_time: false              # stamp with receipt time; chrony disciplines the host from the same receiver
+# Stamp fixes with the receiver's own time (TOW -> UTC): exact 10 ms cadence
+# instead of host-receive jitter. Valid because chrony disciplines the host
+# from this receiver's PPS, so the two time bases agree; set false if that
+# discipline is ever removed.
+gnss_ros_use_gnss_time: true
