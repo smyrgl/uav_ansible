@@ -361,6 +361,10 @@ mavlink_camera_rotation_degrees: 180
 px4_bridge_prefix: "/px4"
 px4_bridge_imu_frame: "fmu_housing_link"   # URDF frame of the Pixhawk housing (not IMU-calibrated)
 px4_bridge_odom_frame: "px4_local"         # PX4 EKF2's own local frame, distinct from our odom/map
+# PPS edges captured by PX4 (pps_capture on FMU_CAP1, custom firmware) measure
+# the XRCE timesync error against UTC; the bridge reports it in px4/bridge and,
+# when true, subtracts the median residual from every republished stamp.
+px4_bridge_pps_correct_stamps: true
 gnss_ros_namespace: "/gnss"
 gnss_ros_frame_id: "gnss_main_link"
 gnss_ros_aux1_frame_id: "gnss_aux_link"

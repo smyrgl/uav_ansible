@@ -62,3 +62,20 @@ The unit sends `ping -i 0.02` (about 27 kbit/s) to `px4_ip`. It is a
 workaround for a driver bug, not a design feature: set
 `px4_link_keepalive_interval_ms: 0` to remove it once the driver or the
 board's IOB pool is fixed upstream.
+
+## PPS into FMU_CAP1 must be isolated (boot-time Ethernet failure)
+
+Feeding the GNSS receiver's PPS straight into the FC's capture input
+(`FMU_CAP1`, AD&IO pin 2 on the Holybro Jetson baseboard, PE11 on the 6X)
+works at runtime but breaks the FC's Ethernet PHY if the pulse is present
+while the FC powers up: `ifup eth0` fails, the XRCE-DDS client stays
+"Running, disconnected", and warm or cold cycles do not recover it until the
+lead is unplugged. Measured 2026-09-30 on stock v1.17.0 and on the PPS-capture
+build alike; with the lead hot-plugged after boot the link ran 30 s with no
+loss and the client at 96.6 Hz. The receiver is powered from the Jetson's USB
+and pulses before the FC's rails exist, so the push-pull output back-powers
+the FMU's 3.3 V domain through PE11's protection diode and the LAN8742A never
+sees a clean power-on reset. Use an isolated or FC-powered stage: a fast
+optocoupler (6N137 class, about 50 ns, inverted output, so set the receiver's
+PPS polarity so the UTC-aligned edge arrives as the rising edge) with its
+pull-up on the AD&IO 5 V pin, or a 74LVC1G17 buffer powered from the FC side.

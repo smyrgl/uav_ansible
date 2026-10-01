@@ -1,4 +1,5 @@
 """uORB message contents -> ROS message field values. Pure functions, tested."""
+import collections
 import math
 
 from .frames import (diag_covariance, frd_to_flu, ned_to_enu, px4_to_ros_orientation,
@@ -114,3 +115,75 @@ def battery_fields(voltage_v, current_a, remaining, capacity_mah, discharged_mah
             "present": bool(connected), "cell_voltage": cells, "temperature": f(temperature, math.nan),
             "warning": BATTERY_WARNING.get(int(warning), str(warning)),
             "time_remaining_s": f(time_remaining_s, math.nan)}
+
+
+def pps_residual_us(timestamp_us):
+    """Signed distance of a timesync-converted PPS edge stamp from the nearest
+    whole second, in microseconds, in [-500000, 500000). A real PPS edge sits on
+    the UTC second, and the XRCE client adds its timesync offset to every
+    published timestamp, so this residual is the timesync error at the edge:
+    positive means PX4 stamps arrive late (behind UTC)."""
+    r = int(timestamp_us) % 1_000_000
+    return r - 1_000_000 if r >= 500_000 else r
+
+
+class PpsTracker:
+    """PPS residuals with a linear model.
+
+    The residual drifts between the XRCE client's timesync corrections at the
+    FC crystal's rate error (tens of ppm, i.e. tens of microseconds per second),
+    so a window statistic lags. The correction for a stamp is the residual
+    extrapolated from the last two edges: last residual plus slope times the
+    time since that edge, slope clamped to a physical crystal range."""
+
+    MAX_SLOPE = 200e-6   # 200 ppm: anything larger is a timesync step, not drift
+
+    def __init__(self, window=30):
+        self.residuals = collections.deque(maxlen=window)   # (edge_timestamp_us, residual_us)
+        self.edges = 0
+        self.last_timestamp_us = None
+        self.rate_exceeded = 0
+
+    def observe(self, timestamp_us, rate_exceeded_counter=0):
+        self.edges += 1
+        self.last_timestamp_us = int(timestamp_us)
+        self.rate_exceeded = int(rate_exceeded_counter)
+        self.residuals.append((int(timestamp_us), pps_residual_us(timestamp_us)))
+
+    def slope(self):
+        """Residual drift in us per us (ppm / 1e6) from the last two edges, or 0."""
+        if len(self.residuals) < 2:
+            return 0.0
+        (t0, r0), (t1, r1) = self.residuals[-2], self.residuals[-1]
+        if t1 <= t0:
+            return 0.0
+        value = (r1 - r0) / (t1 - t0)
+        return max(-self.MAX_SLOPE, min(self.MAX_SLOPE, value))
+
+    def summary(self):
+        if not self.residuals:
+            return {"edges": self.edges, "n": 0}
+        vals = sorted(r for _, r in self.residuals)
+        n = len(vals)
+        median = vals[n // 2] if n % 2 else (vals[n // 2 - 1] + vals[n // 2]) / 2
+        rms = math.sqrt(sum(v * v for v in vals) / n)
+        return {"edges": self.edges, "n": n, "last_us": self.residuals[-1][1], "median_us": round(median, 1),
+                "rms_us": round(rms, 1), "spread_us": vals[-1] - vals[0], "drift_ppm": round(self.slope() * 1e6, 1),
+                "rate_exceeded": self.rate_exceeded}
+
+    def residual_at(self, timestamp_us, min_edges=2, max_age_us=10_000_000):
+        """Residual to subtract from a converted stamp, or None when there are
+        too few edges or the last edge is older than max_age_us (stale)."""
+        if len(self.residuals) < min_edges:
+            return None
+        t_last, r_last = self.residuals[-1]
+        dt = int(timestamp_us) - t_last
+        if dt > max_age_us or dt < -max_age_us:
+            return None
+        return r_last + self.slope() * dt
+
+    def correction_us(self, min_edges=2):
+        """Residual at the last edge (for display); see residual_at for stamps."""
+        if len(self.residuals) < min_edges:
+            return None
+        return self.residuals[-1][1]

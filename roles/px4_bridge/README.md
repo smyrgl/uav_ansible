@@ -27,3 +27,22 @@ DDS topic list; `sensor_combined` (raw, averaged) is used until the firmware's
 `dds_topics.yaml` adds them. `/px4/imu/data` covariances for rates and
 acceleration are configured constants (`px4_bridge_gyro_stddev_rad_s`,
 `px4_bridge_accel_stddev_m_s2`).
+
+## PPS residual (XRCE timesync against a hardware reference)
+
+With the `pps_capture` driver enabled on the FC (custom firmware; PWM AUX
+function 9 = `PPS_Input` on `FMU_CAP1`, the receiver's PPS wired to the
+baseboard's AD&IO pin 2) PX4 publishes `/fmu/out/pps_capture` with the FC time
+of every PPS edge. The XRCE client adds its timesync offset to that stamp on
+the way out, and a real edge sits on the UTC second, so the fraction the stamp
+lands from the nearest second is the timesync error at that instant. The
+bridge tracks it in `px4/bridge` (`pps/last_us`, `median_us`, `rms_us`,
+`spread_us`, `drift_ppm`, `edges`) and, with `pps_correct_stamps: true`,
+subtracts the residual extrapolated from the last two edges (last value plus
+slope, slope clamped to 200 ppm) from every republished stamp. Measured
+2026-09-30: the client's timesync tracks offset but not rate, so with a crystal
+about 21 ppm off the delivered stamps were 3.5 to 4.7 ms behind UTC and
+drifting 21 us every second with no correction step in a minute; the linear
+model leaves microseconds. A stamp more than 10 s past the last edge gets no
+correction. Its
+`rtc_timestamp` field is ignored: there is no GPS on the FC to fill it.

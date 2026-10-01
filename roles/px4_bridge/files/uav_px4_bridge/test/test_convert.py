@@ -1,7 +1,7 @@
 import math
 import unittest
 
-from uav_px4_bridge.convert import (VELOCITY_FRAME_BODY_FRD, VELOCITY_FRAME_NED, battery_fields, imu_fields,
+from uav_px4_bridge.convert import (pps_residual_us, PpsTracker, VELOCITY_FRAME_BODY_FRD, VELOCITY_FRAME_NED, battery_fields, imu_fields,
                                     local_position_fields, odometry_fields, stamp_from_px4)
 from uav_px4_bridge.frames import (frd_to_flu, ned_to_enu, px4_to_ros_orientation, px4_to_ros_rotation,
                                    quaternion_from_rotation, rotation_from_px4_quaternion, yaw_from_rotation)
@@ -94,3 +94,34 @@ class TestConvert(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestPps(unittest.TestCase):
+    def test_residual_is_signed_distance_to_the_second(self):
+        base = 1_790_000_000_000_000
+        self.assertEqual(pps_residual_us(base + 1234), 1234)
+        self.assertEqual(pps_residual_us(base + 999_000), -1000)
+        self.assertEqual(pps_residual_us(base), 0)
+        self.assertEqual(pps_residual_us(base + 500_000), -500_000)
+
+    def test_tracker_models_drift_between_timesync_corrections(self):
+        t = PpsTracker(window=5)
+        self.assertEqual(t.summary(), {"edges": 0, "n": 0})
+        self.assertIsNone(t.residual_at(1_790_000_000_000_000))
+        base = 1_790_000_000_000_000
+        # residual walking -32 us per second: an FC crystal 32 ppm fast relative to UTC
+        for k, r in enumerate((-1310, -1342, -1374, -1406, -1438)):
+            t.observe(base + k * 1_000_000 + r, rate_exceeded_counter=0)
+        s = t.summary()
+        self.assertEqual((s["edges"], s["n"], s["last_us"], s["drift_ppm"]), (5, 5, -1438, -32.0))
+        self.assertEqual(s["spread_us"], 128)
+        # half a second after the last edge the model continues the drift
+        self.assertAlmostEqual(t.residual_at(base + 4_500_000), -1454.0, places=0)
+        # a stamp 20 s past the last edge is stale: no correction
+        self.assertIsNone(t.residual_at(base + 25_000_000))
+        # a timesync step larger than the physical crystal range is clamped, not extrapolated
+        t.observe(base + 5_000_000 + 900)
+        self.assertEqual(t.slope(), PpsTracker.MAX_SLOPE)
+        self.assertEqual(t.correction_us(), 900)
+        single = PpsTracker(); single.observe(base + 7)
+        self.assertIsNone(single.residual_at(base + 7))

@@ -8,4 +8,5 @@ uav_px4_bridge:
     gyro_stddev_rad_s: {{ px4_bridge_gyro_stddev_rad_s | float }}
     accel_stddev_m_s2: {{ px4_bridge_accel_stddev_m_s2 | float }}
     attitude_max_age_sec: 0.5
+    pps_correct_stamps: {{ px4_bridge_pps_correct_stamps | bool | lower }}
     stale_sec: 3.0

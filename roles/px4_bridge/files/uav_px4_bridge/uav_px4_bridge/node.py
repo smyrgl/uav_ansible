@@ -21,7 +21,7 @@ from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPo
 from sensor_msgs.msg import BatteryState, Imu, NavSatFix, NavSatStatus
 from std_msgs.msg import Bool
 
-from .convert import (ARMING_STATE, NAV_STATE, battery_fields, imu_fields, local_position_fields,
+from .convert import (EPOCH_FLOOR_US, PpsTracker, ARMING_STATE, NAV_STATE, battery_fields, imu_fields, local_position_fields,
                       odometry_fields, stamp_from_px4)
 from .frames import finite_or_nan
 
@@ -38,6 +38,9 @@ class Px4Bridge(Node):
             "prefix": "/px4", "imu_frame_id": "fmu_housing_link", "odom_frame_id": "odom",
             "base_frame_id": "base_link", "gyro_stddev_rad_s": 0.01, "accel_stddev_m_s2": 0.1,
             "attitude_max_age_sec": 0.5, "stale_sec": 3.0,
+            # PPS edges captured by PX4 (pps_capture driver on FMU_CAP1) measure the
+            # XRCE timesync error against UTC. Correction stays off until validated.
+            "pps_correct_stamps": False,
         }
         self.declare_parameters("", list(defaults.items()))
         self.p = {k: self.get_parameter(k).value for k in defaults}
@@ -60,7 +63,9 @@ class Px4Bridge(Node):
         self.orientation_variance = None
         self.rates = collections.defaultdict(lambda: collections.deque(maxlen=512))
         self.state = {"synced": None, "arming": None, "nav": None, "failsafe": None, "landed": None,
-                      "timesync_rtt_us": None, "estimator": {}, "last_error": None}
+                      "timesync_rtt_us": None, "timesync_offset_us": None, "estimator": {}, "last_error": None,
+                      "pps_last_mono": None}
+        self.pps = PpsTracker()
         subs = [("vehicle_attitude", px4.VehicleAttitude, self._attitude),
                 ("sensor_combined", px4.SensorCombined, self._sensor_combined),
                 ("vehicle_odometry", px4.VehicleOdometry, self._odometry),
@@ -70,7 +75,8 @@ class Px4Bridge(Node):
                 ("vehicle_land_detected", px4.VehicleLandDetected, self._landed),
                 ("home_position", px4.HomePosition, self._home),
                 ("estimator_status_flags", px4.EstimatorStatusFlags, self._estimator),
-                ("timesync_status", px4.TimesyncStatus, self._timesync)]
+                ("timesync_status", px4.TimesyncStatus, self._timesync),
+                ("pps_capture", px4.PpsCapture, self._pps)]
         self.topics = {}
         for name, msg_type, cb in subs:
             topic = _versioned(name, msg_type)
@@ -84,6 +90,10 @@ class Px4Bridge(Node):
     def _stamp(self, timestamp_us):
         ns, synced = stamp_from_px4(timestamp_us, self.get_clock().now().nanoseconds)
         self.state["synced"] = synced
+        if synced and self.p["pps_correct_stamps"]:
+            residual = self.pps.residual_at(int(timestamp_us))
+            if residual is not None:
+                ns -= int(residual * 1000)
         s = rclpy.time.Time(nanoseconds=ns).to_msg()
         return s
 
@@ -239,6 +249,13 @@ class Px4Bridge(Node):
     def _timesync(self, msg):
         self._tick("timesync_status")
         self.state["timesync_rtt_us"] = int(msg.round_trip_time)
+        self.state["timesync_offset_us"] = int(msg.estimated_offset)
+
+    def _pps(self, msg):
+        self._tick("pps_capture")
+        if int(msg.timestamp) >= EPOCH_FLOOR_US:   # only meaningful once timesync has converted it
+            self.pps.observe(msg.timestamp, msg.pps_rate_exceeded_counter)
+            self.state["pps_last_mono"] = time.monotonic()
 
     # --- diagnostics -------------------------------------------------------
     def _diagnostics(self):
@@ -248,7 +265,12 @@ class Px4Bridge(Node):
         values = {("rate_hz/" + n): r for n, r in rates.items()}
         values.update({"stamps_epoch_synced": self.state["synced"], "arming": self.state["arming"], "nav_state": self.state["nav"],
                        "failsafe": self.state["failsafe"], "landed": self.state["landed"],
-                       "timesync_rtt_us": self.state["timesync_rtt_us"], "last_error": self.state["last_error"]})
+                       "timesync_rtt_us": self.state["timesync_rtt_us"], "timesync_offset_us": self.state["timesync_offset_us"],
+                       "last_error": self.state["last_error"]})
+        pps = self.pps.summary()
+        values.update({"pps/" + k: v for k, v in pps.items()})
+        values["pps/last_edge_age_s"] = None if self.state["pps_last_mono"] is None else round(now - self.state["pps_last_mono"], 1)
+        values["pps/correction_applied"] = bool(self.p["pps_correct_stamps"]) and self.pps.residual_at(self.pps.last_timestamp_us or 0) is not None
         values.update({"estimator/" + k: v for k, v in self.state["estimator"].items()})
         values.update({"battery/" + k: v for k, v in self.state.get("battery", {}).items()})
         n_live = sum(live.values())
@@ -260,6 +282,8 @@ class Px4Bridge(Node):
             level, msg = DiagnosticStatus.WARN, "PX4 timestamps are boot time, not epoch (XRCE timesync not applied)"
         else:
             level, msg = DiagnosticStatus.OK, "%d/%d uORB topics live; ENU/FLU republished" % (n_live, len(live))
+        if pps.get("n"):
+            msg += "; PPS residual %+d us (median %+.0f, rms %.0f over %d edges)" % (pps["last_us"], pps["median_us"], pps["rms_us"], pps["n"])
         d = DiagnosticArray()
         d.header.stamp = self.get_clock().now().to_msg()
         d.status = [DiagnosticStatus(level=level, name="px4/bridge", message=msg, hardware_id="PX4 via XRCE-DDS",
