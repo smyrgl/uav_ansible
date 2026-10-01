@@ -1,4 +1,5 @@
 """ROS 2 native-DDS RGB consumer and MAVLink camera application."""
+import collections
 import json
 import logging
 from array import array
@@ -80,10 +81,21 @@ class CameraNode(Node):
                 self.log.error('video_topic %s disabled: foxglove_msgs is not installed',
                                self.config['video_topic'])
             else:
-                video_qos = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=10,
-                                       reliability=ReliabilityPolicy.RELIABLE,
+                # Best effort on purpose: a reliable writer can block in publish()
+                # while a slow or departing reader is in play, and this publisher
+                # is fed from the encoder's streaming thread. A dropped frame is
+                # far cheaper than a stalled encoder (measured: a reliable reader
+                # coming and going stalled NVENC for >3 s and forced a rebuild).
+                video_qos = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=5,
+                                       reliability=ReliabilityPolicy.BEST_EFFORT,
                                        durability=DurabilityPolicy.VOLATILE)
                 self._video_pub = self.create_publisher(CompressedVideo, self.config['video_topic'], video_qos)
+        # Encoded access units are queued by the GStreamer thread and published
+        # from the executor, so DDS can never hold up the encoder.
+        self._video_queue = collections.deque(maxlen=8)
+        self._video_dropped = 0
+        if self._video_pub:
+            self._video_timer = self.create_timer(0.005, self._drain_video)
         self.media = MediaManager(self.config, logger=self.log,
                                   on_encoded=self._encoded if self._video_pub else None)
         self.protocol = CameraProtocol(self.media, self.config, logger=self.log)
@@ -121,19 +133,29 @@ class CameraNode(Node):
             self._condition.notify()
 
     def _encoded(self, data, keyframe, meta):
-        """Runs on the GStreamer streaming thread; one Annex B access unit
-        per message, keyframes self-contained (VPS/SPS/PPS inserted). Stamped
-        with host receive time: the D555's own stamps are its unmapped device
-        clock, and the dashboard timeline is host time."""
-        msg = CompressedVideo()  # Foxglove schemas are flat: timestamp + frame_id, no std_msgs Header
-        utc_us = meta[2] if meta else time.time_ns() // 1000
-        msg.timestamp.sec = utc_us // 1000000
-        msg.timestamp.nanosec = (utc_us % 1000000) * 1000
-        msg.frame_id = self.config['video_frame_id'] or (meta[1].rstrip('\x00') if meta else '')
-        msg.format = self.media.codec
-        msg.data = array('B', data)  # array fast path: no per-byte range check
-        self._video_pub.publish(msg)
-        self._video_published += 1
+        """Runs on the GStreamer streaming thread: queue only, never publish
+        here. One Annex B access unit per message, keyframes self-contained
+        (VPS/SPS/PPS inserted)."""
+        if len(self._video_queue) == self._video_queue.maxlen:
+            self._video_dropped += 1
+        self._video_queue.append((data, keyframe, meta))
+
+    def _drain_video(self):
+        """Executor side: publish what the encoder queued. Stamped with host
+        receive time: the D555's own stamps are its unmapped device clock, and
+        the dashboard timeline is host time. Foxglove schemas are flat
+        (timestamp + frame_id, no std_msgs Header)."""
+        while self._video_queue:
+            data, keyframe, meta = self._video_queue.popleft()
+            msg = CompressedVideo()
+            utc_us = meta[2] if meta else time.time_ns() // 1000
+            msg.timestamp.sec = utc_us // 1000000
+            msg.timestamp.nanosec = (utc_us % 1000000) * 1000
+            msg.frame_id = self.config['video_frame_id'] or (meta[1].rstrip('\x00') if meta else '')
+            msg.format = self.media.codec
+            msg.data = array('B', data)  # array fast path: no per-byte range check
+            self._video_pub.publish(msg)
+            self._video_published += 1
 
     def _camera_info(self, msg):
         self._info = {
@@ -186,7 +208,7 @@ class CameraNode(Node):
                       source_age_s=None if self._last_arrival is None else time.monotonic()-self._last_arrival,
                       conversion_error=self._conversion_error,
                       video_topic=self.config['video_topic'] if self._video_pub else '',
-                      video_frames_published=self._video_published,
+                      video_frames_published=self._video_published, video_frames_dropped=self._video_dropped,
                       source_timestamp_clock='camera_device_clock_unmapped')
         self._status_pub.publish(String(data=json.dumps(status, default=str)))
 

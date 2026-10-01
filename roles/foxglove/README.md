@@ -126,7 +126,11 @@ no compressed depth stream and `compressed_depth_image_transport` would need a
 relay node anyway.
 
 Do not use the camera's own `/realsense/<serial>_Color/compressed` (JPEG) or
-`/h264` topics, and the bridge hides them from Foxglove. Measured 2026-09-30
+`/h264` topics, and the bridge hides them from Foxglove. Since 2026-10-01 it
+also hides the raw `_Color`, `_Depth`, `_Infrared_*` and `_Depth_Color_Points`
+streams: one session with raw panels pulled 77 MB/s, which with the camera
+node and the depth relay filled the 1 Gbit camera link and throttled the
+imager to 9 fps. Raw streams remain available to ROS tools on the Jetson. Measured 2026-09-30
 with firmware as shipped: as soon as either had one subscriber the imager's
 frame counter dropped from 29.9 to ~3.5 fps (every stream, RTSP included), the
 JPEG topic cycled four stale payloads padded to exactly width×height bytes,

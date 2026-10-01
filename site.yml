@@ -67,6 +67,8 @@
       tags: ['jetson_stats', 'ros_inspection']
     - role: px4_bridge           # uORB -> ROS-native ENU/FLU (needs the px4_msgs overlay from ros_health)
       tags: ['px4_bridge', 'ros_inspection']
+    - role: flight_recorder      # rosbag2 of every flight, armed -> safed (keys off /px4/armed)
+      tags: ['flight_recorder', 'ros_inspection']
     - role: gnss_ros             # Septentrio ROS 2 driver on the read-only SBF fan-out
       tags: ['gnss_ros', 'ros_inspection']
     - role: localization         # robot_localization EKF + navsat_transform (informational)

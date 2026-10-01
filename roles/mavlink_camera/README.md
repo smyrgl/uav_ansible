@@ -161,7 +161,12 @@ B-frames), so Foxglove's Image panel decodes it directly. Messages are stamped
 with host receive time because the D555's own stamps are its unmapped device
 clock; `video_frame_id` is a label for overlays, and the picture is already
 rotated by `rotation_degrees`, so a panel should not rotate it again. `~/status`
-reports `video_frames_published`.
+reports `video_frames_published` and `video_frames_dropped`. The publisher is
+best effort and fed through a small queue drained by the node's executor: a
+reliable writer can block in `publish()` while a slow or departing reader is
+in play, and this data comes from the encoder's streaming thread, where any
+blocking shows up as an NVENC stall and a pipeline rebuild (measured
+2026-10-01 with a rosbag2 reader).
 
 Why not the camera's own compressed streams: the D555 firmware (as shipped,
 2026-09-30) offers `/realsense/<serial>_Color/compressed` (JPEG) and `/h264`,

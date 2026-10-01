@@ -14,6 +14,7 @@ reported). No GNSS data from PX4 is republished: the Jetson's own receiver
 | `vehicle_odometry` | `/px4/odometry` | `nav_msgs/Odometry` | EKF2 output, pose ENU in `px4_local` (PX4's own origin; no TF published), twist in `base_link`; **for comparison only, not fused** |
 | `vehicle_local_position` | `/px4/local_position/pose`, `/twist` (frame `px4_local`), `/origin` | Pose/TwistWithCovarianceStamped, NavSatFix | invalid axes are NaN; origin = PX4's local-frame reference point |
 | `battery_status` | `/px4/battery` | `sensor_msgs/BatteryState` | current negative when discharging; cells, warning |
+| `vehicle_status` | `/px4/armed`, `/px4/safety_off` | `std_msgs/Bool`, latched (transient local) | arming state and safety switch for the flight recorder and anything else that keys off transitions |
 | `vehicle_land_detected` | `/px4/landed` | `std_msgs/Bool` | |
 | `home_position` | `/px4/home` | `geographic_msgs/GeoPointStamped` | when valid |
 | `vehicle_status`, `estimator_status_flags`, `timesync_status` | `/diagnostics` (`px4/bridge`) | | arming, mode, failsafe, EKF2 fusion flags, rates, timesync RTT |

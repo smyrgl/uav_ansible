@@ -2,7 +2,13 @@
   <Domain Id="any">
     <General>
       <Interfaces><NetworkInterface name="{{ lan_interface }}"/></Interfaces>
-      <AllowMulticast>true</AllowMulticast>
+      <!-- spdp: multicast for discovery only. With 'true', any topic with two
+           readers switches to multicast data, which the switch floods to every
+           port of the camera LAN: the D555, the SIYI link, the FC. Measured
+           2026-10-01: two readers on the LiDAR clouds put 13 MB/s of multicast
+           on that segment and starved the camera topics. Unicast copies over
+           loopback are free by comparison. -->
+      <AllowMulticast>spdp</AllowMulticast>
     </General>
   </Domain>
 </CycloneDDS>

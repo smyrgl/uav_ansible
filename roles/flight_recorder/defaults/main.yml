@@ -1,0 +1,16 @@
+---
+flight_recorder_user: "{{ uav_ros_user | default('uav-ros') }}"
+flight_recorder_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+flight_recorder_workspace: "{{ uav_ros_workspace | default('/opt/uav/ros') }}"
+flight_recorder_px4_msgs_workspace: /opt/uav/px4_msgs
+flight_recorder_config: /etc/uav/ros/flight_recorder.yaml
+flight_recorder_dir: /data/flights
+flight_recorder_post_roll_sec: 30.0      # keep recording this long after disarm
+flight_recorder_safed_grace_sec: 5.0     # ...or this long after the safety switch is engaged post-disarm
+flight_recorder_min_free_gb: 50.0        # refuse to start, and stop, below this
+flight_recorder_exclude_regex: "^/realsense/"   # raw D555 streams: a second subscriber starves the encoder's link
+flight_recorder_storage_preset: zstd_fast
+flight_recorder_max_cache_size: 268435456
+flight_recorder_armed_topic: /px4/armed
+flight_recorder_safety_topic: /px4/safety_off
+flight_recorder_manual_topic: /flight_recorder/manual

@@ -1,0 +1,79 @@
+---
+# Flight-gated rosbag2 recorder: starts on arming, rolls through disarm, stops
+# when the vehicle is safed. Bags land on the NVMe root in flight_recorder_dir.
+- name: Install rosbag2 and build dependencies
+  ansible.builtin.apt:
+    name:
+      - python3-colcon-common-extensions
+      - "ros-{{ ros_distro }}-rclpy"
+      - "ros-{{ ros_distro }}-std-msgs"
+      - "ros-{{ ros_distro }}-diagnostic-msgs"
+      - "ros-{{ ros_distro }}-ros2bag"
+      - "ros-{{ ros_distro }}-rosbag2-storage-mcap"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+# Owned by the service user; the operator's group can read and prune.
+- name: Create the flight bag directory
+  ansible.builtin.file:
+    path: "{{ flight_recorder_dir }}"
+    state: directory
+    owner: "{{ flight_recorder_user }}"
+    group: "{{ target_user }}"
+    mode: "2775"
+
+- name: Install the flight recorder package
+  ansible.builtin.copy:
+    src: uav_flight_recorder
+    dest: "{{ flight_recorder_workspace }}/src/"
+    owner: root
+    group: root
+    mode: preserve
+  register: flight_recorder_source
+  notify: Restart flight recorder
+
+- name: Run the recorder's policy tests on the target
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, -m, unittest, -q, test_policy]
+    chdir: "{{ flight_recorder_workspace }}/src/uav_flight_recorder/test"
+  environment:
+    PYTHONPATH: "{{ flight_recorder_workspace }}/src/uav_flight_recorder"
+  changed_when: false
+
+- name: Check the installed recorder executable
+  ansible.builtin.stat:
+    path: "{{ flight_recorder_workspace }}/install/lib/uav_flight_recorder/flight_recorder"
+  register: flight_recorder_executable
+
+- name: Build the flight recorder package
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    /usr/bin/colcon build --packages-select uav_flight_recorder --merge-install
+  args:
+    executable: /bin/bash
+    chdir: "{{ flight_recorder_workspace }}"
+  when: flight_recorder_source is changed or not flight_recorder_executable.stat.exists
+  notify: Restart flight recorder
+
+- name: Configure the flight recorder
+  ansible.builtin.template:
+    src: flight_recorder.yaml.j2
+    dest: "{{ flight_recorder_config }}"
+    mode: "0644"
+  notify: Restart flight recorder
+
+- name: Install the flight recorder service
+  ansible.builtin.template:
+    src: uav-flight-recorder.service.j2
+    dest: /etc/systemd/system/uav-flight-recorder.service
+    mode: "0644"
+  notify: Restart flight recorder
+
+- name: Enable the flight recorder at boot
+  ansible.builtin.systemd_service:
+    name: uav-flight-recorder.service
+    enabled: true
+    state: started
+    daemon_reload: true

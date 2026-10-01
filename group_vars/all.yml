@@ -404,6 +404,13 @@ foxglove_message_backlog_size: 128
 foxglove_depth_throttle_hz: 2.0
 # The airframe description (Blender + LinkForge authoring, exported ROS
 # package) lives in this repository: x950_description/ at the root.
+# Flight recorder: rosbag2 (mcap) of every flight on the NVMe root, armed -> safed.
+# Raw D555 streams excluded (per-subscriber unicast would starve the encoder).
+flight_recorder_dir: /data/flights
+flight_recorder_post_roll_sec: 30.0
+flight_recorder_min_free_gb: 50.0
+flight_recorder_exclude_regex: "^/realsense/"
+
 # Jetson platform stats (isaac_ros_jetson_stats on jtop) -> /diagnostics
 jetson_stats_interval_sec: 1.0
 

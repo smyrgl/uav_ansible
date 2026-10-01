@@ -1,0 +1,13 @@
+# Managed by uav_ansible (flight_recorder).
+uav_flight_recorder:
+  ros__parameters:
+    bag_dir: {{ flight_recorder_dir | to_json }}
+    armed_topic: {{ flight_recorder_armed_topic | to_json }}
+    safety_topic: {{ flight_recorder_safety_topic | to_json }}
+    manual_topic: {{ flight_recorder_manual_topic | to_json }}
+    post_roll_sec: {{ flight_recorder_post_roll_sec | float }}
+    safed_grace_sec: {{ flight_recorder_safed_grace_sec | float }}
+    min_free_gb: {{ flight_recorder_min_free_gb | float }}
+    exclude_regex: {{ flight_recorder_exclude_regex | to_json }}
+    storage_preset: {{ flight_recorder_storage_preset | to_json }}
+    max_cache_size: {{ flight_recorder_max_cache_size | int }}

@@ -47,7 +47,11 @@ class Px4Bridge(Node):
         prefix = str(self.p["prefix"]).rstrip("/")
         out = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=10, reliability=ReliabilityPolicy.RELIABLE,
                          durability=DurabilityPolicy.VOLATILE)
+        latched = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=1, reliability=ReliabilityPolicy.RELIABLE,
+                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
         self.pub = {
+            "armed": self.create_publisher(Bool, prefix + "/armed", latched),
+            "safety_off": self.create_publisher(Bool, prefix + "/safety_off", latched),
             "imu": self.create_publisher(Imu, prefix + "/imu/data", out),
             "imu_raw": self.create_publisher(Imu, prefix + "/imu/data_raw", out),
             "odom": self.create_publisher(Odometry, prefix + "/odometry", out),
@@ -224,6 +228,9 @@ class Px4Bridge(Node):
         self.state["nav"] = NAV_STATE.get(int(msg.nav_state), str(msg.nav_state))
         self.state["failsafe"] = bool(msg.failsafe)
         self.state["gcs_connection_lost"] = bool(msg.gcs_connection_lost)
+        # Latched booleans for consumers that only need the transitions (flight recorder).
+        self.pub["armed"].publish(Bool(data=int(msg.arming_state) == 2))
+        self.pub["safety_off"].publish(Bool(data=bool(msg.safety_off)))
 
     def _landed(self, msg):
         self._tick("vehicle_land_detected")
