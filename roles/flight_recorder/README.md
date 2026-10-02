@@ -73,9 +73,13 @@ arming would then go unseen.
 Everything is recorded except `^/realsense/`: the D555 unicasts a copy of every
 raw stream per subscriber, so a second subscriber on the raw colour or depth
 would starve the encoder's link. The bag takes `/d555/color/video` (H.265,
-about 0.7 MB/s) and `/d555/depth/throttled` (about 1.8 MB/s) instead. With both
-LiDARs that is roughly 14 MB/s, 50 GB per flight hour, about 34 hours on the
-1.7 TB free. PX4's own ulog on the SD card remains the primary flight log; the
+about 0.7 MB/s) instead (the throttled depth is off since 2026-10-02). With both
+LiDARs that was roughly 14 MB/s, 50 GB per flight hour. Since 2026-10-02 bags
+also hold the odometry inputs and outputs: `/avia/custom` (about 20 bytes a
+point, ~3 MB/s), `/avia/imu`, `/Odometry`, `/lio/odometry` and
+`/vslam/odometry`, so FAST-LIO can be re-run offline from a bag. Its derived
+clouds (`/cloud_registered` at ~11 MB/s, `/lio/map` and the like) are excluded
+(`flight_recorder_exclude_regex` in `group_vars`). PX4's own ulog on the SD card remains the primary flight log; the
 bag is the companion-side record in the same UTC time base.
 
 Bench test without arming: flip the channel-11 switch on, wait, then off; or

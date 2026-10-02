@@ -1,0 +1,40 @@
+---
+# Visual odometry from the D555's stereo IR: Isaac ROS cuVSLAM (isaac_ros role,
+# pinned 4.6 debs) plus a bridge that puts its output on the host UTC time base.
+vslam_state: present                      # present | absent
+vslam_service_user: "{{ uav_ros_user | default('uav-ros') }}"
+vslam_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+vslam_launch_path: /etc/uav/ros/vslam.launch.py
+vslam_cuda_cache_path: /var/lib/uav-ros/.nv/ComputeCache
+vslam_cuda_cache_max_bytes: 1073741824
+
+# Inputs: the camera's own rectified IR pair (hardware-synchronised, identical
+# stamps) is read directly, so cuVSLAM is their only subscriber (the D555 sends
+# one unicast copy per reader). Their camera_info goes through the bridge, which
+# drops the occasional message the camera labels with another stream's frame.
+vslam_d555_serial: "261622302751"
+vslam_left_image_topic: "/realsense/D555_{{ vslam_d555_serial }}_Infrared_1"
+vslam_right_image_topic: "/realsense/D555_{{ vslam_d555_serial }}_Infrared_2"
+vslam_imu_topic: "/realsense/D555_{{ vslam_d555_serial }}_Motion"
+vslam_left_camera_info_topic: /vslam/infra1/camera_info
+vslam_right_camera_info_topic: /vslam/infra2/camera_info
+
+# cuVSLAM. Odometry only: SLAM (loop closure, relocalisation) can jump the pose,
+# and it would publish TF that fights robot_localization's, so both are off and
+# its frames are renamed. 0 = stereo visual odometry; 1 = VIO with the D555 IMU
+# (100 Hz; NVIDIA's RealSense example runs 200 Hz) once evaluated.
+vslam_tracking_mode: 0
+vslam_base_frame: base_link
+vslam_camera_optical_frames:
+  - camera_infra1_optical_frame
+  - camera_infra2_optical_frame
+vslam_imu_frame: camera_imu_optical_frame
+vslam_imu_rate_hz: 100.0
+vslam_odom_frame: vslam_odom
+vslam_map_frame: vslam_map
+vslam_image_jitter_threshold_ms: 45.0     # 29.3 Hz frames arrive every ~34.1 ms; the 34 ms default flags them
+
+# Bridge output.
+vslam_odometry_topic: /vslam/odometry     # UTC-stamped nav_msgs/Odometry, twist in base_link
+vslam_twist_stddev_mps: 0.05              # used when cuVSLAM leaves the twist covariance empty
+vslam_max_latency_s: 0.25                 # diagnostic WARN above this receipt-minus-capture delay

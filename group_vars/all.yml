@@ -431,7 +431,10 @@ foxglove_depth_throttle_hz: 0.0   # off since 2026-10-02: the camera link carrie
 flight_recorder_dir: /data/flights
 flight_recorder_post_roll_sec: 30.0
 flight_recorder_min_free_gb: 50.0
-flight_recorder_exclude_regex: "^/realsense/"
+# Raw D555 streams (a second subscriber starves the camera link) and the
+# derived LiDAR clouds (~11 MB/s; FAST-LIO re-creates them from /avia/custom
+# and /avia/imu, which are recorded).
+flight_recorder_exclude_regex: "^/(realsense/|cloud_registered|cloud_registered_body|cloud_effected|Laser_map|lio/map)"
 
 # Jetson platform stats (isaac_ros_jetson_stats on jtop) -> /diagnostics
 jetson_stats_interval_sec: 1.0
@@ -463,10 +466,10 @@ hflow_range_max_m: 30.0
 # repository path, the signing key is checked by fingerprint before the keyring
 # is trusted, and the package version is installed as pkg=version.
 # =============================================================================
-# Retired 2026-09-30 with the nvblox POC: both roles now enforce "absent"
-# (packages, apt source, units and helpers removed). Set present to bring the
-# POC back; the code and its findings stay in roles/nvblox/README.md.
-isaac_ros_state: "absent"
+# Retired 2026-09-30 with the nvblox POC (nvblox_state stays "absent"; its code
+# and findings stay in roles/nvblox/README.md). Back since 2026-10-02 for the
+# vslam role: cuVSLAM on the D555's stereo IR.
+isaac_ros_state: "present"
 nvblox_state: "absent"
 isaac_ros_release: "release-4.6"
 isaac_ros_apt_suite: "noble-jetpack"
@@ -475,8 +478,7 @@ isaac_ros_key_fingerprints:
   - "9EEB7195A4BD947C572666F9BBE5EA6DE681BCAB"   # Alexander Poddubny, Isaac ROS Buildfarm (2023-09-05)
 isaac_ros_package_version: "4.6.0-0noble.20260818193828000"
 isaac_ros_packages:
-  - "ros-{{ ros_distro }}-nvblox-ros"
-  - "ros-{{ ros_distro }}-nvblox-msgs"
+  - "ros-{{ ros_distro }}-isaac-ros-visual-slam"
 
 # =============================================================================
 # nvblox  (Isaac ROS 3D reconstruction: D555 depth + colour and Avia LiDAR

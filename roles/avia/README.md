@@ -44,7 +44,29 @@ Reconstruct `packet_time_raw = low | (uint64(high) << 32)`. For timestamp type 0
 
 The ROS timer uses a steady clock. The buffer is bounded to 100,000 points; an executor backlog older than 0.5 s is discarded. No stale buffered cloud is emitted after the 2 s receipt timeout. Packet timestamp regressions and clock-type changes clear the aggregation buffer. Diagnostics report packet gaps (a conservative >600 µs interval for type 0/1), regressions, unsupported formats, buffer drops, receipt age, and output rate. A packet-gap count is an observation, not a precise loss estimator.
 
-IMU packet receipt is counted for transport health. **No IMU ROS topic is published in this pass**; units, capture timestamps, covariances, and the IMU frame must be handled deliberately before fusion.
+### LiDAR-inertial outputs
+
+For FAST-LIO (the `lio` role) the driver also publishes:
+
+- `/avia/imu`: the built-in IMU at 200 Hz (`sensor_msgs/Imu`, reliable). The SDK
+  reports acceleration in g; the topic carries m/s². Frame `avia_imu`
+  (`avia_imu_frame_id`): LiDAR axes, origin at (−41.65, −23.26, +28.40) mm in the
+  LiDAR frame (Livox's factory offset). Stamped like the clouds: sensor UTC when
+  the packet passes the same checks, host receipt otherwise. No orientation
+  (`orientation_covariance[0] = -1`), covariances unknown (0).
+- `/avia/custom`: Livox `CustomMsg` (reliable). `timebase` and the header stamp
+  are the frame's first point in sensor UTC; each point's `offset_time` is its
+  packet's stamp plus its slot (4167 ns) minus that. Published only for frames
+  whose first packet carried trusted sensor time, so the LiDAR and the IMU are
+  never on different clocks, and only while something subscribes. Points whose
+  time cannot be decoded or falls outside the frame are dropped and counted.
+
+`livox_ros_driver2` in this role is message definitions only (wire-compatible
+with Livox's driver, which FAST-LIO depends on); Livox's driver and SDK2 are not
+used. Measured 2026-10-02: IMU 203.8 Hz, receipt latency median 1.8 ms (p99
+4.8 ms), |a| 9.74 m/s² at rest; frames 10.0 Hz, ~16,000 points indoors, offsets
+0–99.6 ms. `avia/driver` reports `imu_published_sensor_time`,
+`imu_published_receipt_time`, `lio_frames_published` and `lio_points_dropped`.
 
 ## Frames and visualization
 

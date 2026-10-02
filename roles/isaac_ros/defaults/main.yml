@@ -1,7 +1,7 @@
 ---
 # NVIDIA Isaac ROS apt repository (native Jazzy debs for JetPack 7.2; no Docker).
 # Mirrored in group_vars/all.yml; pin release, key fingerprints and version.
-isaac_ros_state: absent           # present | absent (retired with the nvblox POC)
+isaac_ros_state: absent           # present | absent (group_vars: present, for the vslam role)
 isaac_ros_release: "release-4.6"
 isaac_ros_apt_suite: "noble-jetpack"
 isaac_ros_apt_url: "https://isaac.download.nvidia.com/isaac-ros/{{ isaac_ros_release }}"
@@ -12,5 +12,4 @@ isaac_ros_key_fingerprints:
   - "9EEB7195A4BD947C572666F9BBE5EA6DE681BCAB"   # Alexander Poddubny (Isaac ROS Buildfarm), 2023-09-05
 isaac_ros_package_version: "4.6.0-0noble.20260818193828000"
 isaac_ros_packages:
-  - "ros-{{ ros_distro }}-nvblox-ros"
-  - "ros-{{ ros_distro }}-nvblox-msgs"
+  - "ros-{{ ros_distro }}-isaac-ros-visual-slam"

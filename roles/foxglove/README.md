@@ -29,7 +29,8 @@ each native D555 stream as needed. Foxglove's Topic Graph shows discovered nodes
 and connections; service process health is separate from receipt of valid data.
 
 Import `files/x950-bench-layout.json` from this role into Foxglove for a starting
-layout with the robot, `/e1r/points`, `/avia/points`, the D555 colour video, and diagnostics
+layout with the robot, `/e1r/points`, `/avia/points`, the FAST-LIO voxel map
+(`/lio/map`, coloured by height; see the lio role), the D555 colour video, and diagnostics
 summary/detail on `/uav/health` (one row per sensor; grouped data/timing details).
 Existing imported layouts need their Diagnostics Summary and Detail topics changed
 from `/diagnostics` to `/uav/health`. Raw driver diagnostics remain on `/diagnostics`.

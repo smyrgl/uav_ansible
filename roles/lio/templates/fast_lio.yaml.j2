@@ -1,0 +1,41 @@
+# Managed by uav_ansible (lio). FAST-LIO2 on the Avia + its built-in IMU.
+/**:
+  ros__parameters:
+    feature_extract_enable: false
+    point_filter_num: {{ lio_point_filter_num | int }}
+    max_iteration: 3
+    filter_size_surf: {{ lio_filter_size_surf_m | float }}
+    filter_size_map: {{ lio_filter_size_map_m | float }}
+    cube_side_length: 1000.0
+    runtime_pos_log_enable: false
+    map_file_path: ""
+    common:
+      lid_topic: {{ lio_lidar_topic | to_json }}
+      imu_topic: {{ lio_imu_topic | to_json }}
+      time_sync_en: false               # both on the Avia's PTP clock
+      time_offset_lidar_to_imu: 0.0
+    preprocess:
+      lidar_type: 1                     # Livox CustomMsg
+      scan_line: 6
+      blind: {{ lio_blind_m | float }}
+      scan_rate: 10
+    mapping:
+      acc_cov: 0.1
+      gyr_cov: 0.1
+      b_acc_cov: 0.0001
+      b_gyr_cov: 0.0001
+      fov_degree: 90.0
+      det_range: 450.0
+      extrinsic_est_en: false
+      extrinsic_T: {{ lio_extrinsic_t | to_json }}
+      extrinsic_R: {{ lio_extrinsic_r | to_json }}
+    publish:
+      path_en: false
+      effect_map_en: false
+      map_en: false
+      scan_publish_en: {{ lio_publish_scans | bool | lower }}
+      dense_publish_en: {{ lio_dense_scans | bool | lower }}
+      scan_bodyframe_pub_en: false
+    pcd_save:
+      pcd_save_en: false
+      interval: -1

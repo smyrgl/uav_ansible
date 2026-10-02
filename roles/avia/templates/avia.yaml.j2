@@ -3,6 +3,7 @@ avia_driver:
     broadcast_code: "{{ avia_broadcast_code }}"
     lidar_ip: "{{ avia_lidar_ip }}"
     frame_id: "{{ avia_frame_id }}"
+    imu_frame_id: "{{ avia_imu_frame_id }}"
     publish_rate_hz: {{ avia_publish_rate_hz }}
     receipt_timeout_sec: {{ avia_receipt_timeout_sec }}
     utc_sync: {{ avia_utc_sync | bool | lower }}

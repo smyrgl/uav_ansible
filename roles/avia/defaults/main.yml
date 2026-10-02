@@ -6,6 +6,7 @@ avia_sdk_revision: 14c533dd7175bd90a6b568c0aa1733f35d36cb89
 avia_broadcast_code: 3JEDNAP001S5701
 avia_lidar_ip: 192.168.144.80
 avia_frame_id: avia_nominal_lidar_frame
+avia_imu_frame_id: avia_imu        # the built-in IMU on /avia/imu: LiDAR axes, origin (-41.65, -23.26, +28.40) mm in the LiDAR frame
 avia_publish_rate_hz: 10.0
 avia_receipt_timeout_sec: 2.0
 # GPS-style time sync (Avia manual, "Timestamp"): PPS on the Sync pair plus the

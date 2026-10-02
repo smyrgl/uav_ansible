@@ -1,0 +1,27 @@
+[Unit]
+Description=FAST-LIO bridge (base_link odometry on {{ lio_odometry_topic }}, lio diagnostic)
+After=network-online.target
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ lio_service_user }}
+Group={{ lio_service_user }}
+EnvironmentFile={{ lio_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/lio_bridge.py --odometry-topic {{ lio_odometry_topic }} --imu-lever-arm {{ lio_imu_lever_arm | join(" ") }} --twist-stddev {{ lio_twist_stddev_mps }}'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=20
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

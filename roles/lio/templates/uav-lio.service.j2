@@ -1,0 +1,30 @@
+[Unit]
+Description=FAST-LIO2 LiDAR-inertial odometry (Livox Avia + its built-in IMU)
+After=network-online.target uav-avia.service
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ lio_service_user }}
+Group={{ lio_service_user }}
+EnvironmentFile={{ lio_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+WorkingDirectory=/var/lib/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ lio_workspace }}/install/local_setup.bash && exec {{ lio_workspace }}/install/lib/fast_lio/fastlio_mapping --ros-args --params-file {{ lio_config_path }}'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+# FAST-LIO opens <source>/Log/pos_log.txt unconditionally and fcloses it on exit.
+ReadWritePaths={{ lio_source_dir }}/Log {{ lio_source_dir }}/PCD
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

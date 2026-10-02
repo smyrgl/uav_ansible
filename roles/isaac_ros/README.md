@@ -23,8 +23,11 @@ JetPack itself ships `/etc/apt/preferences.d/nvidia-repo-pin`, which raises ever
 ship packages that shadow `packages.ros.org`, so this has no effect on the ROS
 base install, but it is why `apt-cache policy` shows 600 for `ros-jazzy-nvblox-*`.
 
-Only the nvblox packages are installed here; roles that use Isaac ROS list their
-own runtime dependencies. Adding another Isaac package is a one-line change to
+Since 2026-10-02 the role installs `ros-jazzy-isaac-ros-visual-slam` (cuVSLAM)
+for the `vslam` role; the nvblox POC that first used it is retired. The install
+added the Isaac/NITROS packages, CV-CUDA, VPI and CUDA 13.2.2, and upgraded or
+removed nothing; no Isaac apt pins are installed (OpenCV stays Ubuntu's 4.6).
+Roles that use Isaac ROS list their own runtime dependencies. Adding another Isaac package is a one-line change to
 `isaac_ros_packages` (same version string, same repository).
 
 Note on GPU code: the Jetson debs embed SASS and PTX for `sm_75` only. The Orin

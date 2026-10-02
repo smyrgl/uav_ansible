@@ -13,7 +13,9 @@
 #include <sys/timex.h>
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
+#include <sensor_msgs/msg/imu.hpp>
 #include <diagnostic_msgs/msg/diagnostic_array.hpp>
+#include <livox_ros_driver2/msg/custom_msg.hpp>
 #include <livox_sdk.h>
 #include "uav_avia/point.hpp"
 #include "uav_avia/time.hpp"
@@ -23,6 +25,8 @@
 using namespace std::chrono_literals;
 using Steady = std::chrono::steady_clock;
 using Cloud = sensor_msgs::msg::PointCloud2;
+using Imu = sensor_msgs::msg::Imu;
+using Custom = livox_ros_driver2::msg::CustomMsg;
 using Diag = diagnostic_msgs::msg::DiagnosticStatus;
 using uav_avia::ns_per_s;
 
@@ -46,6 +50,7 @@ class AviaNode : public rclcpp::Node {
     code_=declare_parameter<std::string>("broadcast_code","3JEDNAP001S5701");
     ip_=declare_parameter<std::string>("lidar_ip","192.168.144.80");
     frame_=declare_parameter<std::string>("frame_id","avia_nominal_lidar_frame");
+    imu_frame_=declare_parameter<std::string>("imu_frame_id","avia_imu");
     rate_=declare_parameter<double>("publish_rate_hz",10.0);
     timeout_=declare_parameter<double>("receipt_timeout_sec",2.0);
     utc_sync_=declare_parameter<bool>("utc_sync",true);
@@ -71,6 +76,11 @@ class AviaNode : public rclcpp::Node {
         (header_policy_!="sensor_utc" && header_policy_!="host_receipt"))
       throw std::invalid_argument("Invalid Avia time synchronization configuration");
     cloud_pub_=create_publisher<Cloud>("/avia/points",rclcpp::SensorDataQoS().keep_last(2));
+    // For LiDAR-inertial odometry (FAST-LIO): the Avia's own IMU and Livox's
+    // per-point-time frame, both on the sensor clock. Reliable, as FAST-LIO
+    // subscribes reliably (a best-effort publisher would never match it).
+    imu_pub_=create_publisher<Imu>("/avia/imu",rclcpp::QoS(50));
+    custom_pub_=create_publisher<Custom>("/avia/custom",rclcpp::QoS(5));
     diag_pub_=create_publisher<diagnostic_msgs::msg::DiagnosticArray>("/diagnostics",10);
     fields_=fields();buffer_.reserve(30000*uav_avia::point_step);
     instance_=this;
@@ -100,7 +110,7 @@ class AviaNode : public rclcpp::Node {
   std::atomic<bool> stopping_{false},connected_{false},configuring_{false},sampling_{false};
   std::atomic<uint8_t> handle_{0};
   std::atomic<int> stage_{0},config_errors_{0};
-  std::string code_,ip_,frame_,header_policy_,firmware_="unknown";
+  std::string code_,ip_,frame_,imu_frame_,header_policy_,firmware_="unknown";
   double rate_,timeout_,utc_phase_=0.1,max_clock_error_=0.05;
   bool utc_sync_=true;
   int64_t lo_ns_=0,hi_ns_=0,phase_ns_=0,lat_min_ns_=0,lat_max_ns_=0,ptp_utc_offset_ns_=0;
@@ -119,6 +129,8 @@ class AviaNode : public rclcpp::Node {
   uint64_t packets_=0,imu_packets_=0,slots_=0,valid_=0,clouds_=0,bad_=0,overflows_=0;
   uint64_t gap_events_=0,regressions_=0,previous_time_=0,raw_time_=0;
   uint64_t previous_packets_=0,previous_clouds_=0,previous_imu_=0;
+  uint64_t imu_sensor_=0,imu_receipt_=0;           // under mutex_
+  uint64_t customs_=0,custom_points_dropped_=0;    // executor thread only
   // Sensor-time evidence for the current diagnostic interval (under mutex_).
   int64_t lat_lo_=0,lat_hi_=0;
   double lat_sum_=0;
@@ -130,6 +142,8 @@ class AviaNode : public rclcpp::Node {
   uint32_t status_=0;
   uint8_t timestamp_type_=255,previous_type_=255;
   rclcpp::Publisher<Cloud>::SharedPtr cloud_pub_;
+  rclcpp::Publisher<Imu>::SharedPtr imu_pub_;
+  rclcpp::Publisher<Custom>::SharedPtr custom_pub_;
   rclcpp::Publisher<diagnostic_msgs::msg::DiagnosticArray>::SharedPtr diag_pub_;
   rclcpp::TimerBase::SharedPtr timer_,diag_timer_;
 
@@ -176,7 +190,7 @@ class AviaNode : public rclcpp::Node {
     switch (stage_.load()) {
       case 0: result=SetCartesianCoordinate(handle_,configured,this);break;
       case 1: result=LidarSetPointCloudReturnMode(handle_,kFirstReturn,configured,this);break;
-      // Receive IMU packets for transport health only. No IMU ROS topic is asserted yet.
+      // The built-in IMU at 200 Hz, published on /avia/imu.
       case 2: result=LidarSetImuPushFrequency(handle_,kImuFreq200Hz,configured,this);break;
       case 3: result=LidarStartSampling(handle_,configured,this);break;
       default: sampling_=true;configuring_=false;RCLCPP_INFO(get_logger(),"Avia streaming Cartesian single-return data");return;
@@ -247,9 +261,9 @@ class AviaNode : public rclcpp::Node {
     auto* n=static_cast<AviaNode*>(context);if (n->stopping_ || !packet) return;
     const auto received=Steady::now();const builtin_interfaces::msg::Time stamp=n->get_clock()->now();
     const int64_t receipt_ns=static_cast<int64_t>(stamp.sec)*ns_per_s+stamp.nanosec;
+    if (packet->version==5 && packet->data_type==kImu && count==1) {n->imu(packet,received,stamp,receipt_ns);return;}
     std::lock_guard<std::mutex> lock(n->mutex_);
     if (packet->version!=5) {++n->bad_;return;}
-    if (packet->data_type==kImu && count==1) {++n->imu_packets_;n->last_imu_=received;return;}
     if (packet->data_type!=kExtendCartesian || count!=96) {++n->bad_;return;}
     const auto raw=uav_avia::read<uint64_t>(packet->timestamp);
     // Monotonic packet time for gap and regression checks: uptime or PTP
@@ -286,16 +300,56 @@ class AviaNode : public rclcpp::Node {
     for (uint32_t i=0;i<count;++i)
       if (uav_avia::append_point(n->buffer_,packet->data+i*sizeof(LivoxExtendRawPoint),i,raw,packet->timestamp_type,packet->err_code)) ++n->valid_;
   }
+  // An IMU sample, stamped like the clouds: sensor UTC when its packet passes
+  // the same trust checks, host receipt otherwise. The SDK reports g; ROS wants m/s^2.
+  void imu(const LivoxEthPacket* packet,Steady::time_point received,const builtin_interfaces::msg::Time& receipt,int64_t receipt_ns) {
+    int64_t sensor_ns=0;
+    const bool have=uav_avia::point_time_ns(uav_avia::read<uint64_t>(packet->timestamp),packet->timestamp_type,0,ptp_utc_offset_ns_,sensor_ns);
+    const bool sensor=have && header_policy_=="sensor_utc" &&
+      uav_avia::sensor_time_trusted(packet->timestamp_type,packet->err_code,receipt_ns-sensor_ns,lat_min_ns_,lat_max_ns_);
+    LivoxImuPoint p{};std::memcpy(&p,packet->data,sizeof(p));
+    constexpr double g=9.80665;
+    Imu msg;msg.header.frame_id=imu_frame_;msg.header.stamp=sensor?to_msg(sensor_ns):receipt;
+    msg.orientation_covariance[0]=-1.0;  // no orientation estimate
+    msg.angular_velocity.x=p.gyro_x;msg.angular_velocity.y=p.gyro_y;msg.angular_velocity.z=p.gyro_z;
+    msg.linear_acceleration.x=p.acc_x*g;msg.linear_acceleration.y=p.acc_y*g;msg.linear_acceleration.z=p.acc_z*g;
+    {std::lock_guard<std::mutex> lock(mutex_);++imu_packets_;last_imu_=received;++(sensor?imu_sensor_:imu_receipt_);}
+    imu_pub_->publish(std::move(msg));
+  }
+  // Livox's CustomMsg for FAST-LIO: timebase = the frame's first point, every
+  // point's offset from its packet stamp plus its slot in the packet. Only for
+  // frames on trusted sensor time (the IMU is then on the same clock), and only
+  // when something subscribes.
+  void publish_custom(const Cloud& cloud,int64_t base_ns) {
+    Custom out;out.header.frame_id=frame_;out.header.stamp=to_msg(base_ns);
+    out.timebase=static_cast<uint64_t>(base_ns);out.lidar_id=0;out.points.reserve(cloud.width);
+    const uint8_t* p=cloud.data.data();
+    for (uint32_t i=0;i<cloud.width;++i,p+=uav_avia::point_step) {
+      const uint64_t raw=uav_avia::read<uint32_t>(p+20)|(static_cast<uint64_t>(uav_avia::read<uint32_t>(p+24))<<32);
+      int64_t t=0;
+      if (!uav_avia::point_time_ns(raw,p[18],uav_avia::read<uint32_t>(p+28),ptp_utc_offset_ns_,t) ||
+          t<base_ns || t-base_ns>ns_per_s) {++custom_points_dropped_;continue;}
+      livox_ros_driver2::msg::CustomPoint q;
+      q.offset_time=static_cast<uint32_t>(t-base_ns);
+      q.x=uav_avia::read<float>(p);q.y=uav_avia::read<float>(p+4);q.z=uav_avia::read<float>(p+8);
+      q.reflectivity=static_cast<uint8_t>(std::clamp(uav_avia::read<float>(p+12),0.0f,255.0f));
+      q.tag=p[16];q.line=p[17];
+      out.points.push_back(q);
+    }
+    out.point_num=static_cast<uint32_t>(out.points.size());
+    custom_pub_->publish(std::move(out));++customs_;
+  }
   void publish_cloud() {
     if (config_errors_.load()>0) throw std::runtime_error("Avia setup failed; restart required");
-    Cloud msg;
+    Cloud msg;bool sensor=false;int64_t base_ns=0;
     {
       std::lock_guard<std::mutex> lock(mutex_);
       if (last_point_==Steady::time_point{} || Steady::now()-last_point_>std::chrono::duration<double>(timeout_)) {buffer_.clear();return;}
       msg.header.frame_id=frame_;
       // Sensor UTC of the cloud's first packet when that packet passed every
       // check; otherwise the host receipt time of that packet.
-      const bool sensor=header_policy_=="sensor_utc" && !buffer_.empty() && first_trusted_;
+      sensor=header_policy_=="sensor_utc" && !buffer_.empty() && first_trusted_;
+      base_ns=first_sensor_ns_;
       msg.header.stamp=buffer_.empty()?static_cast<builtin_interfaces::msg::Time>(get_clock()->now()):
                                        (sensor?to_msg(first_sensor_ns_):first_receipt_);
       // Never emit a backlog as a fresh scan after the executor has stalled.
@@ -305,7 +359,9 @@ class AviaNode : public rclcpp::Node {
     }
     msg.height=1;msg.width=msg.data.size()/uav_avia::point_step;msg.fields=fields_;
     msg.point_step=uav_avia::point_step;msg.row_step=msg.width*msg.point_step;
-    msg.is_bigendian=false;msg.is_dense=true;cloud_pub_->publish(std::move(msg));
+    msg.is_bigendian=false;msg.is_dense=true;
+    if (sensor && msg.width>0 && custom_pub_->get_subscription_count()>0) publish_custom(msg,base_ns);
+    cloud_pub_->publish(std::move(msg));
   }
   static void value(Diag& d,const std::string& key,const std::string& val) {
     diagnostic_msgs::msg::KeyValue kv;kv.key=key;kv.value=val;d.values.push_back(kv);
@@ -330,6 +386,8 @@ class AviaNode : public rclcpp::Node {
     value(stream,"point_packet_hz",packet_hz);value(stream,"cloud_hz",cloud_hz);
     value(stream,"imu_packet_hz",(imu_packets_-previous_imu_)/dt);value(stream,"point_age_sec",point_age);value(stream,"imu_age_sec",imu_age);
     value(stream,"point_slots_total",slots_);value(stream,"valid_points_total",valid_);value(stream,"zero_returns_removed",slots_-valid_);
+    value(stream,"imu_published_sensor_time",imu_sensor_);value(stream,"imu_published_receipt_time",imu_receipt_);
+    value(stream,"lio_frames_published",customs_);value(stream,"lio_points_dropped",custom_points_dropped_);
     value(stream,"unsupported_packets",bad_);value(stream,"buffer_drops",overflows_);value(stream,"packet_gap_events",gap_events_);value(stream,"timestamp_regressions",regressions_);value(stream,"status_code",status_);
 
     // Clock: which time the headers carry, and the evidence for it.

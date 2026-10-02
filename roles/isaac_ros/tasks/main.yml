@@ -1,6 +1,6 @@
 ---
-# NVIDIA Isaac ROS apt repository + pinned packages (native Jazzy debs). The
-# only consumer, the nvblox POC, is retired: isaac_ros_state selects install
-# (present) or removal (absent, the declared state).
+# NVIDIA Isaac ROS apt repository + pinned packages (native Jazzy debs).
+# isaac_ros_state selects install (present: cuVSLAM for the vslam role since
+# 2026-10-02) or removal (absent).
 - name: Apply the Isaac ROS state ({{ isaac_ros_state }})
   ansible.builtin.include_tasks: "{{ isaac_ros_state }}.yml"

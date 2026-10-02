@@ -71,6 +71,10 @@
       tags: ['flight_recorder', 'ros_inspection']
     - role: gnss_ros             # Septentrio ROS 2 driver on the read-only SBF fan-out
       tags: ['gnss_ros', 'ros_inspection']
+    - role: vslam                # cuVSLAM on the D555 stereo IR -> /vslam/odometry (UTC); needs isaac_ros, description, foxglove adapter
+      tags: ['vslam']
+    - role: lio                  # FAST-LIO2 on the Avia + its IMU (GPL-2.0 source fetched at build time); needs avia
+      tags: ['lio']
     - role: localization         # robot_localization EKF + navsat_transform (informational)
       tags: ['localization', 'ros_inspection']
     - role: nvblox               # D555 + Avia -> GPU TSDF; needs isaac_ros, description, foxglove adapters

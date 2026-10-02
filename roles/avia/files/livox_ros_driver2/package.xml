@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>livox_ros_driver2</name><version>1.0.0</version>
+  <description>Message definitions only: Livox's CustomMsg/CustomPoint, wire-compatible with livox_ros_driver2, which FAST-LIO consumes. The Avia itself runs on uav_avia (SDK1); Livox's driver and SDK2 are not used.</description>
+  <maintainer email="maintainer@example.com">Local UAV package maintainer</maintainer>
+  <license>Apache-2.0</license>
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <buildtool_depend>rosidl_default_generators</buildtool_depend>
+  <depend>std_msgs</depend>
+  <exec_depend>rosidl_default_runtime</exec_depend>
+  <member_of_group>rosidl_interface_packages</member_of_group>
+  <export><build_type>ament_cmake</build_type></export>
+</package>

@@ -247,11 +247,13 @@ discards anything written to it).
 | `px4_bridge` | PX4 uORB → ROS-native ENU/FLU topics (IMU, odometry for comparison, battery, status); no GNSS |
 | `gnss_ros` | Septentrio ROS 2 driver as a read-only client of the SBF fan-out: NavSatFix (full covariance), GPSFix, pose, twist, attitude |
 | `localization` | robot_localization REP-105 dual EKF (`ekf_odom`: odom→base_link, `ekf_map`: map→odom) + navsat_transform (utm→map, GNSS); PX4's own estimate stays in `px4_local`, informational |
+| `vslam` | Isaac ROS cuVSLAM on the D555 stereo IR → `/vslam/odometry` (UTC, base_link twist); shadow source, nothing fuses it yet |
+| `lio` | FAST-LIO2 on the Avia + its built-in IMU (GPL-2.0, fetched and built at a pinned commit) → `/lio/odometry`; shadow source, primary candidate |
 | `hflow` | H-Flow over the FC's CAN2 bus, read listen-only on the Jetson's can0 → PX4-typed ROS 2 topics + Range |
 | `mavlink_router` | MAVLink hub: PX4 (TELEM2 UART) ↔ QGC (TCP 5760) ↔ onboard apps (UDP 14540) |
 | `rt_tuning` | soft-RT: isolation, SCHED_FIFO, mlock, IRQ affinity, governor |
 | `rt_kernel` | **parked** — opt-in, measurement-gated PREEMPT_RT |
-| `isaac_ros` | **retired** (`isaac_ros_state: absent`): NVIDIA Isaac ROS apt repository, pinned; removed with the nvblox POC |
+| `isaac_ros` | NVIDIA Isaac ROS apt repository and packages, pinned (4.6); back since 2026-10-02 for `vslam` (cuVSLAM) |
 | `nvblox` | **retired** (`nvblox_state: absent`): the September 2026 nvblox POC; findings in the role README |
 
 ## D555 camera
@@ -286,8 +288,8 @@ arguments, the sensor frames and the mesh-optimisation records. Moved here from
 ## 3D reconstruction (nvblox) — retired
 
 The nvblox POC ran on the bench in September 2026 (Isaac ROS 4.6 natively on
-JetPack 7.2) and is taken down: `nvblox_state` and `isaac_ros_state` are
-`absent`, so a converge removes the units, helpers, packages and apt source.
+JetPack 7.2) and is taken down: `nvblox_state` is `absent`, so a converge
+removes its units and helpers (the `isaac_ros` repository is back for `vslam`).
 Its bandwidth was the deciding cost: every D555 subscriber receives its own
 unicast copy of the images, and nvblox plus its colour adapter were two of the
 five copies that saturated the drone LAN. What was learned (JIT compile cache,

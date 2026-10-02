@@ -1,0 +1,27 @@
+[Unit]
+Description=cuVSLAM bridge (IR camera_info relay, UTC odometry, vslam diagnostic)
+After=network-online.target
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ vslam_service_user }}
+Group={{ vslam_service_user }}
+EnvironmentFile={{ vslam_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/vslam_bridge.py --left-info-in {{ vslam_left_image_topic }}/camera_info --right-info-in {{ vslam_right_image_topic }}/camera_info --left-info-out {{ vslam_left_camera_info_topic }} --right-info-out {{ vslam_right_camera_info_topic }} --odometry-topic {{ vslam_odometry_topic }} --map-frame {{ vslam_map_frame }} --twist-stddev {{ vslam_twist_stddev_mps }} --max-latency-s {{ vslam_max_latency_s }}'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=20
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

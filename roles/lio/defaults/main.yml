@@ -1,0 +1,53 @@
+---
+# LiDAR-inertial odometry: FAST-LIO2 (HKU MARS) on the Livox Avia and its
+# built-in IMU (/avia/custom + /avia/imu from the avia role, both on the
+# Avia's PTP-locked clock). Built from source in the shared ROS workspace,
+# where the avia role's livox_ros_driver2 messages live.
+lio_state: present                         # present | absent
+lio_service_user: "{{ uav_ros_user | default('uav-ros') }}"
+lio_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+lio_workspace: "{{ uav_ros_workspace | default('/opt/uav/ros') }}"
+# GPL-2.0: fetched at build time at a pinned commit, never vendored here.
+lio_repository: https://github.com/hku-mars/FAST_LIO.git
+lio_revision: a4743b095409588842a5b30ddfa27e29d2f99164   # ROS2 branch, 2025-01-15 (with ikd-Tree submodule)
+lio_checkout_dir: /opt/uav/vendor/FAST_LIO   # pristine, outside the colcon workspace
+lio_source_dir: "{{ lio_workspace }}/src/FAST_LIO"   # the copy that is built (C++17)
+lio_config_path: /etc/uav/ros/fast_lio.yaml
+lio_build_jobs: 4                          # the IKFoM templates are memory-hungry
+
+lio_lidar_topic: /avia/custom
+lio_imu_topic: /avia/imu
+# Avia preprocessing: FAST-LIO's own avia.yaml discards everything within 4 m;
+# 1.5 m keeps the near ground at low altitude and still drops the airframe.
+lio_blind_m: 1.5
+lio_point_filter_num: 3                    # every 3rd point
+lio_filter_size_surf_m: 0.5
+lio_filter_size_map_m: 0.5
+# The Avia's built-in IMU relative to its LiDAR (factory; FAST-LIO's avia.yaml):
+# LiDAR origin in the IMU frame, axes aligned.
+lio_extrinsic_t: [0.04165, 0.02326, -0.0284]
+lio_extrinsic_r: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+lio_publish_scans: true                    # /cloud_registered (world frame): feeds the voxel map
+# Full undistorted scans on /cloud_registered (~24k points x 48 B per frame,
+# ~11 MB/s on the local DDS) rather than the 0.5 m feature cloud; the voxel map
+# needs them, and the flight recorder excludes the derived clouds.
+lio_dense_scans: true
+
+# Voxel map of the registered scans. Fine: new voxels only, every
+# update period, on /lio/map/updates (viewers accumulate them), and what
+# /lio/map/save writes (binary PCD into lio_map_dir). Overview: the whole
+# map, latched on /lio/map, for viewers that connect late.
+lio_map_voxel_m: 0.05
+lio_map_max_points: 4000000                # 64 MB of points; stops growing (WARN) beyond
+lio_map_update_period_s: 1.0
+lio_map_overview_voxel_m: 0.2
+lio_map_overview_max_points: 2000000
+lio_map_publish_period_s: 10.0             # overview
+lio_map_dir: /data/maps
+
+# Bridge: FAST-LIO's IMU pose -> base_link odometry on lio_odometry_topic.
+lio_odometry_topic: /lio/odometry
+# The Avia IMU in base_link: base_link -> avia_nominal_lidar_frame (URDF,
+# (0.262, -0.003, 0.110), level) plus the IMU in the LiDAR frame (-T above).
+lio_imu_lever_arm: [0.22035, -0.02626, 0.1384]
+lio_twist_stddev_mps: 0.05

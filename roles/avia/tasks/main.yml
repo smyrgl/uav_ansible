@@ -10,6 +10,7 @@
       - "ros-{{ ros_distro }}-rclcpp"
       - "ros-{{ ros_distro }}-sensor-msgs"
       - "ros-{{ ros_distro }}-diagnostic-msgs"
+      - "ros-{{ ros_distro }}-rosidl-default-generators"   # livox_ros_driver2 messages
     state: present
     update_cache: true
     cache_valid_time: 3600
@@ -34,13 +35,17 @@
   register: avia_sdk_source
   notify: Restart Avia ROS driver
 
-- name: Install the Avia ROS adapter source
+- name: Install the Avia ROS adapter and Livox message sources
+  # livox_ros_driver2 here is message definitions only (CustomMsg for FAST-LIO).
   ansible.builtin.copy:
-    src: uav_avia
+    src: "{{ item }}"
     dest: "{{ avia_workspace }}/src/"
     owner: root
     group: root
     mode: preserve
+  loop:
+    - livox_ros_driver2
+    - uav_avia
   register: avia_adapter_source
   notify: Restart Avia ROS driver
 
@@ -53,7 +58,7 @@
   ansible.builtin.shell: |
     set -e
     source /opt/ros/{{ ros_distro }}/setup.bash
-    colcon build --merge-install --packages-select uav_avia --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+    colcon build --merge-install --packages-select livox_ros_driver2 uav_avia --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
     ctest --test-dir build/uav_avia --output-on-failure
   args:
     executable: /bin/bash

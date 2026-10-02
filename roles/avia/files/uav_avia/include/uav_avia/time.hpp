@@ -72,6 +72,26 @@ constexpr uint8_t timestamp_utc = 3;   // kTimestampTypePpsGps: UTC calendar sta
 // live (PTP: ptp_status and sync mode 1; PPS + UTC: pps_status and sync mode 2)
 // and the stamp, converted to UTC, is plausibly just before its receipt. A
 // label one second off, or a TAI/UTC mix-up, fails the latency bound.
+// A point's (or IMU sample's) sensor time in UTC nanoseconds: its packet's stamp
+// plus its offset within the packet. PTP stamps are the master's timescale
+// (TAI behind ptpd: ptp_utc_offset_ns 37 s); type 3 is the UTC calendar layout.
+// False for stamps that carry no absolute time (uptime, PPS-only).
+inline bool point_time_ns(uint64_t packet_raw, uint8_t type, uint32_t offset_ns,
+                          int64_t ptp_utc_offset_ns, int64_t& ns) {
+  if (type == timestamp_ptp) {
+    ns = static_cast<int64_t>(packet_raw) - ptp_utc_offset_ns + offset_ns;
+    return true;
+  }
+  if (type == timestamp_utc) {
+    uint8_t b[8];
+    std::memcpy(b, &packet_raw, sizeof(b));
+    if (!utc_stamp_ns(b, ns)) return false;
+    ns += offset_ns;
+    return true;
+  }
+  return false;
+}
+
 inline bool sensor_time_trusted(uint8_t type, uint32_t status, int64_t latency_ns,
                                 int64_t min_latency_ns, int64_t max_latency_ns) {
   bool source = false;

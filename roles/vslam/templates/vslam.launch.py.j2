@@ -1,0 +1,45 @@
+# Managed by uav_ansible (vslam). cuVSLAM as a component, as NVIDIA's launch files
+# run it: the packaged standalone executable is a Bazel binary that looks for a
+# runfiles tree the deb does not ship.
+from launch import LaunchDescription
+from launch_ros.actions import ComposableNodeContainer
+from launch_ros.descriptions import ComposableNode
+
+
+def generate_launch_description():
+    visual_slam = ComposableNode(
+        package="isaac_ros_visual_slam",
+        plugin="nvidia::isaac_ros::visual_slam::VisualSlamNode",
+        name="visual_slam",
+        parameters=[{
+            "num_cameras": 2,
+            "camera_optical_frames": {{ vslam_camera_optical_frames | to_json }},
+            "base_frame": {{ vslam_base_frame | to_json }},
+            "rectified_images": True,
+            "tracking_mode": {{ vslam_tracking_mode | int }},
+            "imu_frame": {{ vslam_imu_frame | to_json }},
+            "calibration_frequency": {{ vslam_imu_rate_hz | float }},
+            "image_jitter_threshold_ms": {{ vslam_image_jitter_threshold_ms | float }},
+            "image_qos": "SENSOR_DATA",
+            "imu_qos": "SENSOR_DATA",
+            # Odometry only: no SLAM, no TF (robot_localization owns odom and map).
+            "enable_localization_n_mapping": False,
+            "publish_odom_to_base_tf": False,
+            "publish_map_to_odom_tf": False,
+            "odom_frame": {{ vslam_odom_frame | to_json }},
+            "map_frame": {{ vslam_map_frame | to_json }},
+            "enable_slam_visualization": False,
+            "enable_landmarks_view": False,
+            "enable_observations_view": False,
+        }],
+        remappings=[
+            ("visual_slam/image_0", {{ vslam_left_image_topic | to_json }}),
+            ("visual_slam/camera_info_0", {{ vslam_left_camera_info_topic | to_json }}),
+            ("visual_slam/image_1", {{ vslam_right_image_topic | to_json }}),
+            ("visual_slam/camera_info_1", {{ vslam_right_camera_info_topic | to_json }}),
+            ("visual_slam/imu", {{ vslam_imu_topic | to_json }}),
+        ],
+    )
+    return LaunchDescription([ComposableNodeContainer(
+        name="vslam_container", namespace="", package="rclcpp_components",
+        executable="component_container_mt", composable_node_descriptions=[visual_slam], output="screen")])

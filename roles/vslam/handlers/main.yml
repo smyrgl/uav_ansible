@@ -1,0 +1,16 @@
+---
+- name: Restart vslam bridge
+  ansible.builtin.systemd_service:
+    name: uav-vslam-bridge.service
+    state: restarted
+    daemon_reload: true
+
+- name: Restart vslam
+  ansible.builtin.systemd_service:
+    name: uav-vslam.service
+    state: restarted
+    daemon_reload: true
+
+- name: Reload systemd for vslam
+  ansible.builtin.systemd_service:
+    daemon_reload: true

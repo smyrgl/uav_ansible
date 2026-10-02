@@ -1,0 +1,199 @@
+---
+# FAST-LIO2 on the Avia (see defaults). The livox_ros_driver2 messages and the
+# /avia/custom + /avia/imu topics come from the avia role.
+- name: Install and run FAST-LIO
+  when: lio_state == 'present'
+  block:
+    - name: Install FAST-LIO build dependencies
+      ansible.builtin.apt:
+        name:
+          - git
+          - libeigen3-dev
+          - libpcl-dev
+          - python3-dev                 # FAST-LIO includes Python.h (matplotlibcpp)
+          - python3-numpy
+          - "ros-{{ ros_distro }}-pcl-ros"
+          - "ros-{{ ros_distro }}-pcl-conversions"
+          - "ros-{{ ros_distro }}-rclcpp-components"
+          - "ros-{{ ros_distro }}-std-srvs"
+          - "ros-{{ ros_distro }}-visualization-msgs"
+          - "ros-{{ ros_distro }}-nav-msgs"
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Check that the Livox messages are built (avia role)
+      ansible.builtin.stat:
+        path: "{{ lio_workspace }}/install/share/livox_ros_driver2/package.xml"
+      register: lio_livox_messages
+
+    - name: Refuse to build FAST-LIO without the Livox messages
+      ansible.builtin.assert:
+        that: lio_livox_messages.stat.exists
+        fail_msg: Run the avia role first (it builds livox_ros_driver2 and publishes /avia/custom).
+        quiet: true
+
+    - name: Fetch the pinned FAST-LIO source
+      ansible.builtin.git:
+        repo: "{{ lio_repository }}"
+        dest: "{{ lio_checkout_dir }}"
+        version: "{{ lio_revision }}"
+        recursive: true
+      register: lio_checkout
+
+    - name: Check for the prepared FAST-LIO build tree
+      ansible.builtin.stat:
+        path: "{{ lio_source_dir }}/CMakeLists.txt"
+      register: lio_tree
+
+    # FAST-LIO's CMakeLists forces C++14; Jazzy's rclcpp headers need C++17
+    # (std::is_convertible_v, ...). The pinned checkout stays pristine; the copy
+    # colcon builds gets the standard switched.
+    - name: Prepare the FAST-LIO build tree (C++17)
+      ansible.builtin.shell: |
+        set -e
+        rm -rf {{ lio_source_dir }}
+        cp -a {{ lio_checkout_dir }} {{ lio_source_dir }}
+        rm -rf {{ lio_source_dir }}/.git
+        sed -i -e 's/c++14/c++17/g' -e 's/CMAKE_CXX_STANDARD 14/CMAKE_CXX_STANDARD 17/' {{ lio_source_dir }}/CMakeLists.txt
+        grep -q 'CMAKE_CXX_STANDARD 17' {{ lio_source_dir }}/CMakeLists.txt
+      args:
+        executable: /bin/bash
+      when: lio_checkout is changed or not lio_tree.stat.exists
+      register: lio_source
+
+    - name: Check for the FAST-LIO executable
+      ansible.builtin.stat:
+        path: "{{ lio_workspace }}/install/lib/fast_lio/fastlio_mapping"
+      register: lio_executable
+
+    - name: Build FAST-LIO
+      ansible.builtin.shell: |
+        set -e
+        source /opt/ros/{{ ros_distro }}/setup.bash
+        source {{ lio_workspace }}/install/local_setup.bash
+        MAKEFLAGS=-j{{ lio_build_jobs }} colcon build --merge-install --packages-select fast_lio --cmake-args -DCMAKE_BUILD_TYPE=Release
+      args:
+        executable: /bin/bash
+        chdir: "{{ lio_workspace }}"
+      when: lio_source is changed or not lio_executable.stat.exists
+      notify: Restart lio
+
+    - name: Let the service write FAST-LIO's log and map directories
+      ansible.builtin.file:
+        path: "{{ lio_source_dir }}/{{ item }}"
+        state: directory
+        owner: "{{ lio_service_user }}"
+        group: "{{ lio_service_user }}"
+        mode: "0755"
+      loop:
+        - Log
+        - PCD
+
+    - name: Install the lio bridge, the voxel map and their tests
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/usr/local/lib/uav/{{ item }}"
+        mode: "0755"
+      loop:
+        - lio_bridge.py
+        - test_lio_bridge.py
+        - lio_map.py
+        - test_lio_map.py
+      notify:
+        - Restart lio bridge
+        - Restart lio map
+
+    - name: Run the bridge and map tests on the target
+      ansible.builtin.command:
+        argv: [/usr/bin/python3, -m, unittest, -q, test_lio_bridge, test_lio_map]
+        chdir: /usr/local/lib/uav
+      environment:
+        PYTHONDONTWRITEBYTECODE: "1"
+      changed_when: false
+
+    - name: Install the lio bridge unit
+      ansible.builtin.template:
+        src: uav-lio-bridge.service.j2
+        dest: /etc/systemd/system/uav-lio-bridge.service
+        mode: "0644"
+      notify: Restart lio bridge
+
+    - name: Enable the lio bridge at boot
+      ansible.builtin.systemd_service:
+        name: uav-lio-bridge.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    # Owned by the service user; the operator's group can read and prune.
+    - name: Create the map directory
+      ansible.builtin.file:
+        path: "{{ lio_map_dir }}"
+        state: directory
+        owner: "{{ lio_service_user }}"
+        group: "{{ target_user }}"
+        mode: "2775"
+
+    - name: Install the lio map unit
+      ansible.builtin.template:
+        src: uav-lio-map.service.j2
+        dest: /etc/systemd/system/uav-lio-map.service
+        mode: "0644"
+      notify: Restart lio map
+
+    - name: Enable the lio map at boot
+      ansible.builtin.systemd_service:
+        name: uav-lio-map.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Configure FAST-LIO
+      ansible.builtin.template:
+        src: fast_lio.yaml.j2
+        dest: "{{ lio_config_path }}"
+        mode: "0644"
+      notify: Restart lio
+
+    - name: Install the FAST-LIO unit
+      ansible.builtin.template:
+        src: uav-lio.service.j2
+        dest: /etc/systemd/system/uav-lio.service
+        mode: "0644"
+      notify: Restart lio
+
+    - name: Enable FAST-LIO at boot
+      ansible.builtin.systemd_service:
+        name: uav-lio.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+- name: Stop and remove FAST-LIO's unit
+  when: lio_state == 'absent'
+  block:
+    - name: Stop and disable FAST-LIO and its bridge
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: false
+        state: stopped
+      loop:
+        - uav-lio.service
+        - uav-lio-bridge.service
+        - uav-lio-map.service
+      failed_when: false
+
+    - name: Remove the FAST-LIO units, configuration and bridge
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/uav-lio.service
+        - /etc/systemd/system/uav-lio-bridge.service
+        - /etc/systemd/system/uav-lio-map.service
+        - "{{ lio_config_path }}"
+        - /usr/local/lib/uav/lio_bridge.py
+        - /usr/local/lib/uav/test_lio_bridge.py
+        - /usr/local/lib/uav/lio_map.py
+        - /usr/local/lib/uav/test_lio_map.py

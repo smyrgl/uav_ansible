@@ -58,6 +58,24 @@
           "pointSize": 2,
           "pointShape": "circle",
           "decayTime": 0.5
+        },
+        "/lio/map": {
+          "visible": true,
+          "colorMode": "colormap",
+          "colorField": "z",
+          "colorMap": "turbo",
+          "pointSize": 2,
+          "pointShape": "circle",
+          "decayTime": 0
+        },
+        "/lio/map/updates": {
+          "visible": true,
+          "colorMode": "colormap",
+          "colorField": "z",
+          "colorMap": "turbo",
+          "pointSize": 2,
+          "pointShape": "circle",
+          "decayTime": 86400
         }
       },
       "layers": {

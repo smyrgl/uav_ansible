@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>uav_avia</name><version>0.1.0</version>
-  <description>Original Avia SDK1 adapter: PointCloud2 with per-pulse UTC push and validated sensor-UTC headers.</description>
+  <description>Original Avia SDK1 adapter: PointCloud2 with per-pulse UTC push and validated sensor-UTC headers; the built-in IMU and Livox CustomMsg frames for LiDAR-inertial odometry.</description>
   <maintainer email="maintainer@example.com">Local UAV package maintainer</maintainer>
   <license>Apache-2.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>
-  <depend>rclcpp</depend><depend>sensor_msgs</depend><depend>diagnostic_msgs</depend>
+  <depend>rclcpp</depend><depend>sensor_msgs</depend><depend>diagnostic_msgs</depend><depend>livox_ros_driver2</depend>
   <export><build_type>ament_cmake</build_type></export>
 </package>

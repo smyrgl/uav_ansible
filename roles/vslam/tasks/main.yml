@@ -1,0 +1,90 @@
+---
+# Visual odometry from the D555's stereo IR: Isaac ROS cuVSLAM (package from the
+# isaac_ros role) plus a bridge that puts its odometry on the host UTC time base.
+- name: Install cuVSLAM and its bridge
+  when: vslam_state == 'present'
+  block:
+    - name: Check that the cuVSLAM component is installed
+      ansible.builtin.stat:
+        path: "/opt/ros/{{ ros_distro }}/lib/libisaac_ros_visual_slam_node.so"
+      register: vslam_component
+
+    - name: Refuse to configure cuVSLAM without its package
+      ansible.builtin.assert:
+        that: vslam_component.stat.exists
+        fail_msg: >-
+          ros-{{ ros_distro }}-isaac-ros-visual-slam is missing: run the isaac_ros
+          role with isaac_ros_state: present first.
+        quiet: true
+
+    - name: Install the vslam bridge and its tests
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/usr/local/lib/uav/{{ item }}"
+        mode: "0755"
+      loop:
+        - vslam_bridge.py
+        - test_vslam_bridge.py
+      notify: Restart vslam bridge
+
+    - name: Run the bridge tests on the target
+      ansible.builtin.command:
+        argv: [/usr/bin/python3, -m, unittest, -q, test_vslam_bridge]
+        chdir: /usr/local/lib/uav
+      environment:
+        PYTHONDONTWRITEBYTECODE: "1"
+      changed_when: false
+
+    - name: Configure cuVSLAM
+      ansible.builtin.template:
+        src: vslam.launch.py.j2
+        dest: "{{ vslam_launch_path }}"
+        mode: "0644"
+      notify: Restart vslam
+
+    - name: Install the vslam units
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: "0644"
+      loop:
+        - uav-vslam-bridge.service
+        - uav-vslam.service
+      notify:
+        - Restart vslam bridge
+        - Restart vslam
+
+    - name: Enable the vslam units at boot
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop:
+        - uav-vslam-bridge.service
+        - uav-vslam.service
+
+- name: Remove cuVSLAM and its bridge
+  when: vslam_state == 'absent'
+  block:
+    - name: Stop and disable the vslam units
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: false
+        state: stopped
+      loop:
+        - uav-vslam.service
+        - uav-vslam-bridge.service
+      failed_when: false
+
+    - name: Remove the vslam units, configuration and bridge
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/uav-vslam.service
+        - /etc/systemd/system/uav-vslam-bridge.service
+        - "{{ vslam_launch_path }}"
+        - /usr/local/lib/uav/vslam_bridge.py
+        - /usr/local/lib/uav/test_vslam_bridge.py
+      notify: Reload systemd for vslam

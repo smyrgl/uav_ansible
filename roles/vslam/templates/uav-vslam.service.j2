@@ -1,0 +1,33 @@
+[Unit]
+Description=Isaac ROS cuVSLAM visual odometry (D555 stereo IR)
+After=network-online.target uav-description.service uav-vslam-bridge.service
+Wants=network-online.target uav-description.service uav-vslam-bridge.service
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ vslam_service_user }}
+Group={{ vslam_service_user }}
+# CUDA on Tegra: /dev/nvgpu/igpu0/*, /dev/nvhost-*-gpu and /dev/nvmap are
+# root:video; the render nodes /dev/dri/renderD* are root:render.
+SupplementaryGroups=video render
+EnvironmentFile={{ vslam_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+Environment=CUDA_CACHE_PATH={{ vslam_cuda_cache_path }}
+Environment=CUDA_CACHE_MAXSIZE={{ vslam_cuda_cache_max_bytes }}
+WorkingDirectory=/var/lib/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && exec ros2 launch {{ vslam_launch_path }}'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=30
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

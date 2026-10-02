@@ -25,6 +25,17 @@ int main() {
   const uint32_t too_big = 3600000000u;
   std::memcpy(bad_us + 4, &too_big, 4);
   assert(!utc_stamp_ns(bad_us, ns));
+  // Point times: PTP (TAI) minus the UTC offset plus the in-packet offset; the
+  // calendar layout through the raw 64-bit value; nothing for uptime or PPS-only.
+  int64_t pt = 0;
+  assert(point_time_ns(1790880462000000000ULL, timestamp_ptp, 5 * 4167, 37LL * ns_per_s, pt));
+  assert(pt == 1790880425LL * ns_per_s + 5 * 4167);
+  uint64_t raw = 0;
+  std::memcpy(&raw, b, sizeof(raw));
+  assert(point_time_ns(raw, timestamp_utc, 4167, 0, pt));
+  assert(pt == 1790880425LL * ns_per_s + 123456000LL + 4167);
+  assert(!point_time_ns(raw, 0, 0, 0, pt));
+  assert(!point_time_ns(raw, 4, 0, 0, pt));
   // Before 2000 does not fit a year-since-2000 byte.
   assert(!utc_fields(946684799, f));
   // Send window: 100 ms after the top of a second labels that second; outside it, nothing.
