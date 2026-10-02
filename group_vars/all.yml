@@ -361,6 +361,13 @@ mavlink_camera_rtsp_host: "{{ system_hostname }}"
 mavlink_camera_system_id: 1
 mavlink_camera_component_id: 100
 mavlink_camera_rotation_degrees: 180
+# Transmitter buttons served by the camera component, read from the
+# autopilot's RC_CHANNELS (0 disables): photo, and start/stop recording.
+# "button" acts on a momentary press; "toggle" on every flip of a latching
+# button or switch.
+mavlink_camera_rc_photo_channel: 12
+mavlink_camera_rc_video_channel: 13
+mavlink_camera_rc_button_mode: button
 
 # =============================================================================
 # px4_bridge  (uORB -> ROS-native ENU/FLU), gnss_ros (Septentrio ROS 2 driver

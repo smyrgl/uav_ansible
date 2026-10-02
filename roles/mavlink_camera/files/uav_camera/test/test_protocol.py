@@ -326,3 +326,82 @@ def test_async_media_error_is_reported_to_ground_station_once_per_change(camera)
     b.last_error = "media pipeline failed: NVENC unavailable"
     p.tick()
     assert len(messages(sent, "STATUSTEXT")) == 3
+
+
+def autopilot(msg, source=(1, 1)):
+    wire = mav.MAVLink(None, srcSystem=source[0], srcComponent=source[1])
+    return mav.MAVLink(None).parse_char(msg.pack(wire))
+
+
+def rc_frame(source=(1, 1), **channels):
+    values = [1499] * 4 + [999] + [1499] * 4 + [1049] * 4 + [1499, 1499, 1999, 998, 998]
+    for key, raw in channels.items():
+        values[int(key[2:]) - 1] = raw
+    return autopilot(mav.MAVLink_rc_channels_message(0, 18, *values, 255), source)
+
+
+def sys_status(rc_present=True):
+    bit = mav.MAV_SYS_STATUS_SENSOR_RC_RECEIVER if rc_present else 0
+    return autopilot(mav.MAVLink_sys_status_message(bit, bit, bit, 0, 0, -1, -1, 0, 0, 0, 0, 0, 0))
+
+
+@pytest.fixture
+def rc_camera():
+    backend = Backend()
+    protocol = CameraProtocol(backend, {"rc_photo_channel": 12, "rc_video_channel": 13})
+    sent = []
+    protocol._send = sent.append
+    yield protocol, backend, sent
+    protocol._socket = None
+    protocol.close()
+
+
+def press(protocol, **channel):
+    for msg in (rc_frame(), rc_frame(), rc_frame(**channel), rc_frame(**channel), rc_frame(), rc_frame()):
+        protocol.handle_message(msg)
+    settle(protocol)
+
+
+def test_rc_buttons_take_a_photo_and_toggle_recording_without_acks(rc_camera):
+    protocol, backend, sent = rc_camera
+    protocol.handle_message(sys_status())
+    press(protocol, ch12=1949)
+    assert backend.photos == 1
+    assert any(m.get_type() == "CAMERA_IMAGE_CAPTURED" for m in sent)
+    press(protocol, ch13=1949)
+    assert backend.recording and backend.record_starts == 1
+    press(protocol, ch13=1949)
+    assert not backend.recording and backend.record_stops == 1
+    assert not any(m.get_type() == "COMMAND_ACK" for m in sent)   # nobody asked
+    assert protocol.rc_status()["presses"] == {"photo": 1, "video": 2}
+
+
+def test_rc_needs_the_autopilot_and_a_present_receiver(rc_camera):
+    protocol, backend, _ = rc_camera
+    press(protocol, ch12=1949)                       # no SYS_STATUS yet
+    protocol.handle_message(sys_status())
+    for msg in (rc_frame((255, 190)), rc_frame((255, 190), ch12=1949), rc_frame((255, 190), ch12=1949)):
+        protocol.handle_message(msg)                 # a GCS's RC_CHANNELS is not the transmitter
+    settle(protocol)
+    protocol.handle_message(sys_status(False))
+    press(protocol, ch12=1949)
+    assert backend.photos == 0
+
+
+def test_rc_rate_is_requested_when_short_and_not_repeated_within_10s(rc_camera):
+    protocol, _, sent = rc_camera
+    protocol._socket = object()
+    protocol.tick(100.0)
+    protocol.tick(105.0)
+    requests = [m for m in sent if m.get_type() == "COMMAND_LONG" and m.command == mav.MAV_CMD_SET_MESSAGE_INTERVAL]
+    assert len(requests) == 1
+    request = requests[0]
+    assert (request.target_system, request.target_component) == (1, 1)
+    assert (request.param1, request.param2) == (mav.MAVLINK_MSG_ID_RC_CHANNELS, 50000)
+
+
+def test_rc_disabled_by_default(camera):
+    protocol, backend, _ = camera
+    protocol.handle_message(sys_status())
+    press(protocol, ch12=1949)
+    assert protocol.rc_status() is None and backend.photos == 0

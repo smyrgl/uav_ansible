@@ -16,5 +16,9 @@ uav_camera:
     mavlink_endpoint: "tcp:127.0.0.1:{{ mavlink_router_tcp_port }}"
     system_id: {{ mavlink_camera_system_id }}
     component_id: {{ mavlink_camera_component_id }}
+    rc_photo_channel: {{ mavlink_camera_rc_photo_channel | int }}
+    rc_video_channel: {{ mavlink_camera_rc_video_channel | int }}
+    rc_button_mode: {{ mavlink_camera_rc_button_mode | to_json }}
+    rc_rate_hz: 20.0
     camera_name: "D555 RGB"
     vendor_name: "RealSense"

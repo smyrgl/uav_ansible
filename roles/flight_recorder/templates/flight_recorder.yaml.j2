@@ -2,6 +2,11 @@
 uav_flight_recorder:
   ros__parameters:
     bag_dir: {{ flight_recorder_dir | to_json }}
+    arm_source: {{ flight_recorder_arm_source | to_json }}
+    mavlink_endpoint: {{ flight_recorder_mavlink_endpoint | to_json }}
+    mavlink_stale_sec: {{ flight_recorder_mavlink_stale_sec | float }}
+    rc_channel: {{ flight_recorder_rc_channel | int }}
+    rc_mode: {{ flight_recorder_rc_mode | to_json }}
     armed_topic: {{ flight_recorder_armed_topic | to_json }}
     safety_topic: {{ flight_recorder_safety_topic | to_json }}
     manual_topic: {{ flight_recorder_manual_topic | to_json }}

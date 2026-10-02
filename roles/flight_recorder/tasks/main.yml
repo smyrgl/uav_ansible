@@ -1,10 +1,12 @@
 ---
-# Flight-gated rosbag2 recorder: starts on arming, rolls through disarm, stops
-# when the vehicle is safed. Bags land on the NVMe root in flight_recorder_dir.
+# Flight-gated rosbag2 recorder: starts on arming (the autopilot HEARTBEAT by
+# default), rolls through disarm, stops after a post-roll. Bags land on the NVMe
+# root in flight_recorder_dir.
 - name: Install rosbag2 and build dependencies
   ansible.builtin.apt:
     name:
       - python3-colcon-common-extensions
+      - python3-venv
       - "ros-{{ ros_distro }}-rclpy"
       - "ros-{{ ros_distro }}-std-msgs"
       - "ros-{{ ros_distro }}-diagnostic-msgs"
@@ -33,9 +35,18 @@
   register: flight_recorder_source
   notify: Restart flight recorder
 
-- name: Run the recorder's policy tests on the target
+# The HEARTBEAT arm source; system ROS stays importable from the venv.
+- name: Install the recorder's pinned MAVLink dependency
+  ansible.builtin.pip:
+    name: "pymavlink=={{ flight_recorder_pymavlink_version }}"
+    virtualenv: "{{ flight_recorder_venv }}"
+    virtualenv_command: /usr/bin/python3 -m venv
+    virtualenv_site_packages: true
+  notify: Restart flight recorder
+
+- name: Run the recorder's tests on the target
   ansible.builtin.command:
-    argv: [/usr/bin/python3, -m, unittest, -q, test_policy]
+    argv: ["{{ flight_recorder_venv }}/bin/python", -m, unittest, -q, test_policy, test_mavlink_arm]
     chdir: "{{ flight_recorder_workspace }}/src/uav_flight_recorder/test"
   environment:
     PYTHONPATH: "{{ flight_recorder_workspace }}/src/uav_flight_recorder"

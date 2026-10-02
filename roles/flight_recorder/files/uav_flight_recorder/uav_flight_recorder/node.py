@@ -1,7 +1,11 @@
 """Flight-gated rosbag2 recorder.
 
-Starts `ros2 bag record` when the vehicle arms (or on a manual request),
-keeps it rolling through disarm, and stops once the vehicle is safed. The raw
+Starts `ros2 bag record` when the vehicle arms (or on a manual request: the
+manual topic or a transmitter switch),
+keeps it rolling through disarm, and stops after a post-roll. The armed state
+comes from the autopilot's MAVLink HEARTBEAT through mavlink-router (default),
+or from the PX4 bridge's /px4/armed and /px4/safety_off, which can also stop
+the bag early once the vehicle is safed. The raw
 D555 streams are excluded by regex: the camera unicasts a copy per subscriber
 and a second copy would starve the encoder's link; the H.265 video topic and
 the throttled depth are recorded instead.
@@ -21,6 +25,7 @@ from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool
 
+from .mavlink_arm import AutopilotLink
 from .policy import FlightPolicy, IDLE, RECORDING, POST_ROLL
 
 DEFAULTS = {
@@ -29,6 +34,14 @@ DEFAULTS = {
     "post_roll_sec": 30.0, "safed_grace_sec": 5.0, "min_free_gb": 50.0,
     "exclude_regex": "^/realsense/", "storage_preset": "zstd_fast", "max_cache_size": 268435456,
     "stop_timeout_sec": 45.0,
+    # Where the armed state comes from: "mavlink" (the autopilot's HEARTBEAT
+    # through mavlink-router, i.e. over TELEM2) or "ros" (/px4/armed and
+    # /px4/safety_off from the PX4 bridge, i.e. over the FC's Ethernet).
+    "arm_source": "mavlink", "mavlink_endpoint": "tcp:127.0.0.1:5760", "mavlink_stale_sec": 3.0,
+    # A transmitter channel (RC_CHANNELS via the same router link, 0 = off) that
+    # requests a bag like the manual topic: "switch" records while it is on,
+    # "button" starts or stops on each press.
+    "rc_channel": 0, "rc_mode": "switch",
 }
 
 
@@ -51,9 +64,25 @@ class FlightRecorder(Node):
         self.policy = FlightPolicy(self.p["post_roll_sec"], self.p["safed_grace_sec"])
         latched = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=1, reliability=ReliabilityPolicy.RELIABLE,
                              durability=DurabilityPolicy.TRANSIENT_LOCAL)
-        self.create_subscription(Bool, self.p["armed_topic"], lambda m: self._event(armed=m.data), latched)
-        self.create_subscription(Bool, self.p["safety_topic"], lambda m: self._event(safety_off=m.data), latched)
-        self.create_subscription(Bool, self.p["manual_topic"], lambda m: self._event(manual=m.data), 10)
+        self.mav = None
+        self._mav_armed = None
+        self.rc_channel = int(self.p["rc_channel"])
+        if self.rc_channel and self.p["rc_mode"] not in ("switch", "button"):
+            raise ValueError("rc_mode must be 'switch' or 'button'")
+        self._manual_topic = self._manual_rc = False
+        self._rc_presses_seen = 0
+        if self.p["arm_source"] == "ros":
+            self.create_subscription(Bool, self.p["armed_topic"], lambda m: self._event(armed=m.data), latched)
+            self.create_subscription(Bool, self.p["safety_topic"], lambda m: self._event(safety_off=m.data), latched)
+        elif self.p["arm_source"] != "mavlink":
+            raise ValueError("arm_source must be 'mavlink' or 'ros'")
+        if self.p["arm_source"] == "mavlink" or self.rc_channel:
+            # HEARTBEAT carries no safety-switch state; the switch is bypassed on
+            # this FC anyway (CBRK_IO_SAFETY 22027). The bag closes on the post-roll.
+            self.mav = AutopilotLink(self.p["mavlink_endpoint"], self.rc_channel)
+            self.mav.start()
+            self.create_timer(0.2, self._mavlink_poll)
+        self.create_subscription(Bool, self.p["manual_topic"], self._on_manual_topic, 10)
         self.diag = self.create_publisher(DiagnosticArray, "/diagnostics", 10)
         self.proc = None
         self.bag = None             # dict(path, started_at, armed_at, reason)
@@ -64,12 +93,42 @@ class FlightRecorder(Node):
         self.size_checked = 0.0
         os.makedirs(self.p["bag_dir"], exist_ok=True)
         self.create_timer(1.0, self._tick)
-        self.get_logger().info("flight recorder: %s, post-roll %.0f s, excluding %r" % (
-            self.p["bag_dir"], self.p["post_roll_sec"], self.p["exclude_regex"]))
+        self.get_logger().info("flight recorder: %s, armed state from %s, post-roll %.0f s, excluding %r%s" % (
+            self.p["bag_dir"], "the autopilot HEARTBEAT (%s)" % self.p["mavlink_endpoint"] if self.p["arm_source"] == "mavlink"
+            else self.p["armed_topic"], self.p["post_roll_sec"], self.p["exclude_regex"],
+            ", bag %s on RC channel %d" % (self.p["rc_mode"], self.rc_channel) if self.rc_channel else ""))
 
     # --- policy -------------------------------------------------------------
     def _event(self, **kw):
         self._act(self.policy.update(time.monotonic(), **kw))
+
+    def _on_manual_topic(self, msg):
+        self._manual_topic = bool(msg.data)
+        self._event(manual=self._manual_topic or self._manual_rc)
+
+    def _mavlink_poll(self):
+        """Hand changes to the policy, on the executor thread. A stale or lost
+        link keeps the last known state: a dropout must never end a flight's
+        bag early, and an absent transmitter holds its last request."""
+        snap = self.mav.snapshot()
+        armed = snap["armed"]
+        if self.p["arm_source"] == "mavlink" and armed is not None and armed != self._mav_armed:
+            self._mav_armed = armed
+            self.get_logger().info("autopilot %s (HEARTBEAT)" % ("armed" if armed else "disarmed"))
+            self._event(armed=armed)
+        if not self.rc_channel:
+            return
+        request = self._manual_rc
+        if self.p["rc_mode"] == "switch":
+            if snap["rc_level"] is not None:
+                request = snap["rc_level"]
+        elif (snap["rc_presses"] - self._rc_presses_seen) % 2:
+            request = not self._manual_rc
+        self._rc_presses_seen = snap["rc_presses"]
+        if request != self._manual_rc:
+            self._manual_rc = request
+            self.get_logger().info("bag %s on RC channel %d" % ("requested" if request else "released", self.rc_channel))
+            self._event(manual=self._manual_topic or self._manual_rc)
 
     def _tick(self):
         now = time.monotonic()
@@ -175,6 +234,20 @@ class FlightRecorder(Node):
                            "duration_s": round(time.monotonic() - self.bag["started_mono"]), "start_reason": self.bag["reason"]})
         if self.last_flight:
             values.update({"last_flight/" + k: v for k, v in self.last_flight.items() if k in ("bag", "duration_sec", "bytes", "stop_reason")})
+        values["arm_source"] = self.p["arm_source"]
+        link_problem = None
+        if self.rc_channel:
+            snap = self.mav.snapshot()
+            values.update({"rc/channel": self.rc_channel, "rc/mode": self.p["rc_mode"], "rc/present": snap["rc_present"],
+                           "rc/level": snap["rc_level"], "manual/rc": self._manual_rc, "manual/topic": self._manual_topic})
+        if self.mav and self.p["arm_source"] == "mavlink":
+            mav = self.mav.snapshot()
+            age = mav["heartbeat_age_s"]
+            values.update({"mavlink/connected": mav["connected"], "mavlink/heartbeats": mav["heartbeats"],
+                           "mavlink/heartbeat_age_s": None if age is None else round(age, 1),
+                           "mavlink/error": mav["error"]})
+            if age is None or age > float(self.p["mavlink_stale_sec"]):
+                link_problem = "no autopilot HEARTBEAT" + (" (%s)" % mav["error"] if mav["error"] else "")
         if self.last_error and (self.proc is None and state != IDLE):
             level, msg = DiagnosticStatus.ERROR, self.last_error
         elif state == RECORDING:
@@ -185,6 +258,9 @@ class FlightRecorder(Node):
             level, msg = DiagnosticStatus.WARN, "Idle; %.0f GB free is below the %.0f GB guard, no recording possible" % (free, self.p["min_free_gb"])
         else:
             level, msg = DiagnosticStatus.OK, "Idle; armed-flight recording ready (%.0f GB free)" % free
+        if link_problem and level == DiagnosticStatus.OK:
+            level = DiagnosticStatus.WARN
+            msg = (msg + "; " if state != IDLE else "Idle; arming would not be detected: ") + link_problem
         d = DiagnosticArray()
         d.header.stamp = self.get_clock().now().to_msg()
         d.status = [DiagnosticStatus(level=level, name="Flight Recorder", message=msg, hardware_id="rosbag2 mcap",
@@ -192,6 +268,8 @@ class FlightRecorder(Node):
         self.diag.publish(d)
 
     def close(self):
+        if self.mav is not None:
+            self.mav.close()
         if self.proc is not None:
             self._finish("recorder shutting down")
 

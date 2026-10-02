@@ -39,6 +39,9 @@ DEFAULTS = {
     # imager to ~3.5 fps and replay stale buffers).
     'video_topic': '/d555/color/video', 'video_frame_id': 'camera_color_optical_frame',
     'clock_topic': '/d555/clock',
+    # Transmitter buttons from the autopilot's RC_CHANNELS (channel 0 = off).
+    # 'button' acts on a momentary press, 'toggle' on every flip of a latching one.
+    'rc_photo_channel': 0, 'rc_video_channel': 0, 'rc_button_mode': 'button', 'rc_rate_hz': 20.0,
 }
 
 
@@ -234,7 +237,7 @@ class CameraNode(Node):
                       video_frames_published=self._video_published, video_frames_dropped=self._video_dropped,
                       video_stamped_capture_utc=self._video_capture_stamped,
                       video_stamped_receipt=self._video_receipt_stamped,
-                      clock_model=self.clock.reason,
+                      clock_model=self.clock.reason, rc_buttons=self.protocol.rc_status(),
                       source_timestamp_clock='camera_device_clock, mapped to UTC via /d555/clock')
         self._status_pub.publish(String(data=json.dumps(status, default=str)))
 

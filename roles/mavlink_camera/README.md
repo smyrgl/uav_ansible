@@ -93,6 +93,35 @@ rotation. Intrinsics refer to original source pixels; apply the saved transform
 before using them with a rotated photo. These host times are not a substitute
 for the planned sensor clock/extrinsic calibration.
 
+## Transmitter buttons
+
+The camera also serves two transmitter buttons, read from the autopilot's
+RC_CHANNELS on its router connection: `mavlink_camera_rc_photo_channel` (12)
+takes one photo and `mavlink_camera_rc_video_channel` (13) starts or stops
+recording. They act like the GCS commands with nobody to acknowledge; QGC
+still sees the capture event and the recording status. `button` mode
+(`mavlink_camera_rc_button_mode`) acts on a momentary press, `toggle` on every
+flip of a latching button or switch. A press is ignored, with a STATUSTEXT,
+while the camera is busy, an interval sequence runs or no fresh frame exists.
+
+RC_CHANNELS carries no loss or failsafe marker: PX4 forwards whatever the
+receiver sends, failsafe positions included (the IO firmware keeps decoding
+SBUS values while the failsafe bit is set, and SBUS RSSI stays at maximum). A
+press therefore counts only while SYS_STATUS lists the RC receiver as present
+(PX4 drops it from the present mask while manual control is invalid; 1 Hz),
+after a two-frame debounce, and not in a frame where three or more other
+channels jump by over 150 µs at once (a jump to failsafe positions, or back).
+After a loss or a gap the current positions are a new baseline, not a press.
+What remains is the second or so before SYS_STATUS reports a loss, if the
+receiver's failsafe moves only these channels: set them to hold in the
+handheld's failsafe settings.
+
+PX4 streams RC_CHANNELS at 5 Hz on TELEM2, slow enough to miss a short press,
+so while buttons are enabled the camera asks for 20 Hz (SET_MESSAGE_INTERVAL)
+whenever the last 5 s fell short; PX4 forgets the rate on reboot. `~/status`
+reports `rc_buttons`: channels, presses, receiver presence, measured rate and
+suppressed frames.
+
 Geotagging/camera pose is not implemented. CAMERA_IMAGE_CAPTURED reports NaN
 orientation and INT32_MAX integer pose fields as application-level unavailable
 sentinels; MAVLink has no standard integer-invalid value for those fields. Do not

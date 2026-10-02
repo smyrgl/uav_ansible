@@ -1,6 +1,6 @@
 [Unit]
-Description=UAV flight recorder (rosbag2 mcap from arming until safed)
-After=network-online.target uav-px4-bridge.service
+Description=UAV flight recorder (rosbag2 mcap of armed flights)
+After=network-online.target uav-mavlink-router.service uav-px4-bridge.service
 Wants=network-online.target
 PartOf=uav-ros.target
 StartLimitIntervalSec=0
@@ -12,8 +12,9 @@ Group={{ flight_recorder_user }}
 UMask=0002
 EnvironmentFile={{ flight_recorder_environment_file }}
 Environment=ROS_LOG_DIR=/var/log/uav-ros
-# px4_msgs overlay: the bag records the raw /fmu topics too.
-ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ flight_recorder_workspace }}/install/local_setup.bash && [ -f {{ flight_recorder_px4_msgs_workspace }}/install/local_setup.bash ] && source {{ flight_recorder_px4_msgs_workspace }}/install/local_setup.bash; exec ros2 run uav_flight_recorder flight_recorder --ros-args --params-file {{ flight_recorder_config }}'
+# px4_msgs overlay: the bag records the raw /fmu topics too. The venv's python
+# adds pymavlink (the HEARTBEAT arm source) to the system ROS environment.
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ flight_recorder_workspace }}/install/local_setup.bash && [ -f {{ flight_recorder_px4_msgs_workspace }}/install/local_setup.bash ] && source {{ flight_recorder_px4_msgs_workspace }}/install/local_setup.bash; exec {{ flight_recorder_venv }}/bin/python {{ flight_recorder_workspace }}/install/lib/uav_flight_recorder/flight_recorder --ros-args --params-file {{ flight_recorder_config }}'
 Restart=on-failure
 RestartSec=5
 KillSignal=SIGINT

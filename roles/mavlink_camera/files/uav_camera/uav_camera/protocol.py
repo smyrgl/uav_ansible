@@ -13,7 +13,7 @@ recent 256 captures in this process; media files are retained by the backend.
 """
 from __future__ import annotations
 
-from collections import OrderedDict
+from collections import OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 import logging
@@ -24,6 +24,8 @@ import threading
 import time
 
 from pymavlink.dialects.v20 import common as mav
+
+from .rc import BUTTON, RcButtons
 
 # Deprecated command removed from the generated enum; retained for older GCSs.
 _REQUEST_IMAGE_CAPTURE = 2002
@@ -43,8 +45,16 @@ class CameraProtocol:
     """Expose ``backend`` using MAVLink 2 over the existing router's TCP port.
 
     Config keys: system_id, component_id, mavlink_endpoint, rtsp_uri,
-    codec, camera_name, vendor_name, hfov_deg, min_photo_interval_s. Defaults target the D555
+    codec, camera_name, vendor_name, hfov_deg, min_photo_interval_s,
+    rc_photo_channel, rc_video_channel, rc_button_mode, rc_rate_hz. Defaults target the D555
     on jethawk. The backend status method must return quickly and be thread-safe.
+
+    Transmitter buttons (``rc_*``, channel 0 = off) are read from the autopilot's
+    RC_CHANNELS through the same router connection and act like the GCS
+    commands, with nobody to acknowledge: photo takes one picture, video
+    starts or stops recording. While they are enabled the protocol keeps
+    RC_CHANNELS at ``rc_rate_hz`` with SET_MESSAGE_INTERVAL (PX4 streams it at
+    5 Hz, slow enough to miss a short press, and forgets the rate on reboot).
     """
 
     def __init__(self, backend, config: dict, logger=None):
@@ -88,6 +98,15 @@ class CameraProtocol:
         self._status_period = 1.0
         self._closed = False
         self.min_photo_interval = max(0.5, float(config.get("min_photo_interval_s", 1.0)))
+        mode = str(config.get("rc_button_mode", BUTTON))
+        buttons = {name: (int(config.get(f"rc_{name}_channel", 0) or 0), mode) for name in ("photo", "video")}
+        buttons = {name: spec for name, spec in buttons.items() if spec[0] > 0}
+        self.rc = RcButtons(buttons) if buttons else None
+        self.rc_rate_hz = float(config.get("rc_rate_hz", 20.0))
+        if self.rc and not 1.0 <= self.rc_rate_hz <= 50.0:
+            raise ValueError("rc_rate_hz must be between 1 and 50")
+        self._rc_frames = deque(maxlen=256)
+        self._rc_rate_requested = -math.inf
         self._known_commands = {
             mav.MAV_CMD_REQUEST_MESSAGE,
             mav.MAV_CMD_REQUEST_CAMERA_INFORMATION,
@@ -229,7 +248,13 @@ class CameraProtocol:
             self._ack(transaction.message, result)
 
     def handle_message(self, message):
-        if message.get_type() != "COMMAND_LONG":
+        kind = message.get_type()
+        if kind in ("RC_CHANNELS", "SYS_STATUS"):
+            if self.rc and (message.get_srcSystem(), message.get_srcComponent()) == (
+                    self.system_id, mav.MAV_COMP_ID_AUTOPILOT1):
+                self._handle_rc(message, time.monotonic())
+            return
+        if kind != "COMMAND_LONG":
             return
         if message.target_system not in (0, self.system_id) or message.target_component not in (0, self.component_id):
             return
@@ -335,6 +360,59 @@ class CameraProtocol:
             self._finish(transaction, mav.MAV_RESULT_FAILED)
             self._status_text(f"Camera command failed: {exc}")
 
+    def _handle_rc(self, message, now):
+        if message.get_type() == "SYS_STATUS":
+            self.rc.set_present(message.onboard_control_sensors_present & mav.MAV_SYS_STATUS_SENSOR_RC_RECEIVER)
+            return
+        self._rc_frames.append(now)
+        values = [getattr(message, f"chan{i}_raw") for i in range(1, 19)]
+        for name in self.rc.update(values, now):
+            self._rc_press(name, now)
+
+    def _rc_press(self, name, now):
+        """A transmitter button: the GCS command's checks, without a requester to ACK."""
+        status = self._status()
+        if self._pending is not None:
+            self._status_text(f"Camera busy, RC {name} ignored")
+        elif name == "photo":
+            if self._sequence is not None:
+                self._status_text("Photo sequence running, RC photo ignored")
+            elif not status.get("ready", False):
+                self._status_text("D555: no fresh RGB frame for photo")
+            else:
+                self.log.info("RC button: photo")
+                self._submit("photo", self.backend.capture_photo, None, now)
+        elif name == "video":
+            if status.get("recording", False):
+                self.log.info("RC button: stop recording")
+                self._submit("record_stop", self.backend.stop_recording, None, now)
+            elif not status.get("ready", False):
+                self._status_text("D555: no fresh RGB frame, RC record ignored")
+            else:
+                self.log.info("RC button: start recording")
+                self._submit("record_start", self.backend.start_recording, None, now)
+
+    def _keep_rc_rate(self, now):
+        # Ask again whenever the last 5 s fell short of the rate (PX4 reboot,
+        # router reconnect); at most every 10 s.
+        if self._socket is None or now - self._rc_rate_requested < 10.0:
+            return
+        recent = sum(1 for t in self._rc_frames if now - t <= 5.0)
+        if recent >= 0.75 * 5.0 * self.rc_rate_hz:
+            return
+        self._rc_rate_requested = now
+        self._send(mav.MAVLink_command_long_message(
+            self.system_id, mav.MAV_COMP_ID_AUTOPILOT1, mav.MAV_CMD_SET_MESSAGE_INTERVAL, 0,
+            mav.MAVLINK_MSG_ID_RC_CHANNELS, 1e6 / self.rc_rate_hz, 0, 0, 0, 0, 0))
+
+    def rc_status(self):
+        if not self.rc:
+            return None
+        now = time.monotonic()
+        return {"buttons": {name: {"channel": channel, "mode": mode} for name, (channel, mode) in self.rc.buttons.items()},
+                "rc_present": self.rc.present, "presses": dict(self.rc.presses), "suppressed": self.rc.suppressed,
+                "rate_hz": round(sum(1 for t in self._rc_frames if now - t <= 5.0) / 5.0, 1)}
+
     @staticmethod
     def _request_commands():
         return {
@@ -405,6 +483,8 @@ class CameraProtocol:
 
     def tick(self, now=None):
         now = time.monotonic() if now is None else now
+        if self.rc:
+            self._keep_rc_rate(now)
         if self._pending:
             future, kind, transaction = self._pending
             if future.done():

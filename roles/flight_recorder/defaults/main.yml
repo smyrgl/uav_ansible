@@ -11,6 +11,19 @@ flight_recorder_min_free_gb: 50.0        # refuse to start, and stop, below this
 flight_recorder_exclude_regex: "^/realsense/"   # raw D555 streams: a second subscriber starves the encoder's link
 flight_recorder_storage_preset: zstd_fast
 flight_recorder_max_cache_size: 268435456
+# Armed state: "mavlink" reads the autopilot's HEARTBEAT through mavlink-router
+# (TELEM2 serial); "ros" uses /px4/armed and /px4/safety_off from the PX4 bridge
+# (XRCE over the FC's Ethernet). Only "ros" can stop early on a safed vehicle.
+flight_recorder_arm_source: mavlink
+flight_recorder_mavlink_endpoint: "tcp:127.0.0.1:{{ mavlink_router_tcp_port | default(5760) }}"
+flight_recorder_mavlink_stale_sec: 3.0   # diagnostic WARN after this long without an autopilot HEARTBEAT
+# Transmitter channel that requests a bag like the manual topic, read from the
+# autopilot's RC_CHANNELS over the same router link (0 disables): "switch"
+# records while it is on, "button" starts or stops on each press.
+flight_recorder_rc_channel: 11
+flight_recorder_rc_mode: switch
+flight_recorder_venv: /opt/uav/flight-recorder-venv
+flight_recorder_pymavlink_version: "2.4.49"   # same pin as ros_health
 flight_recorder_armed_topic: /px4/armed
 flight_recorder_safety_topic: /px4/safety_off
 flight_recorder_manual_topic: /flight_recorder/manual
