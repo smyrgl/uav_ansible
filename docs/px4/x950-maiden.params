@@ -1,0 +1,36 @@
+# X950 / Pixhawk 6X (PX4 v1.17.0 + pps_capture build) — maiden-flight parameter set, 2026-10-01
+# QGroundControl "Parameters > Tools > Load from file" format: vehicle<TAB>component<TAB>name<TAB>value<TAB>type (6 = INT32, 9 = FLOAT)
+# Section 1: applied to the FC on 2026-10-01 and saved (verified after reboot).
+1	1	CA_R_REV	0	6
+1	1	COM_LOW_BAT_ACT	3	6
+1	1	GF_ACTION	3	6
+1	1	GF_MAX_HOR_DIST	50	9
+1	1	GF_MAX_VER_DIST	30	9
+1	1	MPC_MAN_TILT_MAX	25	9
+1	1	MPC_MAN_Y_MAX	60	9
+1	1	MC_YAWRATE_MAX	90	9
+1	1	SDLOG_PROFILE	19	6
+# Section 1b: applied 2026-10-02 (UTC), owner-approved. Six mode buttons on ch 5: Stabilized, Altitude, Position,
+# Position Slow, Land, Return. RC input: RC wins whenever valid, MAVLink joystick only as a fallback.
+1	1	COM_FLTMODE1	8	6
+1	1	COM_FLTMODE2	1	6
+1	1	COM_FLTMODE3	2	6
+1	1	COM_FLTMODE4	9	6
+1	1	COM_FLTMODE5	11	6
+1	1	COM_FLTMODE6	5	6
+1	1	COM_RC_IN_MODE	5	6
+# Section 2: proposed, NOT applied — pilot/owner decisions (uncomment to import).
+# CAN-only motor path: the AUX pins currently emit DShot600 (PWM_AUX_TIM0=-3) into the A1C PWM inputs, which do not decode it,
+# and the resulting DShot esc_status instance 0 is what COM_ARM_CHK_ESCS evaluates instead of the UAVCAN telemetry.
+#1	1	PWM_AUX_FUNC1	0	6
+#1	1	PWM_AUX_FUNC2	0	6
+#1	1	PWM_AUX_FUNC3	0	6
+#1	1	PWM_AUX_FUNC4	0	6
+#1	1	PWM_AUX_TIM0	400	6
+#1	1	DSHOT_BIDIR_EN	0	6
+# RC-flown maiden: no automatic action on GCS link loss (RC loss still → NAV_RCL_ACT=2 Return).
+#1	1	NAV_DLL_ACT	0	6
+# Optical flow off until the H-Flow axis orientation has been validated in motion.
+#1	1	EKF2_OF_CTRL	0	6
+# Generic GPS driver configured for the same port as the Septentrio driver (it loses the race today).
+#1	1	GPS_1_CONFIG	0	6
