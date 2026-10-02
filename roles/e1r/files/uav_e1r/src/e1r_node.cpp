@@ -1,6 +1,7 @@
 #include "uav_e1r/time_gate.hpp"
 #include <rs_driver/msg/point_cloud_msg.hpp>
 #include <rs_driver/driver/decoder/decoder_RSE1.hpp>
+#include "uav_e1r/decoder_params.hpp"
 
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/point_cloud2.hpp>
@@ -113,12 +114,7 @@ class E1RNode final : public rclcpp::Node {
   }
 
   void initialize_decoder() {
-    robosense::lidar::RSDecoderParam params;
-    params.use_lidar_clock = true;
-    params.ts_first_point = true;
-    params.dense_points = false;
-    params.wait_for_difop = true;
-    decoder_ = std::make_unique<Decoder>(params);
+    decoder_ = std::make_unique<Decoder>(uav_e1r::decoder_params());
     decoder_->point_cloud_ = std::make_shared<Cloud>();
     decoder_->regCallback(
       [this](const robosense::lidar::Error &e) { ++decoder_errors_; last_reason_ = e.toString(); },

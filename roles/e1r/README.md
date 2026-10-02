@@ -15,6 +15,16 @@ Outputs:
   uint8 intensity, uint16 ring, float64 `timestamp` in **UTC seconds**. The cloud
   header is first-point UTC. Invalid ranges remain NaN. Per-point timing is
   preserved, with the same PTP-to-UTC offset removed from every point.
+
+  No returns: the decoder's own distance window is [0, 200] m inclusive, so a
+  channel with no return (distance 0) passed it and decoded to (0, 0, 0) with
+  its intensity, 6.9 % of the points on the bench, contradicting the NaN above.
+  Since 2026-10-02 the adapter passes a user window of [5 mm, 200 m]
+  (`include/uav_e1r/decoder_params.hpp`, one distance step above zero; a user
+  window replaces both bounds), so they are NaN points that keep their firing
+  time, and the decoder test covers it. Measured on the bench: 27,648 points
+  per frame in 432 firing slots of 64 points, 216 µs apart (95.7 ms per frame),
+  frames starting on the UTC 100 ms grid; `ring` is always 0.
 * `/e1r/difop_raw`: best-effort UInt8MultiArray retaining the complete 256-byte
   device status packet, including its original raw PTP timestamp and IMU bytes.
 * `/diagnostics`: `e1r/driver`, hardware ID `E1R@192.168.144.95`, every second.
