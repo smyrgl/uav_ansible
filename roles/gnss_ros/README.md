@@ -16,10 +16,14 @@ command; the fan-out is read-only anyway. Topics under `/gnss`:
 
 Frames follow the URDF: `gnss_main_link` (ARP of the main antenna),
 `gnss_aux_link`, `base_link`, `odom`. Stamps are the receiver's own time
-(`gnss_ros_use_gnss_time: true`): the 100 Hz PVT then carries an exact 10 ms
-cadence instead of host-receipt jitter, and chrony disciplines the host from
-the same receiver's PPS, so the two time bases agree. The moving-baseline heading is the
-direction of the (lateral) aux–main baseline as the receiver reports it; the
-attitude offset is a receiver setting, not applied by the driver here.
+(`gnss_ros_use_gnss_time: true`): the 50 Hz PVT (the receiver's limit with
+attitude on) then carries an exact 20 ms cadence instead of host-receipt
+jitter, and chrony disciplines the host from the same receiver's PPS, so the
+two time bases agree. The heading is the receiver's multi-antenna attitude:
+the direction of the lateral Main-Aux1 baseline with the receiver's attitude
+offset (90°) already applied, so it is the vehicle's heading. With
+`use_ros_axis_orientation: true` the driver publishes it in REP-103 terms:
+`/gnss/atteuler` carries ENU yaw, counter-clockwise from east, so yaw = 90° -
+heading (a 99.4° heading reads 350.6°), and pitch changes sign.
 
 `robot_localization` consumes `navsatfix`; `gpsfix` is for dashboards.

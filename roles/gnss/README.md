@@ -24,10 +24,17 @@ The Jetson fan-out, ROS driver, chrony time feed and health node read USB2:
 
 ```text
 setDataInOut, USB2, RTCMv3, SBF
-setSBFOutput, Stream5, USB2, AttEuler+PVTGeodetic+PosCovGeodetic+VelCovGeodetic+AttCovEuler, msec10
+setSBFOutput, Stream5, USB2, AttEuler+PVTGeodetic+PosCovGeodetic+VelCovGeodetic+AttCovEuler, msec20
 setSBFOutput, Stream6, USB2, AuxAntPositions+GALAuthStatus+BaseVectorGeod+DOP+ReceiverTime+ReceiverStatus+ReceiverSetup+QualityInd+RFStatus, sec1
 setSBFOutput, Stream7, USB2, MeasEpoch+ChannelStatus, sec1
 ```
+
+Stream5 runs at 50 Hz because that is the P6's maximum with attitude on
+(datasheet: position 100 Hz, but "RTK + attitude" and "Standalone, DGNSS +
+attitude" 50 Hz). Until 2026-10-02 it ran at 10 ms: the attitude engine then
+included no satellites at all (AttEuler NrSV Do-Not-Use, "not enough
+measurements" for the Main-Aux1 baseline) and the error log carried "Bad Sbf
+order" entries, an attitude block dispatched ahead of its PVT block.
 
 USB2 input is RTCMv3 so that stray bytes on the data port can never run as
 commands. Without these streams the fan-out logs "no data from /dev/gnss",
@@ -71,6 +78,28 @@ setFrontendMode, DualAnt
 
 The attitude offset, PVT mode, receiver dynamics and the constellation and
 signal selections are owner settings and are deliberately not listed here.
+Two of them silently disable the heading, found by bisection from the factory
+defaults on 2026-10-02 (backyard, 0.673 m lateral baseline):
+
+| Setting | Effect on multi-antenna attitude |
+| --- | --- |
+| `PPP` in the rover modes of `setPVTMode` | the attitude engine drops to about 8 satellites (18 without), and its float solution never converged: pitch 60-72° on a level baseline, heading wandering by tens of degrees |
+| `setReceiverDynamics, High, ...` | Septentrio: "high-frequency motion becomes visible at the expense of an increase in the noise"; recommended level Moderate. Each dynamics change also restarts the attitude filter |
+| no GLONASS | 3-4 fewer satellites in the attitude solution (owner's choice) |
+| the extra signals (GPS L1C, Galileo AltBOC, BeiDou B2I/B2b, SBAS L5) | no measurable cost |
+
+Since then the Boot file has the rover modes without PPP and the dynamics at
+`Moderate, UAV`, and the attitude fixes: AttEuler mode 2 on 13 satellites,
+heading 99.4° (owner-confirmed), 1-sigma 0.62° (AttCovEuler), pitch within ±1°,
+and the AuxAntPositions baseline 0.667 m against the URDF's 0.673 m.
+`setGNSSAttitude` stays at its default `MultiAntenna, Fixed`, so only fixed
+headings leave the receiver: float solutions here swung by tens of degrees.
+
+Under trees or near the house the Aux1 antenna loses enough measurements for
+"not enough measurements" even when its satellites are tracked: the helical
+antennas have no ground plane and see reflections from below. A fix comes
+fastest under open sky, and the attitude needs the whole sky more than the
+position does.
 
 ## Changing the receiver from the Jetson
 
@@ -86,7 +115,9 @@ session, one client at a time, and stop the fan-out and drone-link first.
 
 ## Checks
 
-The fan-out should carry about 30 kB/s, with the Stream5 blocks at 100 Hz.
+The fan-out should carry about 30 kB/s, with the Stream5 blocks at 50 Hz.
+Attitude: AttEuler Mode 2 (fixed ambiguities), Error 0, and in AuxAntPositions
+(Stream6) an Aux1 baseline near 0.67 m with ambiguity type 0 (fixed).
 MeasEpoch should list measurements from both antennas: antenna ID is bits 5-7
 of each sub-block's Type byte. ReceiverStatus should list AGC entries for the
 Aux1 front ends as well as the Main ones.
