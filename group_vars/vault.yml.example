@@ -6,3 +6,8 @@
 # --- Wi-Fi uplink ---
 vault_wifi_ssid: "your-wifi-ssid"
 vault_wifi_password: "your-wifi-password"
+# --- Egress through the Siyi GCS (gcs_gateway): SOCKS5 password, 16+ characters ---
+# e.g. python3 -c "import secrets; print(secrets.token_urlsafe(18))"
+vault_gcs_gateway_password: "change-me-to-a-long-random-string"
+# --- Tailscale (optional): a pre-approved auth key joins without the browser login ---
+# vault_tailscale_authkey: "tskey-auth-..."

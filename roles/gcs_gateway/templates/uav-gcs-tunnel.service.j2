@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Egress through the Siyi GCS ({{ gcs_gateway_interface }} -> SOCKS5 on {{ gcs_gateway_gcs_address }}:{{ gcs_gateway_socks_port }})
+After=network-online.target systemd-resolved.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/hev-socks5-tunnel /etc/uav/gcs-tunnel.yml
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

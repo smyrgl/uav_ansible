@@ -1,0 +1,19 @@
+# {{ ansible_managed }}
+[Unit]
+Description=Keep the SOCKS5 server on the Siyi GCS running (adb to {{ gcs_gateway_gcs_address }}:{{ gcs_gateway_adb_port }})
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/lib/uav/uav-gcs-gateway.sh
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths={{ gcs_gateway_state_dir }}
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

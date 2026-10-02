@@ -1,0 +1,131 @@
+---
+- name: Install and join Tailscale
+  when: tailscale_state == 'present'
+  block:
+    - name: Install repository tooling
+      ansible.builtin.apt:
+        name: [ca-certificates, curl, gnupg]
+        state: present
+
+    - name: Create a scratch directory for the repository key
+      ansible.builtin.tempfile:
+        state: directory
+        suffix: tailscale
+      register: tailscale_scratch
+      changed_when: false
+
+    - name: Download the repository key
+      ansible.builtin.get_url:
+        url: "{{ tailscale_key_url }}"
+        dest: "{{ tailscale_scratch.path }}/repo.gpg"
+        mode: "0644"
+      changed_when: false
+
+    - name: Read the fingerprint carried by the downloaded key
+      ansible.builtin.command:
+        argv: [gpg, --batch, --no-default-keyring, --show-keys, --with-colons, "{{ tailscale_scratch.path }}/repo.gpg"]
+      environment:
+        GNUPGHOME: "{{ tailscale_scratch.path }}"
+      register: tailscale_key_listing
+      changed_when: false
+
+    - name: Refuse a key that does not carry the pinned fingerprint
+      ansible.builtin.assert:
+        that: >-
+          tailscale_key_fingerprint in (tailscale_key_listing.stdout_lines | select('match', '^fpr:')
+          | map('regex_replace', '^fpr:+([0-9A-F]+):*$', '\\1') | list)
+        fail_msg: >-
+          {{ tailscale_key_url }} does not carry {{ tailscale_key_fingerprint }}.
+          Verify Tailscale's key out of band before updating the pin.
+        quiet: true
+
+    - name: Trust the verified key
+      ansible.builtin.copy:
+        src: "{{ tailscale_scratch.path }}/repo.gpg"
+        dest: "{{ tailscale_keyring }}"
+        remote_src: true
+        owner: root
+        group: root
+        mode: "0644"
+
+    - name: Remove the scratch directory
+      ansible.builtin.file:
+        path: "{{ tailscale_scratch.path }}"
+        state: absent
+      changed_when: false
+
+    - name: Add the Tailscale repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/tailscale.list
+        content: "deb [signed-by={{ tailscale_keyring }}] {{ tailscale_repo_url }} {{ ansible_facts.distribution_release }} main\n"
+        owner: root
+        group: root
+        mode: "0644"
+      register: tailscale_repo
+
+    - name: Install Tailscale
+      ansible.builtin.apt:
+        name: tailscale
+        state: present
+        update_cache: "{{ tailscale_repo is changed }}"
+
+    - name: Run tailscaled at boot
+      ansible.builtin.systemd_service:
+        name: tailscaled.service
+        enabled: true
+        state: started
+
+    - name: Read the node's state
+      ansible.builtin.command:
+        argv: [tailscale, status, --json]
+      register: tailscale_status
+      changed_when: false
+      failed_when: false
+
+    - name: Note the backend state
+      ansible.builtin.set_fact:
+        tailscale_backend: "{{ (tailscale_status.stdout | from_json).BackendState | default('Unknown') if tailscale_status.stdout is match('^\\s*\\{') else 'Unknown' }}"
+
+    - name: Join the tailnet with the auth key
+      ansible.builtin.command:
+        argv: "{{ ['tailscale', 'up', '--authkey=' ~ tailscale_authkey, '--hostname=' ~ tailscale_hostname] + tailscale_flags }}"
+      no_log: true
+      when: tailscale_backend == 'NeedsLogin' and tailscale_authkey | length > 0
+
+    - name: Say how to log in once
+      ansible.builtin.debug:
+        msg: >-
+          Tailscale is not logged in. On the Jetson run
+          `sudo tailscale up --hostname={{ tailscale_hostname }} {{ tailscale_flags | join(' ') }}`
+          and open the link it prints, or set vault_tailscale_authkey.
+      when: tailscale_backend == 'NeedsLogin' and tailscale_authkey | length == 0
+
+    # Only preferences: no re-login, and `set` leaves unchanged values alone.
+    - name: Keep the node's settings
+      ansible.builtin.command:
+        argv: "{{ ['tailscale', 'set', '--hostname=' ~ tailscale_hostname] + tailscale_flags }}"
+      when: tailscale_backend == 'Running'
+      changed_when: false
+
+- name: Remove Tailscale
+  when: tailscale_state == 'absent'
+  block:
+    - name: Stop and disable tailscaled
+      ansible.builtin.systemd_service:
+        name: tailscaled.service
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Remove the package
+      ansible.builtin.apt:
+        name: tailscale
+        state: absent
+
+    - name: Remove the repository and its key
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/apt/sources.list.d/tailscale.list
+        - "{{ tailscale_keyring }}"

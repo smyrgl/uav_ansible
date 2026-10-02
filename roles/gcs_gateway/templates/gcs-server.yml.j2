@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+# hev-socks5-server on the Siyi GCS, pushed there by uav-gcs-gateway. Android's
+# shell user, no root. It listens on the datalink address only, so devices on
+# whatever Wi-Fi the GCS joins cannot use it to reach the drone LAN; UDP from
+# the Jetson arrives inside the TCP session ("udp: tcp" on the tunnel side).
+main:
+  workers: 2
+  port: {{ gcs_gateway_socks_port }}
+  listen-address: '{{ gcs_gateway_gcs_address }}'
+  listen-ipv6-only: false
+auth:
+  username: '{{ gcs_gateway_username }}'
+  password: '{{ gcs_gateway_password }}'
+misc:
+  log-file: {{ gcs_gateway_gcs_dir }}/server.log
+  log-level: warn
+  # A pid file makes it daemonise, so it outlives the adb shell that starts it.
+  pid-file: {{ gcs_gateway_gcs_dir }}/server.pid

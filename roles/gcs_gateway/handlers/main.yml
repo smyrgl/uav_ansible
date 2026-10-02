@@ -1,0 +1,14 @@
+---
+- name: Restart gcs tunnel
+  ansible.builtin.systemd_service:
+    name: uav-gcs-tunnel.service
+    state: restarted
+    daemon_reload: true
+
+# The supervisor re-installs and restarts the GCS-side server whenever it
+# starts, so this also carries a new server binary or configuration to the GCS.
+- name: Restart gcs gateway
+  ansible.builtin.systemd_service:
+    name: uav-gcs-gateway.service
+    state: restarted
+    daemon_reload: true

@@ -1,0 +1,20 @@
+---
+# Tailscale: the operator reaches the Jetson from the tailnet over whatever
+# egress it has (since 2026-10-02: the Siyi GCS, gcs_gateway role). The apt
+# repository key is checked against a pinned fingerprint before it is trusted.
+tailscale_state: present                     # present | absent
+tailscale_repo_url: https://pkgs.tailscale.com/stable/ubuntu
+tailscale_key_url: "{{ tailscale_repo_url }}/{{ ansible_facts.distribution_release }}.noarmor.gpg"
+# Tailscale Inc. (Package repository signing key) <info@tailscale.com>, rsa4096, 2020-02-25
+tailscale_key_fingerprint: 2596A99EAAB33821893C0A79458CA832957F5868
+tailscale_keyring: /usr/share/keyrings/tailscale-archive-keyring.gpg
+tailscale_hostname: "{{ system_hostname }}"
+# The Jetson keeps its own DNS (resolved, gcs_gateway) and routes; the operator
+# account may run tailscale without sudo.
+tailscale_flags:
+  - --accept-dns=false
+  - --accept-routes=false
+  - "--operator={{ target_user }}"
+# Optional: a pre-approved (ideally tagged) auth key joins a new node without
+# the browser login; empty = log in by hand once (README).
+tailscale_authkey: "{{ vault_tailscale_authkey | default('') }}"

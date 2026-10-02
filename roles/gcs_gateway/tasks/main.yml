@@ -1,0 +1,162 @@
+---
+# Egress through the Siyi GCS (see defaults). Binaries come from the
+# controller, so a Jetson without egress can install the gateway; only adb
+# needs apt (installed on any converge that ran with egress).
+- name: Run the GCS gateway
+  when: gcs_gateway_state == 'present'
+  block:
+    - name: Require the gateway password (group_vars/vault.yml)
+      ansible.builtin.assert:
+        that: gcs_gateway_password | length >= 16
+        fail_msg: Set vault_gcs_gateway_password (16+ characters) in group_vars/vault.yml; see vault.yml.example.
+        quiet: true
+
+    - name: Create the binary cache on the controller
+      ansible.builtin.file:
+        path: "{{ gcs_gateway_cache_dir }}"
+        state: directory
+        mode: "0755"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Fetch the pinned gateway binaries on the controller
+      ansible.builtin.get_url:
+        url: "{{ item.url }}"
+        dest: "{{ gcs_gateway_cache_dir }}/{{ item.name }}-{{ item.version }}"
+        checksum: "sha256:{{ item.sha256 }}"
+        mode: "0644"
+      loop:
+        - name: hev-socks5-server
+          url: "{{ gcs_gateway_server_url }}"
+          version: "{{ gcs_gateway_server_version }}"
+          sha256: "{{ gcs_gateway_server_sha256 }}"
+        - name: hev-socks5-tunnel
+          url: "{{ gcs_gateway_tunnel_url }}"
+          version: "{{ gcs_gateway_tunnel_version }}"
+          sha256: "{{ gcs_gateway_tunnel_sha256 }}"
+      loop_control:
+        label: "{{ item.name }} {{ item.version }}"
+      delegate_to: localhost
+      become: false
+      run_once: true
+
+    - name: Install adb (the supervisor reaches the GCS's network ADB)
+      ansible.builtin.apt:
+        name: adb
+        state: present
+
+    - name: Install the tunnel client
+      ansible.builtin.copy:
+        src: "{{ gcs_gateway_cache_dir }}/hev-socks5-tunnel-{{ gcs_gateway_tunnel_version }}"
+        dest: /usr/local/bin/hev-socks5-tunnel
+        owner: root
+        group: root
+        mode: "0755"
+      notify: Restart gcs tunnel
+
+    - name: Create the directories for the GCS payload and the supervisor's key
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: directory
+        owner: root
+        group: root
+        mode: "{{ item.mode }}"
+      loop:
+        - { path: /usr/local/lib/uav/gcs, mode: "0755" }
+        - { path: "{{ gcs_gateway_state_dir }}", mode: "0700" }
+        - { path: /etc/uav, mode: "0755" }
+
+    - name: Stage the server binary that the supervisor pushes to the GCS
+      ansible.builtin.copy:
+        src: "{{ gcs_gateway_cache_dir }}/hev-socks5-server-{{ gcs_gateway_server_version }}"
+        dest: /usr/local/lib/uav/gcs/hev-socks5-server
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart gcs gateway
+
+    - name: Configure the server (pushed to the GCS)
+      ansible.builtin.template:
+        src: gcs-server.yml.j2
+        dest: /etc/uav/gcs-server.yml
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Restart gcs gateway
+
+    - name: Configure the tunnel
+      ansible.builtin.template:
+        src: gcs-tunnel.yml.j2
+        dest: /etc/uav/gcs-tunnel.yml
+        owner: root
+        group: root
+        mode: "0600"
+      notify: Restart gcs tunnel
+
+    - name: Install the tunnel's route and DNS hooks
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "/usr/local/lib/uav/{{ item }}"
+        owner: root
+        group: root
+        mode: "0755"
+      loop: [uav-gcs-tunnel-up.sh, uav-gcs-tunnel-down.sh]
+      notify: Restart gcs tunnel
+
+    - name: Install the supervisor
+      ansible.builtin.template:
+        src: uav-gcs-gateway.sh.j2
+        dest: /usr/local/lib/uav/uav-gcs-gateway.sh
+        owner: root
+        group: root
+        mode: "0755"
+      notify: Restart gcs gateway
+
+    - name: Install the tunnel and supervisor units
+      ansible.builtin.template:
+        src: "{{ item.unit }}.j2"
+        dest: "/etc/systemd/system/{{ item.unit }}"
+        mode: "0644"
+      loop:
+        - { unit: uav-gcs-tunnel.service, handler: Restart gcs tunnel }
+        - { unit: uav-gcs-gateway.service, handler: Restart gcs gateway }
+      loop_control:
+        label: "{{ item.unit }}"
+      notify: "{{ item.handler }}"
+
+    - name: Run the tunnel and the supervisor at boot
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+        daemon_reload: true
+      loop: [uav-gcs-tunnel.service, uav-gcs-gateway.service]
+
+- name: Remove the GCS gateway
+  when: gcs_gateway_state == 'absent'
+  block:
+    - name: Stop and disable the tunnel and the supervisor
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: false
+        state: stopped
+      loop: [uav-gcs-gateway.service, uav-gcs-tunnel.service]
+      failed_when: false
+
+    - name: Remove the gateway's units, binaries and configuration
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/uav-gcs-gateway.service
+        - /etc/systemd/system/uav-gcs-tunnel.service
+        - /usr/local/bin/hev-socks5-tunnel
+        - /usr/local/lib/uav/gcs
+        - /usr/local/lib/uav/uav-gcs-gateway.sh
+        - /usr/local/lib/uav/uav-gcs-tunnel-up.sh
+        - /usr/local/lib/uav/uav-gcs-tunnel-down.sh
+        - /etc/uav/gcs-server.yml
+        - /etc/uav/gcs-tunnel.yml
+      # The supervisor's ADB key (gcs_gateway_state_dir) stays: removing it
+      # would need a new authorisation on the GCS if the gateway comes back.

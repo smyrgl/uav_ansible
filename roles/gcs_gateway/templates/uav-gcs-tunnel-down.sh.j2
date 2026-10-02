@@ -1,0 +1,3 @@
+#!/bin/sh
+# {{ ansible_managed }}
+ip route del default dev {{ gcs_gateway_interface }} metric {{ gcs_gateway_route_metric }} 2>/dev/null || true

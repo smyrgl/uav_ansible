@@ -1,0 +1,21 @@
+# {{ ansible_managed }}
+# hev-socks5-tunnel: the TUN device {{ gcs_gateway_interface }}, whose TCP and UDP go
+# out through the SOCKS5 server on the Siyi GCS; UDP rides inside the TCP
+# session, so the GCS needs no UDP port and the datalink sees one connection.
+tunnel:
+  name: {{ gcs_gateway_interface }}
+  mtu: {{ gcs_gateway_mtu }}
+  multi-queue: false
+  ipv4: {{ gcs_gateway_tun_address }}
+  icmp: 'off'
+  post-up-script: /usr/local/lib/uav/uav-gcs-tunnel-up.sh
+  pre-down-script: /usr/local/lib/uav/uav-gcs-tunnel-down.sh
+socks5:
+  port: {{ gcs_gateway_socks_port }}
+  address: {{ gcs_gateway_gcs_address }}
+  udp: 'tcp'
+  username: '{{ gcs_gateway_username }}'
+  password: '{{ gcs_gateway_password }}'
+misc:
+  log-file: stderr
+  log-level: warn

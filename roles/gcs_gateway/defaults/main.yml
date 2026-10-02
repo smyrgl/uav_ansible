@@ -1,0 +1,43 @@
+---
+# Egress for the Jetson through the Siyi GCS (UniRC 7 Pro). The GCS's Android
+# is a production build (no root) that will not tether the datalink, and its
+# policy routing has no rule for traffic arriving from it, so it cannot route
+# or NAT for the drone. The router is therefore in user space:
+#   GCS:    hev-socks5-server as Android's shell user, listening on the GCS's
+#           datalink address only, password-protected
+#   Jetson: hev-socks5-tunnel, a TUN device carrying TCP and, inside the same
+#           TCP session, UDP; the default route and DNS point at it
+# The GCS side lives in /data/local/tmp and dies with every GCS reboot; the
+# Jetson's supervisor (uav-gcs-gateway) re-installs and restarts it over ADB.
+gcs_gateway_state: present                   # present | absent
+gcs_gateway_gcs_address: 192.168.144.20      # SIYI's address for the GCS's Android on the datalink
+gcs_gateway_adb_port: 5555                   # network ADB, on at boot on the UniRC 7 Pro
+gcs_gateway_socks_port: 1080
+gcs_gateway_username: uav
+gcs_gateway_password: "{{ vault_gcs_gateway_password | default('') }}"
+gcs_gateway_gcs_dir: /data/local/tmp/uav-gw
+# The supervisor's ADB key lives here; the GCS must authorise it once, by hand
+# (README). Its own adb server port keeps it apart from interactive adb use.
+gcs_gateway_state_dir: /var/lib/uav-gcs-gateway
+gcs_gateway_adb_server_port: 5038
+gcs_gateway_check_interval_s: 30
+
+# Jetson side
+gcs_gateway_interface: gcs0
+gcs_gateway_tun_address: 198.18.0.1          # RFC 2544 benchmarking range: never a real network
+gcs_gateway_mtu: 1500
+gcs_gateway_route_metric: 100
+# Public resolvers: they also resolve the RTK base (rtk2.puglab.io), and they
+# work wherever the GCS has internet, unlike the home router.
+gcs_gateway_dns: [1.1.1.1, 8.8.8.8]
+
+# Pinned static aarch64 builds (heiher, MIT). Fetched on the controller (a
+# Jetson without egress cannot fetch them) and checked against GitHub's
+# published digests.
+gcs_gateway_server_version: 2.13.1
+gcs_gateway_server_sha256: 53fb8db2835075f9b0744fe5fa46e308b8fc9d214158e509f4482783799f9b02
+gcs_gateway_server_url: "https://github.com/heiher/hev-socks5-server/releases/download/{{ gcs_gateway_server_version }}/hev-socks5-server-linux-arm64"
+gcs_gateway_tunnel_version: 2.18.0
+gcs_gateway_tunnel_sha256: e44a6965cd718d98829f344e9f300a5664d12020557127b7469bee7c8f3098b0
+gcs_gateway_tunnel_url: "https://github.com/heiher/hev-socks5-tunnel/releases/download/{{ gcs_gateway_tunnel_version }}/hev-socks5-tunnel-linux-arm64"
+gcs_gateway_cache_dir: "{{ lookup('env', 'HOME') }}/.cache/uav_ansible/gcs_gateway"   # on the controller

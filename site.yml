@@ -23,6 +23,11 @@
       tags: ['dev_tools']
     - role: networking
       tags: ['networking']
+    # Egress before anything that needs apt: no Wi-Fi since 2026-10-02.
+    - role: gcs_gateway          # SOCKS5 on the Siyi GCS's Android + a TUN here: the Jetson's internet
+      tags: ['gcs_gateway']
+    - role: tailscale            # operator access from the tailnet over that egress
+      tags: ['tailscale']
     - role: jtop
       tags: ['jtop']
 
