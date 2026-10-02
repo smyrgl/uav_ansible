@@ -4,8 +4,9 @@ The `lio` role builds and runs [FAST-LIO2](https://github.com/hku-mars/FAST_LIO)
 (HKU MARS) on the Livox Avia and the Avia's own IMU, plus a bridge that turns
 its output into `base_link` odometry. Output: `/lio/odometry`
 (`nav_msgs/Odometry`, `camera_init` → `base_link`, twist in `base_link`), FAST-LIO's
-own `/Odometry` and `/cloud_registered`, and the `lio` diagnostic. Nothing fuses
-it yet; it is the primary candidate for the Jetson's EKFs and for PX4 velocity
+own `/Odometry` and `/cloud_registered`, the E1R registered into the same frame
+(`/lio/registered/e1r`), a voxel map of both (`/lio/map`), and the `lio`
+diagnostics. Nothing fuses it yet; it is the primary candidate for the Jetson's EKFs and for PX4 velocity
 once validated in flight against RTK.
 
 ## Why FAST-LIO, and on the Avia
@@ -113,8 +114,71 @@ of index) and the `lio/map` diagnostic says so.
   `camera_init` coordinates; `/lio/map/reset` clears both maps. A gap of more
   than 10 s in the scans (FAST-LIO restarted, new origin) clears them too.
 - The flight recorder excludes the derived clouds (`/cloud_registered`,
-  `/lio/map`, ...); bags keep `/avia/custom` and `/avia/imu`, from which FAST-LIO
-  re-creates them.
+  `/lio/map`, `/lio/registered/e1r`, ...); bags keep `/avia/custom`, `/avia/imu`
+  and `/e1r/points`, from which they are re-created.
+- The map takes every registered cloud in FAST-LIO's frame (`--scan-topics`);
+  the `lio/map` diagnostic counts the fine voxels each one filled first
+  (`points_from <topic>`). The 20 cm overview is fed only the fine map's new
+  points: a coarse voxel seen for the first time always holds a fine voxel seen
+  for the first time (they nest), so it ends up with the same voxels for a
+  fraction of the work (back to every scan once the fine map is full).
+
+## The E1R in the same map (`/lio/registered/e1r`)
+
+The E1R looks straight down and never shares a field of view with the Avia, so
+it cannot be matched against the Avia's scans; its points are placed with
+FAST-LIO's trajectory and the E1R's mount instead. `uav-lio-e1r.service`
+(`/usr/local/lib/uav/lio_register.py`):
+
+- reads `/e1r/points`, whose every point carries its UTC firing time on the
+  same PTP master as the Avia. Measured: frames start on the UTC 100 ms grid
+  (x.000220 s), 27,648 points in 432 firing slots of 64 points, 216 µs apart,
+  95.7 ms from first to last;
+- interpolates the Avia IMU's pose at each firing time between FAST-LIO's
+  10 Hz `/Odometry` poses (linear in position, slerp in attitude) and composes
+  it with the mount, once per slot: base_link → `e1r_nominal_lidar_frame` from
+  `/tf_static` (the URDF: (−0.084, 0, −0.079) m, pitched +90° so the boresight
+  points down and the sensor's "up" points forward), less the IMU lever arm
+  (`lio_imu_lever_arm`). Only the static tree is read: following `/tf` (~70 Hz
+  of small messages) cost about 9 % of a core in Python;
+- waits for the first pose after a frame's last point (median 19 ms; FAST-LIO
+  publishes ~20 ms after its own scan ends), drops points between poses more
+  than `lio_e1r_max_pose_gap_s` (0.25 s) apart (FAST-LIO stalled or restarted
+  with a new origin; never extrapolated), and frames still waiting after
+  `lio_e1r_max_wait_s` (0.5 s);
+- drops points outside the range gate, `lio_e1r_min_range_m` (0.1 m): no
+  returns (NaN since the e1r driver fix of 2026-10-02; before it they were
+  points at the sensor's origin, which would have drawn the trajectory into the
+  map) and the near field;
+- publishes `/lio/registered/e1r` (`camera_init`, x y z intensity, stamped with
+  the frame's first point) and the `lio/e1r` diagnostic: output rate, pose
+  wait, latency, drop counters by cause, and the extrinsic in use.
+
+The interpolation is exact for constant linear and angular velocity (tested:
+4,000 points fired across 0.7 s at 16 m/s and 1.5 rad/s of yaw on a 10° roll,
+through the nominal mount and lever arm, land within 1 µm). What remains is curvature over the 100 ms between poses: an
+angular acceleration α leaves up to α Δt²/8 of attitude error mid-interval,
+0.6 mrad (6 mm at 10 m) at 0.5 rad/s², 6 mrad at an aggressive 5 rad/s².
+Propagating the Avia IMU between poses would remove most of it; mapping flight
+does not need it yet. A clock offset δ between the two LiDARs would add
+v δ + ω × r δ, which is why both must stay on the PTP master.
+
+Bench check (2026-10-02, vehicle standing on a bench): 10.0 Hz out, 44 ms from
+a frame's last point to publication, 32 of 13.9 M points unbracketed (start-up
+only), 8.3 % range-gated (6.9 % no returns, 1.4 % within 0.1 m). The E1R sees
+the bench top 0.260 m below base_link, flat to 14.5 mm rms over 0.9 × 0.5 m;
+the Avia, blind to 1.5 m, sees only the room floor 0.88 m below, so on the
+bench the two sensors share no surface. The extrinsic check (and the input for
+calibration) needs one: the vehicle standing on the floor (the E1R sees it
+directly below, the Avia from 1.5 m out), or carried around so that the E1R
+passes over floor the Avia has mapped. A height step or a tilt between the two
+floors in the map is the E1R's extrinsic error relative to the Avia's (both
+mounts are nominal).
+
+Foxglove: the bench layout has `/lio/registered/e1r` hidden, flat magenta.
+Drawn over the raw `/e1r/points` it differs by the drift between the EKF and
+FAST-LIO (the raw cloud hangs off the EKF's `base_link`), not by the extrinsic;
+compare it with the map instead.
 
 ## Measured on the bench (2026-10-02, indoors, vehicle still)
 
@@ -124,10 +188,10 @@ of index) and the `lio/map` diagnostic says so.
 | `/lio/odometry` | 10.0 Hz, 119 ms after the stamped (middle) pose |
 | Drift | 2.8 cm (2.5 cm of it in z) and 0.05° in 60 s |
 | Velocity noise | ±1.5 / 2.0 / 3.4 cm/s (x / y / z) |
-| Load | FAST-LIO ~10 % of one core, 156 MB; the Avia driver ~13 % with the CustomMsg |
+| Load | FAST-LIO ~10 % of one core, 156 MB; the Avia driver ~13 % with the CustomMsg; bridge ~10 %; with the E1R: registration ~15 %, map ~11 % |
 
 Indoors at close range the Avia is noisier than the D555; outdoors at altitude
-the comparison should reverse. Next: fly both in shadow against RTK, then
-register the E1R into the same map with these poses, calibrate the E1R against
-that map (HKU MARS's mlcc targets this non-overlapping case), and only then
-consider feeding the E1R into the odometry.
+the comparison should reverse. Next: fly both in shadow against RTK, compare
+the E1R's floor with the Avia's (above), calibrate the E1R against the map
+(HKU MARS's mlcc targets this non-overlapping case), and only then consider
+feeding the E1R into the odometry.

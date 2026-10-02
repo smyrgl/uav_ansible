@@ -90,7 +90,7 @@
         - Log
         - PCD
 
-    - name: Install the lio bridge, the voxel map and their tests
+    - name: Install the lio bridge, the voxel map, the second-LiDAR registration and their tests
       ansible.builtin.copy:
         src: "{{ item }}"
         dest: "/usr/local/lib/uav/{{ item }}"
@@ -100,13 +100,16 @@
         - test_lio_bridge.py
         - lio_map.py
         - test_lio_map.py
+        - lio_register.py
+        - test_lio_register.py
       notify:
         - Restart lio bridge
         - Restart lio map
+        - Restart lio e1r
 
-    - name: Run the bridge and map tests on the target
+    - name: Run the bridge, map and registration tests on the target
       ansible.builtin.command:
-        argv: [/usr/bin/python3, -m, unittest, -q, test_lio_bridge, test_lio_map]
+        argv: [/usr/bin/python3, -m, unittest, -q, test_lio_bridge, test_lio_map, test_lio_register]
         chdir: /usr/local/lib/uav
       environment:
         PYTHONDONTWRITEBYTECODE: "1"
@@ -149,6 +152,20 @@
         state: started
         daemon_reload: true
 
+    - name: Install the E1R registration unit
+      ansible.builtin.template:
+        src: uav-lio-e1r.service.j2
+        dest: /etc/systemd/system/uav-lio-e1r.service
+        mode: "0644"
+      notify: Restart lio e1r
+
+    - name: Run the E1R registration at boot (or stop it when disabled)
+      ansible.builtin.systemd_service:
+        name: uav-lio-e1r.service
+        enabled: "{{ lio_e1r_enabled | bool }}"
+        state: "{{ 'started' if lio_e1r_enabled | bool else 'stopped' }}"
+        daemon_reload: true
+
     - name: Configure FAST-LIO
       ansible.builtin.template:
         src: fast_lio.yaml.j2
@@ -182,6 +199,7 @@
         - uav-lio.service
         - uav-lio-bridge.service
         - uav-lio-map.service
+        - uav-lio-e1r.service
       failed_when: false
 
     - name: Remove the FAST-LIO units, configuration and bridge
@@ -192,8 +210,11 @@
         - /etc/systemd/system/uav-lio.service
         - /etc/systemd/system/uav-lio-bridge.service
         - /etc/systemd/system/uav-lio-map.service
+        - /etc/systemd/system/uav-lio-e1r.service
         - "{{ lio_config_path }}"
         - /usr/local/lib/uav/lio_bridge.py
         - /usr/local/lib/uav/test_lio_bridge.py
         - /usr/local/lib/uav/lio_map.py
         - /usr/local/lib/uav/test_lio_map.py
+        - /usr/local/lib/uav/lio_register.py
+        - /usr/local/lib/uav/test_lio_register.py

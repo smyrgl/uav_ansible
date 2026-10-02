@@ -11,6 +11,13 @@
     state: restarted
     daemon_reload: true
 
+- name: Restart lio e1r
+  ansible.builtin.systemd_service:
+    name: uav-lio-e1r.service
+    state: restarted
+    daemon_reload: true
+  when: lio_e1r_enabled
+
 - name: Restart lio bridge
   ansible.builtin.systemd_service:
     name: uav-lio-bridge.service

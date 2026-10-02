@@ -76,6 +76,14 @@
           "pointSize": 2,
           "pointShape": "circle",
           "decayTime": 86400
+        },
+        "/lio/registered/e1r": {
+          "visible": false,
+          "colorMode": "flat",
+          "flatColor": "#ff3df2",
+          "pointSize": 3,
+          "pointShape": "circle",
+          "decayTime": 0
         }
       },
       "layers": {

@@ -248,7 +248,7 @@ discards anything written to it).
 | `gnss_ros` | Septentrio ROS 2 driver as a read-only client of the SBF fan-out: NavSatFix (full covariance), GPSFix, pose, twist, attitude |
 | `localization` | robot_localization REP-105 dual EKF (`ekf_odom`: odom→base_link, `ekf_map`: map→odom) + navsat_transform (utm→map, GNSS); PX4's own estimate stays in `px4_local`, informational |
 | `vslam` | Isaac ROS cuVSLAM on the D555 stereo IR → `/vslam/odometry` (UTC, base_link twist); shadow source, nothing fuses it yet |
-| `lio` | FAST-LIO2 on the Avia + its built-in IMU (GPL-2.0, fetched and built at a pinned commit) → `/lio/odometry`; shadow source, primary candidate |
+| `lio` | FAST-LIO2 on the Avia + its built-in IMU (GPL-2.0, fetched and built at a pinned commit) → `/lio/odometry`; shadow source, primary candidate; voxel map of the Avia and the E1R (registered with FAST-LIO's poses and the nominal extrinsic) |
 | `hflow` | H-Flow over the FC's CAN2 bus, read listen-only on the Jetson's can0 → PX4-typed ROS 2 topics + Range |
 | `mavlink_router` | MAVLink hub: PX4 (TELEM2 UART) ↔ QGC (TCP 5760) ↔ onboard apps (UDP 14540) |
 | `rt_tuning` | soft-RT: isolation, SCHED_FIFO, mlock, IRQ affinity, governor |

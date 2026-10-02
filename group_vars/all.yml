@@ -432,9 +432,10 @@ flight_recorder_dir: /data/flights
 flight_recorder_post_roll_sec: 30.0
 flight_recorder_min_free_gb: 50.0
 # Raw D555 streams (a second subscriber starves the camera link) and the
-# derived LiDAR clouds (~11 MB/s; FAST-LIO re-creates them from /avia/custom
-# and /avia/imu, which are recorded).
-flight_recorder_exclude_regex: "^/(realsense/|cloud_registered|cloud_registered_body|cloud_effected|Laser_map|lio/map)"
+# derived LiDAR clouds (~11 MB/s from FAST-LIO, ~4.4 MB/s of registered E1R;
+# re-created offline from /avia/custom, /avia/imu and /e1r/points, which are
+# recorded).
+flight_recorder_exclude_regex: "^/(realsense/|cloud_registered|cloud_registered_body|cloud_effected|Laser_map|lio/map|lio/registered)"
 
 # Jetson platform stats (isaac_ros_jetson_stats on jtop) -> /diagnostics
 jetson_stats_interval_sec: 1.0

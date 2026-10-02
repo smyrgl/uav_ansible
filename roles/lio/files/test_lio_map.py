@@ -29,6 +29,16 @@ class Map(unittest.TestCase):
         self.assertTrue(m.full)
         self.assertEqual(len(m.add(np.array([[9, 9, 9, 0]], np.float32))), 0)
 
+    def test_overview_from_new_fine_points_matches_the_whole_scans(self):
+        """The overview fed only the fine map's new points holds the same coarse voxels as one fed every scan."""
+        rng = np.random.default_rng(3)
+        fine, coarse, direct = VoxelMap(0.05, 10**6), VoxelMap(0.2, 10**6), VoxelMap(0.2, 10**6)
+        for _ in range(20):
+            scan = np.column_stack([rng.uniform(-3, 3, (2000, 3)), np.ones(2000)]).astype(np.float32)
+            coarse.add(fine.add(scan))
+            direct.add(scan)
+        self.assertEqual(coarse.keys, direct.keys)
+
     def test_pcd_is_header_plus_float32(self):
         pts = np.array([[1, 2, 3, 4], [5, 6, 7, 8]], np.float32)
         blob = pcd_bytes(pts)

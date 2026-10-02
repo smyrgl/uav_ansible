@@ -6,7 +6,9 @@ current scan to an unfiltered, ever-growing cloud and republishes all of it
 every second, and its downsampled ikd-tree map is compiled out (if(0)). This
 node keeps one point per voxel from every registered scan (/cloud_registered:
 undistorted, in FAST-LIO's camera_init frame, which the lio bridge anchors
-under odom), at two resolutions:
+under odom), and from any other cloud registered into that frame with
+FAST-LIO's poses (the E1R: /lio/registered/e1r, from lio_register), at two
+resolutions:
 
 - fine (5 cm): only the newly filled voxels go out, every second, on
   /lio/map/updates, so the bandwidth follows new surface, not map size; a
@@ -121,7 +123,9 @@ def create_map_node(options):
             latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
             self.pub = self.create_publisher(PointCloud2, options.map_topic, latched)
             self.updates_pub = self.create_publisher(PointCloud2, options.map_topic + "/updates", 10)
-            self.create_subscription(PointCloud2, options.scan_topic, self._scan, 20)
+            self.sources = dict.fromkeys(options.scan_topics, 0)      # fine voxels each input filled first
+            for topic in options.scan_topics:
+                self.create_subscription(PointCloud2, topic, lambda message, topic=topic: self._scan(message, topic), 20)
             self.create_service(Trigger, options.map_topic + "/save", self._save)
             self.create_service(Trigger, options.map_topic + "/reset", self._reset)
             self.create_service(Trigger, options.map_topic + "/resend", self._resend)
@@ -130,22 +134,29 @@ def create_map_node(options):
             self.create_timer(options.publish_period, self._publish)
             self.create_timer(options.update_period, self._publish_updates)
             self.create_timer(1.0, self._diagnose)
-            self.get_logger().info(f"lio map: {options.scan_topic} -> {options.map_topic}/updates ({options.voxel} m, new voxels "
+            self.get_logger().info(f"lio map: {', '.join(options.scan_topics)} -> {options.map_topic}/updates ({options.voxel} m, new voxels "
                                    f"every {options.update_period} s) and {options.map_topic} ({options.overview_voxel} m, "
                                    f"latched, every {options.publish_period} s)")
 
-        def _scan(self, message):
+        def _scan(self, message, topic):
             now = time.monotonic()
             if self.last_scan is not None and now - self.last_scan > options.reset_gap_s and self.map.size:
                 self.get_logger().warning(f"no scan for {now - self.last_scan:.0f} s: new map (FAST-LIO restarted?)")
                 self._clear()
+            if self.map.size and message.header.frame_id != self.frame:
+                self.get_logger().warning(f"{topic} is in {message.header.frame_id}, the map in {self.frame}: skipped",
+                                          throttle_duration_sec=10)
+                return
             self.last_scan, self.frame = now, message.header.frame_id
             try:
                 scan = xyzi(message)
                 new = self.map.add(scan)
                 if len(new):
                     self.pending.append(new)
-                if len(self.overview.add(scan)):
+                    self.sources[topic] += len(new)
+                # A coarse voxel seen for the first time holds a fine voxel seen for the first time (the
+                # voxels nest), so the overview needs only the fine map's new points, until that is full.
+                if len(self.overview.add(scan if self.map.full else new)):
                     self.dirty = True
             except (KeyError, ValueError) as exc:
                 self.get_logger().warning(f"scan skipped: {exc}", throttle_duration_sec=10)
@@ -154,6 +165,7 @@ def create_map_node(options):
             self.map.reset()
             self.overview.reset()
             self.pending, self.dirty = [], True
+            self.sources = dict.fromkeys(self.sources, 0)
 
         def _cloud(self, pts):
             PointCloud2_, PointField_ = self._types[:2]
@@ -220,7 +232,8 @@ def create_map_node(options):
                     else f"{self.map.size} points at {self.map.voxel} m, {self.overview.size} at {self.overview.voxel} m")
             values = {"points": self.map.size, "voxel_m": self.map.voxel, "max_points": self.map.max_points,
                       "overview_points": self.overview.size, "overview_voxel_m": self.overview.voxel,
-                      "frame": self.frame, "overview_publishes": self.published, "updates_published": self.updates_sent}
+                      "frame": self.frame, "overview_publishes": self.published, "updates_published": self.updates_sent,
+                      **{f"points_from {topic}": n for topic, n in self.sources.items()}}
             out = DiagnosticArray_()
             out.header.stamp = self.get_clock().now().to_msg()
             out.status = [DiagnosticStatus_(level=level, name="lio/map", hardware_id="FAST-LIO voxel map",
@@ -232,7 +245,8 @@ def create_map_node(options):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--scan-topic", default="/cloud_registered")
+    parser.add_argument("--scan-topics", nargs="+", default=["/cloud_registered"],
+                        help="registered clouds, all in FAST-LIO's frame")
     parser.add_argument("--map-topic", default="/lio/map")
     parser.add_argument("--voxel", type=float, default=0.05, help="fine map voxel (updates, save), m")
     parser.add_argument("--max-points", type=int, default=4_000_000, help="fine map cap")
