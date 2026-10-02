@@ -65,7 +65,7 @@ A bounded 12-second UDP capture received 30,048 Cartesian single-return packets 
 
 The persistent `uav-avia.service` now publishes `/avia/points` at 10 Hz using a small adapter around official SDK1 v2.3.1, pinned at `14c533dd7175bd90a6b568c0aa1733f35d36cb89`. It is enabled at boot, runs as `uav-ros`, and restarts on failure independently of missing E1R/GNSS hardware. `/diagnostics` carries `avia/driver` reception health and a separate `avia/clock` warning. No public Avia IMU topic is published yet.
 
-PointCloud2 headers use first-packet **host receipt time**, with exact raw sensor packet timestamps, their type, status, and per-point offsets preserved as additional point fields. Empty `(0,0,0)` returns are omitted. This is a bench visualization contract; `fusion_ready=false` remains explicit. Detailed field meanings, configuration, and rebuild instructions are in [the Avia role](../roles/avia/README.md).
+PointCloud2 headers carry the Avia's own sample time in UTC once the driver has validated it (PTP lock, or PPS plus the pushed UTC time, and a sane receipt latency), and host receipt time until then. Raw sensor packet timestamps, their type, status, and per-point offsets are preserved as additional point fields. Empty `(0,0,0)` returns are omitted. `fusion_ready=false` remains explicit while the extrinsics are nominal. Detailed field meanings, configuration, and rebuild instructions are in [the Avia role](../roles/avia/README.md).
 
 The description adds `avia_nominal_lidar_frame` under the existing mounting-hole datum `avia_link`, at `(0.0525, 0, 0.0324)` m, aligned X forward/Y left/Z up. This uses the CAD front plane and manual scan-origin height; measured extrinsic calibration is pending. Its XYZ/RPY can be overridden through the description role. The saved Foxglove layout enables `/avia/points` with a 0.5-second decay, and the current desktop 3D view was enabled and visually checked.
 
@@ -117,9 +117,10 @@ CPU 10–25 % per core. Check it again with:
 python3 /usr/local/lib/uav/verify_nvblox.py --wait 60 --save-ply /var/lib/uav-ros/nvblox/bench.ply
 ```
 
-Time bases remain the known limitation: the D555 stamps in device uptime and the
-Avia in host receipt time. That is harmless while every transform is static, and
-it is the first thing that breaks once `odom → base_link` moves.
+Time bases are UTC: the Avia stamps its own PTP-synchronized sample time (the
+time_sync role's ptpd master), the D555 adapter maps the camera's hardware clock
+to UTC from its IMU stream, and the PX4 bridge corrects FC stamps with the PPS.
+See the avia and foxglove role READMEs for how each is validated.
 
 ## Rebuilding and deploying
 

@@ -8,3 +8,20 @@ avia_lidar_ip: 192.168.144.80
 avia_frame_id: avia_nominal_lidar_frame
 avia_publish_rate_hz: 10.0
 avia_receipt_timeout_sec: 2.0
+# GPS-style time sync (Avia manual, "Timestamp"): PPS on the Sync pair plus the
+# UTC time of each pulse, sent over the SDK 10-500 ms after its rising edge.
+# The UTC comes from the host clock (chrony, locked to the same receiver PPS).
+avia_utc_sync: true
+avia_utc_sync_phase_sec: 0.1               # send time after each UTC second
+avia_utc_sync_max_clock_error_sec: 0.05    # kernel maxerror gate; also widens the send-window margins
+# sensor_utc: headers carry the Avia's UTC sample time once its status word shows
+# PPS + GPS sync and receipt - sample time is inside the bounds below; host
+# receipt time until then. host_receipt: always host receipt time.
+avia_header_stamp: sensor_utc
+avia_sensor_latency_min_sec: -0.001
+avia_sensor_latency_max_sec: 0.05
+# PTP time minus UTC for timestamp type 1. The time_sync role's ptpd master
+# announces the PTP timescale and sends TAI, so this is 37 (its
+# avia_ptp_utc_offset). A master serving UTC on an arbitrary timescale would
+# need 0, but the Avia does not lock to one.
+avia_ptp_utc_offset_sec: "{{ avia_ptp_utc_offset | default(37) }}"

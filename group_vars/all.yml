@@ -191,6 +191,16 @@ phc2sys_waitsync_max_correction: 1.0  # synchronised within this many seconds
 phc2sys_step_threshold: 1.0         # -S: step the PHC when the system clock
                                     # is later stepped by more than this
 
+# PTP master for the Livox Avia on the drone LAN (time_sync role): ptpd with
+# software time stamps on the r8168, UDPv4 E2E, master only, never adjusts the
+# system clock. It announces the PTP timescale, the only one the Avia locks to,
+# so it sends TAI: avia_ptp_utc_offset_sec (avia role) must equal the offset
+# here. Interim until the Avia's PPS input works; set false then.
+avia_ptp_enabled: true
+avia_ptp_interface: "{{ lan_interface }}"
+avia_ptp_domain: 0
+avia_ptp_utc_offset: 37
+
 # =============================================================================
 # gnss  (one reader on the receiver's data port; a read-only fan-out serves it)
 # The receiver speaks SBF only: the ROS driver needs it for full covariances,

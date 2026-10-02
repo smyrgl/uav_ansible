@@ -1,0 +1,35 @@
+; Managed by uav_ansible — PTP master for the Livox Avia on the drone LAN.
+;
+; The Avia is an IEEE 1588-2008 ordinary clock over UDP/IPv4 (Sync, Follow_Up,
+; Delay_Req, Delay_Resp: two-step, end to end), and it locks only to a master
+; that announces the PTP timescale. The r8168 here has no PHC, so the master
+; runs on the system clock with software time stamps. ptp4l cannot announce
+; the PTP timescale on the system clock (it announces an arbitrary one): the
+; Avia exchanged messages with it for 20 minutes and never locked. ptpd
+; announces PTP and sends TAI (UTC + utc_offset); the Avia locked within 20 s
+; (2026-10-01). The Avia's stamps are therefore TAI: the avia role converts
+; them with ptp_utc_offset_sec, which must match utc_offset here.
+;
+; The system clock belongs to chrony (GNSS PPS). This instance only serves it:
+; master only, and no_adjust so it can never steer the clock.
+ptpengine:interface={{ avia_ptp_interface }}
+ptpengine:preset=masteronly
+ptpengine:transport=ipv4
+ptpengine:ip_mode=multicast
+ptpengine:delay_mechanism=E2E
+ptpengine:domain={{ avia_ptp_domain }}
+ptpengine:ptp_timescale=PTP
+ptpengine:utc_offset={{ avia_ptp_utc_offset }}
+ptpengine:utc_offset_valid=Y
+; Honest quality: chrony locks the system clock to the GNSS PPS (class 6, GPS),
+; and software time stamps add tens of microseconds of jitter.
+ptpengine:ptp_timesource=GPS
+ptpengine:clock_class=6
+ptpengine:ptp_clock_accuracy=ACC_25US
+; 8 Hz Sync and Delay_Req: more samples for the Avia to average that jitter.
+ptpengine:log_sync_interval=-3
+ptpengine:log_delayreq_interval=-3
+clock:no_adjust=Y
+global:foreground=Y
+global:lock_file=/run/ptpd-avia.lock
+global:status_file=/run/ptpd-avia.status

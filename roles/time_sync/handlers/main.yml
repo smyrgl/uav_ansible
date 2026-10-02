@@ -21,3 +21,9 @@
   ansible.builtin.systemd:
     name: uav-phc2sys.service
     state: restarted
+
+- name: Restart Avia PTP master
+  ansible.builtin.systemd:
+    name: uav-ptpd-avia.service
+    state: restarted
+    daemon_reload: true

@@ -16,7 +16,7 @@ from px4_msgs import msg as px4_messages
 from .dds import TOPICS, topic_name, dds_health
 
 from .core import ImageMetadata, StreamMonitor, OK
-from .health import Sample, check, grouped, lidar_health, px4_health, hflow_health, jetson_health, jetson_identity
+from .health import Sample, check, d555_timing, grouped, lidar_health, px4_health, hflow_health, jetson_health, jetson_identity
 from .observers import Observers, gnss_health
 
 
@@ -130,7 +130,7 @@ class SensorHealth(Node):
                 self.jetson[status.name] = (time.monotonic(), level, status.message,
                                             {v.key: v.value for v in status.values}, status.hardware_id)
                 continue
-            if status.name not in ("avia/driver", "avia/clock", "e1r/driver", "hflow/driver"):
+            if status.name not in ("avia/driver", "avia/clock", "e1r/driver", "hflow/driver", "d555/clock"):
                 continue  # including our own summaries: no feedback loop
             self.drivers.setdefault(status.name, Sample()).observe(time.monotonic(), {
                 **{v.key: v.value for v in status.values}, "level": level,
@@ -145,18 +145,21 @@ class SensorHealth(Node):
 
     def _d555(self, now, wall):
         sections, live = {}, []
+        model = self.drivers.get("d555/clock", Sample())
         for name, monitor in self.monitors.items():
             stream, clock = monitor.assess(now, wall)
             stream.values["topic"] = self.topics[name]
             sections[name.title()] = stream
-            sections[name.title() + " timing"] = clock
+            sections[name.title() + " timing"] = d555_timing(clock, model, now)
             live.append(monitor.last_received is not None and now - monitor.last_received <= monitor.timeout_sec)
         seen = any(m.total for m in self.monitors.values())
         connection = True if any(live) else False if seen else None
-        message = "RGB + depth live; timing unverified" if all(live) else "Connected; one stream missing" if any(live) else (
+        timing = ("UTC via the D555 clock model" if all(sections[k + " timing"].level == OK for k in ("Color", "Depth"))
+                  else "timing unverified")
+        message = f"RGB + depth live; {timing}" if all(live) else "Connected; one stream missing" if any(live) else (
             "D555 data connection lost" if seen else "Unknown; no D555 frames observed")
         if any(live) and any(sections[k].level != OK for k in ("Color", "Depth")):
-            message = "Frames arriving; stream degraded; timing unverified"
+            message = f"Frames arriving; stream degraded; {timing}"
         return grouped(connection, message, sections)
 
     def _publish(self):

@@ -20,11 +20,16 @@
     - /usr/local/libexec
     - /usr/local/lib/uav
 
-- name: Install D555 CameraInfo frame-name adapter
+- name: Install the D555 adapter and its clock model
+  # Frame names, UTC stamps for every /d555 topic (clock model fitted from
+  # the camera's IMU), the dashboard depth relay and /d555/clock.
   ansible.builtin.copy:
-    src: d555_frame_adapter.py
-    dest: /usr/local/lib/uav/d555_frame_adapter.py
+    src: "{{ item }}"
+    dest: "/usr/local/lib/uav/{{ item }}"
     mode: "0755"
+  loop:
+    - d555_frame_adapter.py
+    - d555_clock.py
   notify: Restart D555 frame adapter
 
 - name: Install persistent D555 CameraInfo adapter service
@@ -41,19 +46,17 @@
     state: started
     daemon_reload: true
 
-- name: Install the dashboard depth relay ({{ foxglove_depth_throttle_hz }} Hz)
-  ansible.builtin.template:
-    src: uav-d555-depth-throttle.service.j2
-    dest: /etc/systemd/system/uav-d555-depth-throttle.service
-    mode: "0644"
-  notify: Restart depth relay
-
-- name: Enable the dashboard depth relay at boot
+- name: Retire the topic_tools depth relay (the D555 adapter publishes /d555/depth/throttled)
   ansible.builtin.systemd_service:
     name: uav-d555-depth-throttle.service
-    enabled: true
-    state: started
-    daemon_reload: true
+    enabled: false
+    state: stopped
+  failed_when: false
+
+- name: Remove the topic_tools depth relay unit
+  ansible.builtin.file:
+    path: /etc/systemd/system/uav-d555-depth-throttle.service
+    state: absent
 
 - name: Configure Foxglove (bind address, whitelists, capabilities)
   ansible.builtin.template:

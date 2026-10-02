@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <package format="3">
   <name>uav_avia</name><version>0.1.0</version>
-  <description>Original Avia SDK1 adapter for bench PointCloud2 with explicit host receipt timing.</description>
+  <description>Original Avia SDK1 adapter: PointCloud2 with per-pulse UTC push and validated sensor-UTC headers.</description>
   <maintainer email="maintainer@example.com">Local UAV package maintainer</maintainer>
   <license>Apache-2.0</license>
   <buildtool_depend>ament_cmake</buildtool_depend>

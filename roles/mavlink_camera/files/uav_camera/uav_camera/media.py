@@ -206,13 +206,18 @@ class MediaManager:
             self._error(f"photo save failed: {exc}")
             return {"path": str(path), "index": self._image_count,
                     "time_boot_ms": int(frame.received_mono * 1000) & 0xffffffff,
-                    "time_utc_us": frame.received_utc_us, "success": False}
+                    "time_utc_us": self._photo_utc_us(frame), "success": False}
         with self._condition:
             index = self._image_count
             self._image_count += 1
         return {"path": str(path), "index": index,
                 "time_boot_ms": int(frame.received_mono * 1000) & 0xffffffff,
-                "time_utc_us": frame.received_utc_us, "success": True}
+                "time_utc_us": self._photo_utc_us(frame), "success": True}
+
+    @staticmethod
+    def _photo_utc_us(frame: _Frame) -> int:
+        """Capture time (mid-exposure, UTC) when the node could map it, else receipt."""
+        return (frame.camera_info or {}).get("capture_utc_us") or frame.received_utc_us
 
     def _write_photo(self, path: Path, frame: _Frame):
         import cv2
@@ -228,11 +233,13 @@ class MediaManager:
                         source_clock=(frame.camera_info or {}).get(
                             "source_clock", "camera_device_clock_unmapped"),
                         received_utc_us=frame.received_utc_us,
+                        capture_utc_us=(frame.camera_info or {}).get("capture_utc_us"),
                         received_monotonic_ns=int(frame.received_mono * 1e9),
                         width=frame.width, height=frame.height,
                         encoding="rgb8", camera_info=frame.camera_info,
-                        timestamp_note="source_stamp_ns is the original ROS header stamp; "
-                                       "received_utc_us is host receipt time")
+                        timestamp_note="source_stamp_ns is the original ROS header stamp (device clock); "
+                                       "capture_utc_us is that stamp mapped to UTC via /d555/clock "
+                                       "(null without a valid model); received_utc_us is host receipt time")
         jpeg_tmp = path.with_suffix(".jpg.tmp")
         json_tmp = path.with_suffix(".json.tmp")
         try:

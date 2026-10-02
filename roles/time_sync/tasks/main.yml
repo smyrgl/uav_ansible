@@ -89,3 +89,88 @@
     - chrony
     - uav-ptp4l.service
     - uav-phc2sys.service
+
+# --- PTP master for the Livox Avia (ptpd, software time stamps) --------------
+# Interim time source for the Avia until its PPS input works. The Avia locks
+# only to a master announcing the PTP timescale, which ptp4l cannot do on the
+# system clock; ptpd can (see ptpd-avia.conf.j2). Software time stamps on the
+# r8168 (no PHC): about a millisecond of receive jitter at the host, and a
+# sync far inside what a 10 Hz scan needs.
+- name: Install ptpd
+  ansible.builtin.apt:
+    name: ptpd
+    state: present
+    policy_rc_d: 101  # never let the package start its own service
+  when: avia_ptp_enabled | bool
+
+- name: Keep the packaged ptpd service masked
+  # Its default instance would run as a slave and steer the system clock
+  # against chrony. The package ships START_DAEMON=no; this makes it certain.
+  ansible.builtin.systemd:
+    name: ptpd.service
+    enabled: false
+    masked: true
+  when: avia_ptp_enabled | bool
+
+- name: Configure the Avia PTP master
+  ansible.builtin.template:
+    src: ptpd-avia.conf.j2
+    dest: /etc/uav/ptpd-avia.conf
+    owner: root
+    group: root
+    mode: "0644"
+    validate: /usr/sbin/ptpd -k -c %s
+  when: avia_ptp_enabled | bool
+  notify: Restart Avia PTP master
+
+- name: Install the Avia PTP master unit
+  ansible.builtin.template:
+    src: uav-ptpd-avia.service.j2
+    dest: /etc/systemd/system/uav-ptpd-avia.service
+    mode: "0644"
+  when: avia_ptp_enabled | bool
+  notify:
+    - Reload systemd
+    - Restart Avia PTP master
+
+- name: Retire the ptp4l-based Avia master (it cannot announce the PTP timescale)
+  ansible.builtin.systemd:
+    name: uav-ptp4l-avia.service
+    enabled: false
+    state: stopped
+  failed_when: false
+
+- name: Remove the ptp4l-based Avia master files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/uav-ptp4l-avia.service
+    - /etc/linuxptp/ptp4l-avia.conf
+  notify: Reload systemd
+
+- name: Run the Avia PTP master
+  ansible.builtin.systemd:
+    name: uav-ptpd-avia.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: avia_ptp_enabled | bool
+
+- name: Stop the Avia PTP master when disabled
+  ansible.builtin.systemd:
+    name: uav-ptpd-avia.service
+    enabled: false
+    state: stopped
+  failed_when: false
+  when: not (avia_ptp_enabled | bool)
+
+- name: Remove the Avia PTP master files when disabled
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/uav-ptpd-avia.service
+    - /etc/uav/ptpd-avia.conf
+  when: not (avia_ptp_enabled | bool)
+  notify: Reload systemd

@@ -5,4 +5,11 @@ avia_driver:
     frame_id: "{{ avia_frame_id }}"
     publish_rate_hz: {{ avia_publish_rate_hz }}
     receipt_timeout_sec: {{ avia_receipt_timeout_sec }}
+    utc_sync: {{ avia_utc_sync | bool | lower }}
+    utc_sync_phase_sec: {{ avia_utc_sync_phase_sec }}
+    utc_sync_max_clock_error_sec: {{ avia_utc_sync_max_clock_error_sec }}
+    header_stamp: "{{ avia_header_stamp }}"
+    sensor_latency_min_sec: {{ avia_sensor_latency_min_sec }}
+    sensor_latency_max_sec: {{ avia_sensor_latency_max_sec }}
+    ptp_utc_offset_sec: {{ avia_ptp_utc_offset_sec }}
     use_sim_time: false

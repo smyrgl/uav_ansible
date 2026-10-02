@@ -1,5 +1,5 @@
 [Unit]
-Description=UAV D555 visualization frame-name adapter
+Description=UAV D555 adapter (frame names, UTC clock model, dashboard depth relay)
 After=network-online.target
 Wants=network-online.target
 PartOf=uav-ros.target
@@ -11,7 +11,7 @@ User={{ uav_ros_user }}
 Group={{ uav_ros_user }}
 EnvironmentFile={{ uav_ros_environment_file }}
 Environment=ROS_LOG_DIR=/var/log/uav-ros
-ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/d555_frame_adapter.py --serial {{ d555_frame_adapter_serial | default("261622302751") }}'
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/d555_frame_adapter.py --serial {{ d555_frame_adapter_serial | default("261622302751") }} --depth-hz {{ foxglove_depth_throttle_hz }}'
 Restart=on-failure
 RestartSec=5
 KillSignal=SIGINT

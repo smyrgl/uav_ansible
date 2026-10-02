@@ -1,0 +1,19 @@
+[Unit]
+Description=uav_ansible ptpd (PTP master for the Livox Avia: PTP timescale, software time stamps)
+After=network-online.target chrony.service
+Wants=network-online.target chrony.service
+Conflicts=ptpd.service
+
+[Service]
+Type=simple
+# Serve time only once chrony has synchronised the system clock: after a cold
+# power-off the clock reads 1970 until chrony steps it, and the Avia would
+# otherwise lock to that. Bounded and non-fatal, as for phc2sys.
+ExecStartPre=-/usr/bin/chronyc waitsync {{ phc2sys_waitsync_tries }} {{ phc2sys_waitsync_max_correction }}
+TimeoutStartSec={{ phc2sys_waitsync_tries * 10 + 60 }}
+ExecStart=/usr/sbin/ptpd -c /etc/uav/ptpd-avia.conf
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

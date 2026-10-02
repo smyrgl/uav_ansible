@@ -158,8 +158,14 @@ The node republishes every encoded access unit as
 output that feeds RTSP and recordings: one encode, Annex B byte stream,
 keyframes self-contained (VPS/SPS/PPS inserted every IDR, one per second, no
 B-frames), so Foxglove's Image panel decodes it directly. Messages are stamped
-with host receive time because the D555's own stamps are its unmapped device
-clock; `video_frame_id` is a label for overlays, and the picture is already
+with the frame's capture time in UTC: its device stamp (mid-exposure) through
+the clock model the D555 adapter publishes on `/d555/clock` (foxglove role,
+"D555 time"). Without a valid, fresh model the stamp is host receive time.
+`~/status` counts `video_stamped_capture_utc` and `video_stamped_receipt` and
+reports `clock_model`. Photos use the same capture time for MAVLink
+`time_utc_us` and record `capture_utc_us` beside `received_utc_us` in their JSON
+sidecar. Measured: a video message arrives about 113 ms after its capture time
+(transfer, conversion, NVENC). `video_frame_id` is a label for overlays, and the picture is already
 rotated by `rotation_degrees`, so a panel should not rotate it again. `~/status`
 reports `video_frames_published` and `video_frames_dropped`. The publisher is
 best effort and fed through a small queue drained by the node's executor: a

@@ -102,6 +102,12 @@ residual/RTT limits are bench checks, not proof of sensor hardware sync.
 
 ## D555 streams are watched through CameraInfo, not Image
 
+The observer watches the D555 adapter's UTC relays, `/d555/color/camera_info`
+and `/d555/depth/camera_info`. Their timing is verified (OK) only while the
+adapter's `d555/clock` diagnostic reports a valid clock model and the stamps sit
+within `clock_tolerance_sec` of host UTC; the row then reads "UTC via the D555
+clock model".
+
 Since 2026-09-30 the observer subscribes to `<image topic>/camera_info` for the
 colour and depth streams. The D555 sends every subscriber its own unicast copy
 of each image (~200 Mbit/s per stream at 896×504, ~500 Mbit/s at 1280×800), and
@@ -118,4 +124,6 @@ Since 2026-09-30 the H-FLOW row is built from `/hflow/sensor_optical_flow` and
 `/hflow/range` (the `hflow` role's listen-only DroneCAN observer) plus its
 `hflow/driver` diagnostics, not from PX4's MAVLink OPTICAL_FLOW_RAD and
 DISTANCE_SENSOR streams. A down CAN interface reported by the listener is a
-disconnection (ERROR); a frozen or low-quality stream is a warning.
+disconnection (ERROR); a frozen or low-quality stream is a warning. Timing is
+reported as host receipt time and is informational (OK): the H-Flow puts no
+time in its DroneCAN messages, so receipt is the best stamp available.

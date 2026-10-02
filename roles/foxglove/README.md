@@ -70,11 +70,42 @@ separate PX4 MAVLink and DDS rows without exposing raw flight-control topics.
 D555 native Image messages already use canonical optical frame IDs. Its native
 CameraInfo messages currently serialize the same names in a 64-byte CDR string
 with 37 trailing NUL bytes. Foxglove treats those as different coordinate frames.
-`uav-d555-frames.service` republishes only the two small CameraInfo streams on
+`uav-d555-frames.service` republishes the two small CameraInfo streams on
 `/d555/color/camera_info` and `/d555/depth/camera_info`, with validated canonical
-frame IDs. Capture timestamps and all calibration fields are preserved. Images
-are not copied or re-timestamped. The original native CameraInfo topics remain
-on ROS. Only the bridge node remaps its subscriptions to the normalized topics,
+frame IDs and all calibration fields preserved. The original native CameraInfo
+topics remain on ROS.
+
+### D555 time: everything under `/d555` is UTC
+
+The D555 stamps in its own hardware clock. Over PoE it has no PTP client
+(firmware 7.58 sends no PTP at all) and hardware sync is USB-only, so the same
+service fits that clock to UTC on the host, the way librealsense's global time
+does (`d555_clock.py`). The source is the camera's IMU: 100 Hz in small packets,
+each carrying the DDS source timestamp (the camera's clock when it was sent) and
+the host's DDS receive timestamp (UTC, chrony on the GNSS PPS). Latency only ever
+adds, so a line through the per-second minima of receive minus send, over a 60 s
+window, gives offset and skew; congested seconds are rejected, and a 32-bit
+microsecond wrap of device time (period 4295 s) is unwrapped while any other
+backwards jump starts a new model (camera restart).
+
+Every `/d555` output carries the mapped capture time while the model is valid,
+and host receive time until it is (about 10 s after start):
+
+| Topic | Contents |
+| --- | --- |
+| `/d555/imu` | the camera's IMU, `sensor_msgs/Imu`, 100 Hz |
+| `/d555/color/camera_info`, `/d555/depth/camera_info` | CameraInfo, canonical frame IDs |
+| `/d555/depth/throttled` | depth image at `foxglove_depth_throttle_hz` (2 Hz) |
+| `/d555/clock` | the model as JSON, latched: offset, skew, residual, validity |
+
+The camera node applies `/d555/clock` to `/d555/color/video` and photo times.
+`d555/clock` on `/diagnostics` reports the model; the health node's D555 row
+verifies timing from it. Measured 2026-10-02: skew -9 ppm, bin-minimum residual
+49 us; receipt minus mapped stamp 0.7-4.6 ms for the IMU, 53-56 ms for colour,
+31-37 ms for depth, never negative. The mapping cannot see the minimum one-way
+transport latency, so mapped times are late by about that much (sub-millisecond),
+never early. The service uses about a quarter of one core, mostly Python
+per-message work on the 100 Hz IMU. Only the bridge node remaps its subscriptions to the normalized topics,
 keeping the existing native topic labels in Foxglove and preserving saved layouts.
 The internal adapter topics are hidden from duplicate bridge advertisement. Restart the Foxglove connection to clear any
 orphan names cached before this fix.
@@ -87,7 +118,7 @@ CDR length 64. The adapter rejects and logs inconsistent labels rather than
 rewriting them to the expected camera. The native publisher issue remains for
 future camera-pipeline validation; no factory calibration values are altered.
 
-Avia point clouds are available on `/avia/points`, with `avia/driver` and `avia/clock` diagnostics. The saved bench layout enables a 0.5-second cloud decay. Headers currently use host receipt time for visualization; hardware synchronization and measured extrinsics remain pending.
+Avia point clouds are available on `/avia/points`, with `avia/driver` and `avia/clock` diagnostics. The saved bench layout enables a 0.5-second cloud decay. Headers carry the Avia's validated sample time in UTC when it is synchronized, and host receipt time otherwise; measured extrinsics remain pending.
 
 ## Health display latency
 
@@ -119,11 +150,11 @@ The D555 sends every subscriber its own unicast copy of a stream, so a raw
 pipeline that feeds the RTSP link. The bench layout therefore shows colour
 through `/d555/color/video` (`foxglove_msgs/CompressedVideo`, the camera
 node's own NVENC output, H.265 by default at `mavlink_camera_bitrate`, decoded
-by Foxglove's Image panel) and depth through `uav-d555-depth-throttle`, a
-stock `topic_tools throttle` republishing the raw depth image as
-`/d555/depth/throttled` at `foxglove_depth_throttle_hz` (2 Hz); the D555 has
-no compressed depth stream and `compressed_depth_image_transport` would need a
-relay node anyway.
+by Foxglove's Image panel) and depth through `/d555/depth/throttled`, which the
+D555 adapter republishes at `foxglove_depth_throttle_hz` (2 Hz) with UTC stamps.
+It reads the raw depth stream serialized and decodes only the frames it keeps;
+it replaced a stock `topic_tools throttle`, so the camera still sends one raw
+depth copy. The D555 has no compressed depth stream.
 
 Do not use the camera's own `/realsense/<serial>_Color/compressed` (JPEG) or
 `/h264` topics, and the bridge hides them from Foxglove. Since 2026-10-01 it

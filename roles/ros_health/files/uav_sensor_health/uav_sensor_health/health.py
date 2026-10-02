@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 import math
 import re
 
-from .core import Assessment, OK, WARN, ERROR
+from .core import STALE, Assessment, OK, WARN, ERROR
 
 
 def check(good, message, /, **values):
@@ -77,14 +77,39 @@ def number(values, key, default=-1):
         return default
 
 
+def d555_timing(clock, model, now, timeout=3.0):
+    """A D555 stream's timing section, given the adapter's d555/clock diagnostic.
+
+    The /d555 relays carry UTC stamps; they are verified only while the
+    adapter reports a valid clock model AND the stamps really sit within the
+    monitor's tolerance of host UTC (classification "epoch_compatible")."""
+    live = model.fresh(now, timeout)
+    v = model.values if live else {}
+    valid = bool(live and v.get("level") == OK and v.get("timing_validated") == "true")
+    if not valid or clock.values.get("classification") != "epoch_compatible" or clock.level == STALE:
+        if live and not valid:
+            note = v.get("message", "D555 clock model not valid")
+            return Assessment(clock.level, f"{clock.message}; {note}",
+                              {**clock.values, "clock_model": v.get("reason", "not valid")})
+        return clock
+    return Assessment(OK, "UTC capture time from the D555 IMU clock model",
+                      {**clock.values, "synchronization_verified": True,
+                       "clock_model_skew_ppm": v.get("skew_ppm"),
+                       "clock_model_residual_us": v.get("residual_rms_us")})
+
+
 def lidar_health(kind, cloud, driver, clock, now, timeout=3.0):
     live_cloud, live_driver = cloud.fresh(now, timeout), driver.fresh(now, timeout)
     v = driver.values if live_driver else {}
     if kind == "avia":
         connection = True if live_cloud else (v.get("connected") in ("1", "true") if "connected" in v else None)
-        timing_good = False  # Current driver intentionally stamps host receipt.
-        timing_message = "Host receipt timestamps; hardware sync unverified"
-        timing_values = {k: val for k, val in clock.metrics(now).items() if k not in ("message", "level")} if clock.fresh(now, timeout) else {}
+        # The driver validates its own time base (PPS + pushed UTC, receipt-latency
+        # bounds) and says so in avia/clock; anything less is a timing warning.
+        live_clock = clock.fresh(now, timeout)
+        cv = clock.values if live_clock else {}
+        timing_good = bool(live_clock and cv.get("level") == OK and cv.get("timing_validated") == "true")
+        timing_message = cv.get("message", "No Avia clock diagnostic") if live_clock else "Avia clock diagnostic missing or stale"
+        timing_values = {k: val for k, val in clock.metrics(now).items() if k not in ("message", "level")} if live_clock else {}
     else:
         packet_ages = [number(v, k) for k in ("msop_age_sec", "difop_age_sec")]
         any_packets = any(0 <= age <= timeout for age in packet_ages)
@@ -171,7 +196,10 @@ def hflow_health(flow, distance, driver, now, quality_min=20):
                               **flow.metrics(now), minimum_quality=quality_min),
         "Range": check(range_ok, "Fresh in-range measurement" if range_ok else "Missing, frozen or invalid range", **distance.metrics(now)),
         "Bus": check(driver_live and can_up, bus_text, **{k: v for k, v in driver.values.items() if k.startswith(("can_", "node_", "other_node"))}),
-        "Timing": check(False, "Host receipt timestamps; the H-Flow sends no DroneCAN time (no bus time sync)"),
+        # Informational, not a warning: the H-Flow puts no time in its DroneCAN
+        # messages, so host receipt is the best stamp available (accepted
+        # 2026-10-02). A flow sample's integration window ends a few ms before it.
+        "Timing": check(True, "Host receipt timestamps (the H-Flow sends no DroneCAN time; best available)"),
         "Identity": check(True, str(driver.values.get("hardware_id", "H-Flow DroneCAN node")) + "; observed by uav-hflow on the FC's CAN2 bus, the same frames PX4 fuses"),
     })
 

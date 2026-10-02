@@ -7,7 +7,7 @@ from pathlib import Path
 from types import SimpleNamespace
 import unittest
 
-from d555_frame_adapter import normalize_frame_id, normalize_message_frame
+from d555_frame_adapter import normalize_frame_id, normalize_message_frame, set_stamp, utc_stamp
 
 try:
     from rclpy.serialization import deserialize_message, serialize_message
@@ -32,6 +32,20 @@ class FrameNameTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ValueError):
                 normalize_message_frame(message, expected)
             self.assertEqual(message.header.frame_id, bad)
+
+
+class UtcStampTests(unittest.TestCase):
+    def test_mapped_capture_time_when_valid_receipt_time_otherwise(self):
+        class Model:
+            def __init__(self, offset): self.offset = offset
+            def to_utc_ns(self, device_ns): return None if self.offset is None else device_ns + self.offset
+        message = SimpleNamespace(header=SimpleNamespace(stamp=SimpleNamespace(sec=598, nanosec=434542000)))
+        info = {"received_timestamp": 1_790_913_854_321_647_000}
+        stamp, kind = utc_stamp(Model(1_790_913_255_828_000_000), message, info)
+        self.assertEqual((stamp, kind), (598_434_542_000 + 1_790_913_255_828_000_000, "capture"))
+        self.assertEqual(utc_stamp(Model(None), message, info), (1_790_913_854_321_647_000, "receipt"))
+        set_stamp(message, 1_790_913_854_262_542_000)
+        self.assertEqual((message.header.stamp.sec, message.header.stamp.nanosec), (1_790_913_854, 262_542_000))
 
 
 def pad_wire_frame_id(serialized, length=100):

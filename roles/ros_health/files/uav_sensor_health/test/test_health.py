@@ -3,7 +3,7 @@ import struct
 import unittest
 
 from uav_sensor_health.core import Assessment, ERROR, OK, WARN
-from uav_sensor_health.health import Sample, check, grouped, lidar_health, px4_health, hflow_health, jetson_health, jetson_identity
+from uav_sensor_health.health import Sample, check, d555_timing, grouped, lidar_health, px4_health, hflow_health, jetson_health, jetson_identity
 from uav_sensor_health.observers import sbf_blocks, chrony_assessment, ptp_assessment, gnss_health, parse_pvt_geodetic
 
 
@@ -65,6 +65,38 @@ class TestSensorHealth(unittest.TestCase):
         self.assertEqual(result.level, WARN)
         self.assertEqual(result.values['Timing/timestamp_type'], '0')
 
+    def test_avia_validated_sensor_utc_makes_timing_good(self):
+        driver = sample({'connected': '1', 'level': OK, 'message': 'Receiving point clouds'})
+        cloud = sample({'points': 1000, 'frame_id': 'avia_link', 'layout_valid': True})
+        clock = sample({'level': OK, 'message': 'Sensor UTC from PPS + pushed TOD', 'timing_validated': 'true',
+                        'timestamp_type': '3', 'time_sync_status': '2', 'pps_status': '1'})
+        result = lidar_health('avia', cloud, driver, clock, 20)
+        self.assertEqual(result.level, OK)
+        self.assertEqual(result.values['Timing/time_sync_status'], '2')
+
+    def test_avia_clock_ok_level_without_validation_is_still_a_warning(self):
+        driver = sample({'connected': '1', 'level': OK, 'message': 'Receiving point clouds'})
+        cloud = sample({'points': 1000, 'frame_id': 'avia_link', 'layout_valid': True})
+        clock = sample({'level': OK, 'message': 'Host receipt timestamps', 'timing_validated': 'false'})
+        self.assertEqual(lidar_health('avia', cloud, driver, clock, 20).level, WARN)
+
+    def test_d555_timing_verified_only_with_a_valid_model_and_utc_stamps(self):
+        from uav_sensor_health.core import Assessment
+        utc = Assessment(WARN, "Near host wall time; synchronization unverified",
+                         {"classification": "epoch_compatible", "synchronization_verified": False})
+        model = sample({'level': OK, 'message': 'D555 clock mapped to UTC', 'timing_validated': 'true',
+                        'skew_ppm': '-11.8', 'residual_rms_us': '50.3'})
+        good = d555_timing(utc, model, 20)
+        self.assertEqual(good.level, OK)
+        self.assertTrue(good.values['synchronization_verified'])
+        invalid = sample({'level': WARN, 'message': 'D555 stamps on host receive time: collecting',
+                          'timing_validated': 'false', 'reason': 'collecting: 3 of 10 one-second bins'})
+        self.assertEqual(d555_timing(utc, invalid, 20).level, WARN)
+        device = Assessment(WARN, "Device/non-epoch clock; UTC synchronization unverified",
+                            {"classification": "device_clock"})
+        self.assertEqual(d555_timing(device, model, 20).level, WARN)   # a valid model cannot vouch for device stamps
+        self.assertEqual(d555_timing(utc, Sample(), 20).level, WARN)   # no model diagnostic at all
+
     def test_connected_malformed_e1r_packets_are_warning(self):
         driver = sample({'connected': '1', 'msop_age_sec': '10', 'difop_age_sec': '10',
                          'level': WARN, 'message': 'Malformed E1R packet'})
@@ -89,7 +121,8 @@ class TestSensorHealth(unittest.TestCase):
         self.assertEqual(result.values['Optical flow/status'], 'OK')
         self.assertEqual(result.values['Range/status'], 'OK')
         self.assertEqual(result.values['Bus/status'], 'OK')
-        self.assertEqual(result.level, WARN)  # timing is host receipt, never verified
+        self.assertEqual(result.level, OK)  # host receipt timing is accepted as the best available
+        self.assertEqual(result.values['Timing/status'], 'OK')
         flow.values['quality'] = 0
         self.assertEqual(hflow_health(flow, distance, driver, 20).values['Optical flow/status'], 'WARN')
         for s in (flow, distance):

@@ -18,6 +18,7 @@ try:
 except ImportError:  # ros-<distro>-foxglove-msgs missing: the video topic is disabled
     CompressedVideo = None
 
+from .clock import ClockMapping
 from .media import MediaManager
 from .protocol import CameraProtocol
 
@@ -37,6 +38,7 @@ DEFAULTS = {
     # touches the D555's own compressed streams (see README: they throttle the
     # imager to ~3.5 fps and replay stale buffers).
     'video_topic': '/d555/color/video', 'video_frame_id': 'camera_color_optical_frame',
+    'clock_topic': '/d555/clock',
 }
 
 
@@ -113,6 +115,17 @@ class CameraNode(Node):
                          durability=DurabilityPolicy.VOLATILE)
         self._image_sub = self.create_subscription(Image, self.config['image_topic'], self._image, qos)
         self._info_sub = self.create_subscription(CameraInfo, self.config['camera_info_topic'], self._camera_info, qos)
+        # D555 clock model (published latched by the D555 adapter): maps each
+        # frame's device stamp to UTC capture time for video and photos.
+        self.clock = ClockMapping()
+        self._video_capture_stamped = 0
+        self._video_receipt_stamped = 0
+        latched = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=1,
+                             reliability=ReliabilityPolicy.RELIABLE,
+                             durability=DurabilityPolicy.TRANSIENT_LOCAL)
+        self._clock_sub = (self.create_subscription(String, self.config['clock_topic'],
+                                                    lambda m: self.clock.update(m.data), latched)
+                           if self.config.get('clock_topic') else None)
         self._status_pub = self.create_publisher(String, '~/status', 1)
         self._timer = self.create_timer(1.0, self._status)
         self.media.start()
@@ -141,14 +154,20 @@ class CameraNode(Node):
         self._video_queue.append((data, keyframe, meta))
 
     def _drain_video(self):
-        """Executor side: publish what the encoder queued. Stamped with host
-        receive time: the D555's own stamps are its unmapped device clock, and
-        the dashboard timeline is host time. Foxglove schemas are flat
-        (timestamp + frame_id, no std_msgs Header)."""
+        """Executor side: publish what the encoder queued. Stamped with the
+        frame's capture time in UTC (its device stamp through the /d555/clock
+        model), or host receive time while no valid model is available.
+        Foxglove schemas are flat (timestamp + frame_id, no std_msgs Header)."""
         while self._video_queue:
             data, keyframe, meta = self._video_queue.popleft()
             msg = CompressedVideo()
-            utc_us = meta[2] if meta else time.time_ns() // 1000
+            capture_ns = self.clock.to_utc_ns(meta[0]) if meta else None
+            if capture_ns is not None:
+                utc_us = capture_ns // 1000
+                self._video_capture_stamped += 1
+            else:
+                utc_us = meta[2] if meta else time.time_ns() // 1000
+                self._video_receipt_stamped += 1
             msg.timestamp.sec = utc_us // 1000000
             msg.timestamp.nanosec = (utc_us % 1000000) * 1000
             msg.frame_id = self.config['video_frame_id'] or (meta[1].rstrip('\x00') if meta else '')
@@ -185,6 +204,10 @@ class CameraNode(Node):
                               info.get('frame_id') == msg.header.frame_id)
                 info = dict(info) if valid_info else {'calibration_available': False}
                 info['host_ros_callback_utc_ns'] = received_utc_ns
+                capture_ns = self.clock.to_utc_ns(msg.header.stamp.sec * 1000000000 + msg.header.stamp.nanosec)
+                info['capture_utc_us'] = capture_ns // 1000 if capture_ns is not None else None
+                info['capture_clock'] = ('d555_device_clock_mapped_to_utc' if capture_ns is not None
+                                         else f'unavailable: {self.clock.reason}')
                 info['host_ros_callback_monotonic_ns'] = received_monotonic_ns
                 info['output_rotation_degrees'] = rotation
                 info['intrinsics_reference'] = 'original_unrotated_source_pixels'
@@ -209,7 +232,10 @@ class CameraNode(Node):
                       conversion_error=self._conversion_error,
                       video_topic=self.config['video_topic'] if self._video_pub else '',
                       video_frames_published=self._video_published, video_frames_dropped=self._video_dropped,
-                      source_timestamp_clock='camera_device_clock_unmapped')
+                      video_stamped_capture_utc=self._video_capture_stamped,
+                      video_stamped_receipt=self._video_receipt_stamped,
+                      clock_model=self.clock.reason,
+                      source_timestamp_clock='camera_device_clock, mapped to UTC via /d555/clock')
         self._status_pub.publish(String(data=json.dumps(status, default=str)))
 
     def close(self):
