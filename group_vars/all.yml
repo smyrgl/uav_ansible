@@ -358,11 +358,11 @@ d555_emitter_mode: "Off"
 d555_profile_attempts: 30              # x 10 s: the camera may boot after the Jetson
 mavlink_camera_rtsp_port: 8554
 # Host part of the advertised stream URI (VIDEO_STREAM_INFORMATION). The server
-# binds every interface, so the name lets one URI work on the house Wi-Fi and
-# on the drone LAN, provided the GCS resolves it (home DNS / mDNS `.local`).
-# A GCS on the Siyi link has no resolver: set the LAN address there
-# (lan_address without its prefix) or add a hosts entry on that device.
-mavlink_camera_rtsp_host: "{{ system_hostname }}"
+# binds every interface. Since 2026-10-02 the Jetson has no Wi-Fi of its own
+# and the video's client is the Siyi GCS, which reaches it over the datalink and
+# has no resolver for the Jetson's name ("jethawk" only ever resolved, via the
+# home DNS, to the Wi-Fi address): advertise the drone-LAN address.
+mavlink_camera_rtsp_host: "{{ lan_address.split('/')[0] }}"
 mavlink_camera_system_id: 1
 mavlink_camera_component_id: 100
 mavlink_camera_rotation_degrees: 180

@@ -15,11 +15,12 @@ needed.
 - Output: H.265 Main 8-bit, 8 Mbit/s target, no B-frames, IDR every 30 frames.
 - Image rotated 180 degrees in the presentation/capture branch. Original ROS
   topics and CameraInfo remain unchanged.
-- RTSP: advertised as `rtsp://jethawk:8554/rgb` (`mavlink_camera_rtsp_host`,
-  default the hostname; the server binds every interface), TCP or UDP; RTP
-  packets limited to 1200 bytes. H.264 is available by changing
-  `mavlink_camera_codec`. A GCS without a resolver for the name (the Siyi
-  link) needs the LAN address there instead.
+- RTSP: advertised as `rtsp://192.168.144.1:8554/rgb` (`mavlink_camera_rtsp_host`,
+  the drone-LAN address since 2026-10-02; the server binds every interface), TCP
+  or UDP; RTP packets limited to 1200 bytes. H.264 is available by changing
+  `mavlink_camera_codec`. The name `jethawk` only ever resolved, through the
+  house DNS, to the Jetson's Wi-Fi address; with the Wi-Fi gone the Siyi GCS,
+  which has no resolver for it, showed no video until the address went in.
 - MAVLink: system 1, camera component 100, router `127.0.0.1:5760`.
 - QGC telemetry connection: TCP `jethawk:5760` (the router listens on every
   interface; on the Siyi link use `192.168.144.1`).
