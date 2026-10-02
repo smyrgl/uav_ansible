@@ -11,6 +11,9 @@ node="/D555_{{ d555_serial }}"
 declare -A want=(
   ["RGB.Profile"]="{{ d555_rgb_profile }}"
   ["Depth.Profile"]="{{ d555_depth_profile }}"
+  ["IR1.Profile"]="{{ d555_ir_profile }}"
+  ["IR2.Profile"]="{{ d555_ir_profile }}"
+  ["Depth.option.Emitter_Mode"]="{{ d555_emitter_mode }}"
 )
 for attempt in $(seq 1 {{ d555_profile_attempts }}); do
   all_ok=1
@@ -19,10 +22,14 @@ for attempt in $(seq 1 {{ d555_profile_attempts }}); do
     if [ "$cur" = "${want[$p]}" ]; then continue; fi
     all_ok=0
     if [ -n "$cur" ]; then
-      if timeout 40 ros2 param set "$node" "$p" "${want[$p]}" >/dev/null 2>&1; then
+      # `ros2 param set` parses the value as YAML, where a bare Off/On is a
+      # boolean, and exits 0 even when the camera refuses: tag the value as a
+      # string and check the reply.
+      reply=$(timeout 40 ros2 param set "$node" "$p" "!!str ${want[$p]}" 2>&1)
+      if printf '%s' "$reply" | grep -q "Set parameter successful"; then
         echo "$p: '$cur' -> '${want[$p]}'"
       else
-        echo "$p: set failed (current '$cur')" >&2
+        echo "$p: set failed (current '$cur'): $(printf '%s' "$reply" | tail -1)" >&2
       fi
     else
       echo "$p: camera not answering yet (attempt $attempt)"

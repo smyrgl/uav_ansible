@@ -60,6 +60,8 @@ class SensorHealth(Node):
             self.subs.append(self.create_subscription(msg_type, topic,
                 lambda msg, key=name: self._dds(key, msg), qos))
         for stream in ("color", "depth"):
+            if not params[f"d555_{stream}_topic"]:
+                continue        # an empty topic: not monitored (depth since 2026-10-02)
             self.monitors[stream] = StreamMonitor(self.started,
                 timeout_sec=params["receipt_timeout_sec"], startup_grace_sec=params["startup_grace_sec"],
                 min_rate_hz=params["min_rate_hz"], rate_window_sec=params["rate_window_sec"],
@@ -154,11 +156,13 @@ class SensorHealth(Node):
             live.append(monitor.last_received is not None and now - monitor.last_received <= monitor.timeout_sec)
         seen = any(m.total for m in self.monitors.values())
         connection = True if any(live) else False if seen else None
-        timing = ("UTC via the D555 clock model" if all(sections[k + " timing"].level == OK for k in ("Color", "Depth"))
+        names = [name.title() for name in self.monitors]
+        timing = ("UTC via the D555 clock model" if all(sections[k + " timing"].level == OK for k in names)
                   else "timing unverified")
-        message = f"RGB + depth live; {timing}" if all(live) else "Connected; one stream missing" if any(live) else (
+        streams = " + ".join({"color": "RGB", "depth": "depth"}[name] for name in self.monitors)
+        message = f"{streams} live; {timing}" if all(live) else "Connected; one stream missing" if any(live) else (
             "D555 data connection lost" if seen else "Unknown; no D555 frames observed")
-        if any(live) and any(sections[k].level != OK for k in ("Color", "Depth")):
+        if any(live) and any(sections[k].level != OK for k in names):
             message = f"Frames arriving; stream degraded; {timing}"
         return grouped(connection, message, sections)
 

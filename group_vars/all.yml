@@ -350,6 +350,11 @@ mavlink_camera_video_frame_id: "camera_color_optical_frame"   # label only; the 
 d555_serial: "261622302751"
 d555_rgb_profile: "yuv, 1280, 800, 30"
 d555_depth_profile: "z16, 896, 504, 30"
+# Stereo IR for VSLAM (same stereo module, so the depth resolution and rate).
+# The emitter is off: its dot pattern moves with the camera and would be
+# tracked as features, and nothing consumes depth any more.
+d555_ir_profile: "y8, 896, 504, 30"
+d555_emitter_mode: "Off"
 d555_profile_attempts: 30              # x 10 s: the camera may boot after the Jetson
 mavlink_camera_rtsp_port: 8554
 # Host part of the advertised stream URI (VIDEO_STREAM_INFORMATION). The server
@@ -418,7 +423,7 @@ foxglove_message_backlog_size: 128
 # Dashboard depth: the D555 has no compressed depth, so a topic_tools relay
 # republishes the single raw copy at this rate for Foxglove (colour uses the
 # camera's own H.264 stream).
-foxglove_depth_throttle_hz: 2.0
+foxglove_depth_throttle_hz: 0.0   # off since 2026-10-02: the camera link carries the stereo IR pair for VSLAM instead
 # The airframe description (Blender + LinkForge authoring, exported ROS
 # package) lives in this repository: x950_description/ at the root.
 # Flight recorder: rosbag2 (mcap) of every flight on the NVMe root, armed -> safed.

@@ -5,7 +5,7 @@ ros_health_environment: /etc/uav/ros/environment
 ros_health_config: /etc/uav/ros/health.yaml
 ros_health_d555_serial: "261622302751"
 ros_health_d555_color_topic: /d555/color   # the D555 adapter's UTC-stamped relays
-ros_health_d555_depth_topic: /d555/depth
+ros_health_d555_depth_topic: ""   # "" = not monitored: no depth consumer since 2026-10-02 (the link carries the IR pair for VSLAM)
 ros_health_d555_camera_info_suffix: /camera_info   # watched instead of the images (bandwidth)
 ros_health_receipt_timeout_sec: 2.0
 ros_health_startup_grace_sec: 10.0

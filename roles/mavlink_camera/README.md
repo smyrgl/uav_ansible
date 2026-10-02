@@ -29,8 +29,14 @@ needed.
 The camera's stream profiles are ROS 2 parameters of its node
 (`ros2 param describe /D555_<serial> RGB.Profile` lists the choices) and they
 answer over Cyclone DDS; a user-scope unit, `uav-d555-profile`, sets
-`d555_rgb_profile` and `d555_depth_profile` at boot and retries until the
-camera answers. 1280x800 YUY2 at 30 Hz is ~500 Mbit/s, and the D555 sends
+`d555_rgb_profile`, `d555_depth_profile`, the stereo IR profiles
+(`d555_ir_profile`, for the `vslam` role) and `Depth.option.Emitter_Mode`
+(`d555_emitter_mode`, Off since 2026-10-02: the projector's dots would be
+tracked as features, and nothing consumes depth) at boot, retrying until the
+camera answers. `ros2 param set` parses its value as YAML, where a bare `Off`
+or `On` is a boolean, and exits 0 even when the camera refuses; the script
+therefore sends `!!str <value>` and checks the reply for
+"Set parameter successful". 1280x800 YUY2 at 30 Hz is ~500 Mbit/s, and the D555 sends
 every subscriber its own unicast copy, so this pipeline must stay the only
 image subscriber on the colour stream (2026-09-30: the health observer moved to
 CameraInfo and the nvblox POC was retired for exactly this reason).

@@ -144,49 +144,6 @@
       "layers": {},
       "synchronize": false
     },
-    "Image!d555depth": {
-      "imageMode": {
-        "imageTopic": "/d555/depth/throttled",
-        "calibrationTopic": "/realsense/D555_261622302751_Depth/camera_info",
-        "rotation": 180,
-        "rectifyImage": false,
-        "colorMode": "colormap",
-        "colorMap": "turbo",
-        "minValue": 0,
-        "maxValue": 10000
-      },
-      "cameraState": {
-        "distance": 20,
-        "perspective": true,
-        "phi": 60,
-        "target": [
-          0,
-          0,
-          0
-        ],
-        "targetOffset": [
-          0,
-          0,
-          0
-        ],
-        "targetOrientation": [
-          0,
-          0,
-          0,
-          1
-        ],
-        "thetaOffset": 60,
-        "fovy": 45,
-        "near": 0.5,
-        "far": 5000
-      },
-      "followMode": "follow-pose",
-      "scene": {},
-      "transforms": {},
-      "topics": {},
-      "layers": {},
-      "synchronize": false
-    },
     "DiagnosticSummary!uavhealth": {
       "topicToRender": "/uav/health",
       "minLevel": 0,
@@ -210,12 +167,7 @@
     "first": {
       "direction": "row",
       "first": "3D!x950bench",
-      "second": {
-        "direction": "column",
-        "first": "Image!d555color",
-        "second": "Image!d555depth",
-        "splitPercentage": 50
-      },
+      "second": "Image!d555color",
       "splitPercentage": 65
     },
     "second": {

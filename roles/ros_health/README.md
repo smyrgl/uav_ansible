@@ -102,8 +102,10 @@ residual/RTT limits are bench checks, not proof of sensor hardware sync.
 
 ## D555 streams are watched through CameraInfo, not Image
 
-The observer watches the D555 adapter's UTC relays, `/d555/color/camera_info`
-and `/d555/depth/camera_info`. Their timing is verified (OK) only while the
+The observer watches the D555 adapter's UTC relay `/d555/color/camera_info`
+(and `/d555/depth/camera_info` when `ros_health_d555_depth_topic` is set: it is
+empty since 2026-10-02, when depth lost its last consumer and the camera link
+went to the stereo IR for VSLAM). Their timing is verified (OK) only while the
 adapter's `d555/clock` diagnostic reports a valid clock model and the stamps sit
 within `clock_tolerance_sec` of host UTC; the row then reads "UTC via the D555
 clock model".

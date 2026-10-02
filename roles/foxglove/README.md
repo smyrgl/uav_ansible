@@ -29,7 +29,7 @@ each native D555 stream as needed. Foxglove's Topic Graph shows discovered nodes
 and connections; service process health is separate from receipt of valid data.
 
 Import `files/x950-bench-layout.json` from this role into Foxglove for a starting
-layout with the robot, `/e1r/points`, native D555 color/depth images, and diagnostics
+layout with the robot, `/e1r/points`, `/avia/points`, the D555 colour video, and diagnostics
 summary/detail on `/uav/health` (one row per sensor; grouped data/timing details).
 Existing imported layouts need their Diagnostics Summary and Detail topics changed
 from `/diagnostics` to `/uav/health`. Raw driver diagnostics remain on `/diagnostics`.
@@ -95,7 +95,7 @@ and host receive time until it is (about 10 s after start):
 | --- | --- |
 | `/d555/imu` | the camera's IMU, `sensor_msgs/Imu`, 100 Hz |
 | `/d555/color/camera_info`, `/d555/depth/camera_info` | CameraInfo, canonical frame IDs |
-| `/d555/depth/throttled` | depth image at `foxglove_depth_throttle_hz` (2 Hz) |
+| `/d555/depth/throttled` | depth image at `foxglove_depth_throttle_hz` (off since 2026-10-02) |
 | `/d555/clock` | the model as JSON, latched: offset, skew, residual, validity |
 
 The camera node applies `/d555/clock` to `/d555/color/video` and photo times.
@@ -150,11 +150,12 @@ The D555 sends every subscriber its own unicast copy of a stream, so a raw
 pipeline that feeds the RTSP link. The bench layout therefore shows colour
 through `/d555/color/video` (`foxglove_msgs/CompressedVideo`, the camera
 node's own NVENC output, H.265 by default at `mavlink_camera_bitrate`, decoded
-by Foxglove's Image panel) and depth through `/d555/depth/throttled`, which the
-D555 adapter republishes at `foxglove_depth_throttle_hz` (2 Hz) with UTC stamps.
-It reads the raw depth stream serialized and decodes only the frames it keeps;
-it replaced a stock `topic_tools throttle`, so the camera still sends one raw
-depth copy. The D555 has no compressed depth stream.
+by Foxglove's Image panel). Depth used to come through `/d555/depth/throttled`,
+which the D555 adapter republishes at `foxglove_depth_throttle_hz` with UTC
+stamps from one raw (serialized) depth copy; since 2026-10-02 that rate is 0
+(`group_vars`), and the layout has no depth panel: the 27 MB/s went to the
+stereo IR pair for VSLAM. Set a rate again to bring depth back, minding the
+link budget. The D555 has no compressed depth stream.
 
 Do not use the camera's own `/realsense/<serial>_Color/compressed` (JPEG) or
 `/h264` topics, and the bridge hides them from Foxglove. Since 2026-10-01 it
