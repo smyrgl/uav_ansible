@@ -65,11 +65,20 @@ class Client:
         self.name = "%s:%d" % addr[:2]
         self.queue = bytearray()  # what the kernel's send buffer would not take
         self.discarded = 0
+        self.dropped = False
 
 
 def drop(c, why):
-    sel.unregister(c.sock)
-    del clients[c.sock]
+    # Idempotent: one select() pass can report a client twice over (a failed
+    # send while fanning out serial data, then its own pending event).
+    if c.dropped:
+        return
+    c.dropped = True
+    try:
+        sel.unregister(c.sock)
+    except (KeyError, ValueError):
+        pass
+    clients.pop(c.sock, None)
     c.sock.close()
     log(f"client {c.name} dropped: {why} ({len(clients)} connected)")
 
@@ -134,6 +143,21 @@ def discard(c):
     if not c.discarded:
         log(f"client {c.name} wrote to the port; discarding: it is read-only")
     c.discarded += len(data)
+
+
+def client_event(c, mask):
+    """Service one client's readiness from a select() pass. The client may
+    already have been dropped earlier in the same pass: sending the serial
+    data to it failed (the peer had gone), and select() still holds the read
+    event of its now-closed socket. Touching that socket again raised from
+    drop() and took the whole fan-out down (2026-10-01, a probe disconnecting
+    mid-stream); every client lost GNSS until systemd restarted the broker."""
+    if c.dropped:
+        return
+    if mask & selectors.EVENT_READ:
+        discard(c)
+    if mask & selectors.EVENT_WRITE and not c.dropped:
+        flush(c)
 
 
 def open_serial():
@@ -201,11 +225,7 @@ def main():
                 for c in list(clients.values()):
                     send(c, data)
             else:
-                c = key.data
-                if mask & selectors.EVENT_READ:
-                    discard(c)
-                if mask & selectors.EVENT_WRITE and c.sock in clients:
-                    flush(c)
+                client_event(key.data, mask)
 
         if ser is not None and not quiet and time.monotonic() - last_rx > SILENT_S:
             log(f"no data from {SERIAL_DEV} for {SILENT_S:.0f} s "
