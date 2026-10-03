@@ -46,6 +46,28 @@
   when: not wifi_enabled
   notify: Apply netplan
 
+# netplan's supplicant unit is pulled in when networkd starts at boot. A dongle
+# plugged in later (it comes out for flight) would sit idle until the next
+# netplan apply or reboot; start the supplicant whenever the device appears.
+- name: Start the wifi supplicant when the dongle is plugged in
+  ansible.builtin.copy:
+    dest: /etc/udev/rules.d/90-uav-wifi-hotplug.rules
+    content: |
+      # Managed by uav_ansible: the uplink dongle comes and goes with the flight configuration.
+      ACTION=="add", SUBSYSTEM=="net", KERNEL=="{{ wifi_interface }}", TAG+="systemd", ENV{SYSTEMD_WANTS}+="netplan-wpa-{{ wifi_interface }}.service"
+    owner: root
+    group: root
+    mode: "0644"
+  when: wifi_enabled
+  notify: Reload udev rules
+
+- name: Remove the wifi hotplug rule when wifi is disabled
+  ansible.builtin.file:
+    path: /etc/udev/rules.d/90-uav-wifi-hotplug.rules
+    state: absent
+  when: not wifi_enabled
+  notify: Reload udev rules
+
 - name: Check the uplink's supplicant
   ansible.builtin.command:
     cmd: "systemctl is-active netplan-wpa-{{ wifi_interface }}.service"
@@ -54,10 +76,25 @@
   failed_when: false
   when: wifi_enabled
 
+# The dongle comes out for flight: then the config stays, inert, and there is
+# nothing to bring up (nmcli and the route gate would fail on a missing device).
+- name: Check that the wifi dongle is plugged in
+  ansible.builtin.stat:
+    path: "/sys/class/net/{{ wifi_interface }}"
+  register: uplink_device
+  when: wifi_enabled
+
+- name: Report a missing dongle (flight configuration)
+  ansible.builtin.debug:
+    msg: >-
+      {{ wifi_interface }} is not plugged in: its config stays installed and
+      it joins when the dongle is back; egress meanwhile goes via the GCS.
+  when: wifi_enabled and not uplink_device.stat.exists
+
 # Re-applies whenever the supplicant is not running, not only when the file
 # changed: a run that failed here would otherwise never retry.
 - name: Bring the uplink up now (the LAN is not touched yet)
-  when: wifi_enabled and (uplink_netplan is changed or uplink_wpa.stdout != 'active')
+  when: wifi_enabled and uplink_device.stat.exists and (uplink_netplan is changed or uplink_wpa.stdout != 'active')
   block:
     # NetworkManager reads netplan's udev hint (NM_UNMANAGED=1) only when a
     # device appears, so at runtime it keeps the dongle, and its wpa_supplicant

@@ -1,11 +1,16 @@
 # Egress through the Siyi GCS (gcs_gateway)
 
-Since 2026-10-02 the Jetson has no Wi-Fi: the dongle came out when the airframe
-was sealed. Its only link off the aircraft is the Siyi datalink to the UniRC 7
-Pro handheld (the GCS), whose Android sits on the datalink as `192.168.144.20`
-and on Wi-Fi (the house network on the bench). This role gives the Jetson
-internet through the GCS: RTK corrections (drone-link to the base), apt for
-converges, NTP, and Tailscale for operator access (`tailscale` role).
+In flight the Jetson has no Wi-Fi: the dongle comes out when the airframe is
+sealed (it goes back in on the bench, where its config, always installed,
+rejoins the house network; see `wifi_enabled` in group_vars). Without it, the
+only link off the aircraft is the Siyi datalink to the UniRC 7 Pro handheld
+(the GCS), whose Android sits on the datalink as `192.168.144.20` and on
+Wi-Fi. This role gives the Jetson internet through the GCS: RTK corrections
+(drone-link to the base), apt for converges, NTP, and Tailscale for operator
+access (`tailscale` role). Its default route (metric
+`gcs_gateway_route_metric`, 100) loses to the Wi-Fi's (`wifi_route_metric`,
+50) whenever the dongle is in, so the GCS is the fallback, not the bench's
+path.
 
 ## Why in user space
 
@@ -26,7 +31,7 @@ The GCS cannot route for the drone:
 | --- | --- | --- |
 | `hev-socks5-server` 2.13.1 | GCS, `/data/local/tmp/uav-gw`, Android's shell user | SOCKS5, listening on `192.168.144.20:1080` only, user `uav` + `vault_gcs_gateway_password`; a pid file makes it daemonise |
 | `hev-socks5-tunnel` 2.18.0 | Jetson, `uav-gcs-tunnel.service` | TUN `gcs0` (`198.18.0.1`, MTU 1500); TCP, and UDP inside the same TCP session (`udp: tcp`), go to the server |
-| `uav-gcs-tunnel-up.sh` | Jetson, run by the tunnel | `default dev gcs0 metric 100`; resolved: DNS 1.1.1.1, 8.8.8.8 on `gcs0`, all domains |
+| `uav-gcs-tunnel-up.sh` | Jetson, run by the tunnel | `default dev gcs0 metric 100` (the Wi-Fi's 50 wins when the dongle is in); resolved: DNS 1.1.1.1, 8.8.8.8 on `gcs0` as a default-route link, no routing domain |
 | `uav-gcs-gateway.sh` | Jetson, `uav-gcs-gateway.service` | the supervisor (below) |
 
 The drone LAN, the PTP segment and Docker keep their own, more specific
@@ -35,6 +40,12 @@ happens on the Jetson: the server is a static binary, and Android gives such
 binaries no resolver, so the tunnel hands it IP addresses only. The public
 resolvers also resolve the RTK base (`rtk2.puglab.io`), and work wherever the
 GCS has internet, unlike the house router.
+
+They carry no routing domain. Until 2026-10-03 they had `~.`, which sent every
+lookup to them alone. With the Wi-Fi back and the GCS's server down, DNS hung
+while the Wi-Fi itself worked, and apt and FAST-LIO's converge stalled on it.
+resolved now asks every default-route link at once and takes the first answer:
+`gcs0`, plus the Wi-Fi's DHCP resolver when the dongle is in.
 
 The server lives only until the GCS reboots. The supervisor checks its TCP
 port every `gcs_gateway_check_interval_s` (30 s). On its own start, and

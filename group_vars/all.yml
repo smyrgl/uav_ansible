@@ -86,16 +86,19 @@ lan_gateway: ""                 # leave empty — default route is via wifi
 ptp_interface: "enP1p1s0"       # Intel i226 (igc) — confirmed via ip -br link
 ptp_address: "192.168.145.1/30"
 
-# Uplink: USB 802.11ax dongle (Realtek). Provided the Jetson's default route /
-# internet egress (NTRIP, apt, etc.). Credentials are secrets -> vault.yml.
+# Uplink: USB 802.11ax dongle (Realtek), the Jetson's internet egress (NTRIP,
+# apt, Tailscale) on the bench. Credentials are secrets -> vault.yml.
 # CAUTION: the home wifi subnet must NOT overlap 192.168.144.0/24 or .145.0/30.
 # Depends on the dongle's DKMS driver (kernel_modules) being loaded first.
-# Off since 2026-10-02: the dongle came out when the airframe was sealed. The
-# egress now goes through the Siyi GCS (gcs_gateway role) and the operator
-# reaches the Jetson over Tailscale (tailscale role). Turning this off removes
-# the uplink netplan file, and the netplan apply that follows briefly
-# reconfigures the drone LAN.
-wifi_enabled: false
+# The dongle comes out for flight (sealed airframe) and goes back in on the
+# bench, so its config stays installed either way: without the dongle the
+# interface doesn't exist and the config is inert, and a converge skips the
+# bring-up. The egress then falls back to the Siyi GCS (gcs_gateway role, its
+# default route at gcs_gateway_route_metric); wifi's route has the lower metric,
+# so the bench prefers it whenever both are up. wifi_enabled: false is for a
+# Jetson that should never join (it removes the uplink file, credentials and all).
+wifi_enabled: true
+wifi_route_metric: 50                  # below gcs_gateway_route_metric (100)
 wifi_interface: "wlx7419f815e6a9"  # rtl8852cu dongle — confirmed via ip -br link
 # Address: DHCP with a fixed lease on the UniFi gateway (74:19:f8:15:e6:a9 ->
 # 192.168.1.42), so the name `jethawk` stays in the gateway DNS and the address
@@ -363,10 +366,11 @@ d555_emitter_mode: "Off"
 d555_profile_attempts: 30              # x 10 s: the camera may boot after the Jetson
 mavlink_camera_rtsp_port: 8554
 # Host part of the advertised stream URI (VIDEO_STREAM_INFORMATION). The server
-# binds every interface. Since 2026-10-02 the Jetson has no Wi-Fi of its own
-# and the video's client is the Siyi GCS, which reaches it over the datalink and
-# has no resolver for the Jetson's name ("jethawk" only ever resolved, via the
-# home DNS, to the Wi-Fi address): advertise the drone-LAN address.
+# binds every interface. Advertise the drone-LAN address: QGC on the Siyi GCS
+# reaches it natively over the datalink (it has no resolver for the Jetson's
+# name), and QGC anywhere on the tailnet reaches the same address through the
+# Jetson's /32 tailnet route (tailscale_advertise_routes), on wifi or the GCS
+# alike. No URI that only works on one path.
 mavlink_camera_rtsp_host: "{{ lan_address.split('/')[0] }}"
 mavlink_camera_system_id: 1
 mavlink_camera_component_id: 100

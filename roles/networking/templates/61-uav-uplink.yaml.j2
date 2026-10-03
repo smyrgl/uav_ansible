@@ -8,6 +8,9 @@ network:
   wifis:
     {{ wifi_interface }}:
       dhcp4: true
+      # Below the GCS tunnel's default route: the bench prefers wifi when both are up.
+      dhcp4-overrides:
+        route-metric: {{ wifi_route_metric | default(50) }}
       access-points:
         "{{ wifi_ssid }}":
           password: "{{ wifi_password }}"

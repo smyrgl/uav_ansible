@@ -1,7 +1,8 @@
 ---
 # Tailscale: the operator reaches the Jetson from the tailnet over whatever
-# egress it has (since 2026-10-02: the Siyi GCS, gcs_gateway role). The apt
-# repository key is checked against a pinned fingerprint before it is trusted.
+# egress it has (the wifi dongle on the bench, the Siyi GCS in flight:
+# gcs_gateway role). The apt repository key is checked against a pinned
+# fingerprint before it is trusted.
 tailscale_state: present                     # present | absent
 tailscale_repo_url: https://pkgs.tailscale.com/stable/ubuntu
 tailscale_key_url: "{{ tailscale_repo_url }}/{{ ansible_facts.distribution_release }}.noarmor.gpg"
@@ -9,12 +10,24 @@ tailscale_key_url: "{{ tailscale_repo_url }}/{{ ansible_facts.distribution_relea
 tailscale_key_fingerprint: 2596A99EAAB33821893C0A79458CA832957F5868
 tailscale_keyring: /usr/share/keyrings/tailscale-archive-keyring.gpg
 tailscale_hostname: "{{ system_hostname }}"
+# The Jetson's own drone-LAN address, offered to the tailnet as a /32 route.
+# Everything the Jetson advertises by address (the camera's RTSP URIs, so QGC's
+# video) names 192.168.144.1, native on the Siyi datalink; with this route the
+# same address also reaches the Jetson from any tailnet client (QGC on a
+# laptop), over whichever underlay the Jetson has at the time. One URI, valid
+# on every path. Only the /32: the Jetson itself, not the whole drone LAN (Siyi
+# gear defaults to 192.168.144.x, and a /24 would capture a GCS's own datalink
+# subnet if one ever joined the tailnet). Approve it once in the admin console
+# (Machines > jethawk > Edit route settings) unless an autoApprover covers it.
+tailscale_advertise_routes:
+  - "{{ lan_address.split('/')[0] }}/32"
 # The Jetson keeps its own DNS (resolved, gcs_gateway) and routes; the operator
 # account may run tailscale without sudo.
 tailscale_flags:
   - --accept-dns=false
   - --accept-routes=false
   - "--operator={{ target_user }}"
+  - "--advertise-routes={{ tailscale_advertise_routes | join(',') }}"
 # Optional: a pre-approved (ideally tagged) auth key joins a new node without
 # the browser login; empty = log in by hand once (README).
 tailscale_authkey: "{{ vault_tailscale_authkey | default('') }}"

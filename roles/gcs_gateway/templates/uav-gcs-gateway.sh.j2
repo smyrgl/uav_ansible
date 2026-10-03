@@ -16,39 +16,49 @@ last=
 
 say() { [ "$1" = "$last" ] || { echo "$1"; last=$1; }; }
 
-port_open() { timeout 3 bash -c "exec 3<>/dev/tcp/$gcs/{{ gcs_gateway_socks_port }}" 2>/dev/null; }
+tcp_open() { timeout 3 bash -c "exec 3<>/dev/tcp/$gcs/$1" 2>/dev/null; }
+port_open() { tcp_open {{ gcs_gateway_socks_port }}; }
 
 on_gcs() { adb -s "$target" shell "$1"; }
 
+# Each failure names its cause once (say() logs changes only): a GCS that is
+# simply off, the usual state on the bench, is one line, not one per check.
 install() {
+  if ! tcp_open {{ gcs_gateway_adb_port }}; then
+    say "GCS not reachable at $gcs (off, or the datalink is down): waiting, checking every {{ gcs_gateway_check_interval_s }} s"
+    return 1
+  fi
   adb connect "$target" >/dev/null 2>&1
   local state
   state=$(adb -s "$target" get-state 2>&1)
   if [ "$state" != device ]; then
-    say "GCS adb at $target: $state (an unauthorised key needs the one-time approval on the GCS, see the role README)"
+    say "GCS adb at $target: $state (it answers but refuses ADB: an unauthorised key needs the one-time approval on the GCS, see the role README)"
     return 1
   fi
-  on_gcs "mkdir -p $dir && chmod 700 $dir" >/dev/null || return 1
-  if [ "$(on_gcs "sha256sum $dir/hev-socks5-server 2>/dev/null" | cut -d' ' -f1)" != "$sha" ]; then
-    adb -s "$target" push "$staged" "$dir/hev-socks5-server" >/dev/null || return 1
+  if ! {
+    on_gcs "mkdir -p $dir && chmod 700 $dir" >/dev/null &&
+    { [ "$(on_gcs "sha256sum $dir/hev-socks5-server 2>/dev/null" | cut -d' ' -f1)" = "$sha" ] ||
+      adb -s "$target" push "$staged" "$dir/hev-socks5-server" >/dev/null; } &&
+    adb -s "$target" push /etc/uav/gcs-server.yml "$dir/server.yml" >/dev/null &&
+    # Stop the running copy only if the pid file really names it (pids are reused).
+    on_gcs "cd $dir && chmod 700 hev-socks5-server && chmod 600 server.yml && p=\$(cat server.pid 2>/dev/null); [ -n \"\$p\" ] && grep -q hev-socks5 /proc/\$p/cmdline 2>/dev/null && kill \$p; sleep 1; ./hev-socks5-server server.yml"
+  }; then
+    say "SOCKS5 server install on the GCS failed; retrying every {{ gcs_gateway_check_interval_s }} s"
+    return 1
   fi
-  adb -s "$target" push /etc/uav/gcs-server.yml "$dir/server.yml" >/dev/null || return 1
-  # Stop the running copy only if the pid file really names it (pids are reused).
-  on_gcs "cd $dir && chmod 700 hev-socks5-server && chmod 600 server.yml && p=\$(cat server.pid 2>/dev/null); [ -n \"\$p\" ] && grep -q hev-socks5 /proc/\$p/cmdline 2>/dev/null && kill \$p; sleep 1; ./hev-socks5-server server.yml" || return 1
   sleep 2
-  port_open
+  port_open || { say "SOCKS5 server on $gcs:{{ gcs_gateway_socks_port }} installed but not answering; retrying"; return 1; }
 }
 
 installed=0
 while true; do
   if [ "$installed" = 0 ] || ! port_open; then
-    [ "$installed" = 1 ] && say "SOCKS5 server on $gcs:{{ gcs_gateway_socks_port }} stopped answering (GCS rebooted?): reinstalling"
+    [ "$installed" = 1 ] && say "SOCKS5 server on $gcs:{{ gcs_gateway_socks_port }} stopped answering (GCS off or rebooted?): reinstalling"
     if install; then
       installed=1
       say "SOCKS5 server on $gcs:{{ gcs_gateway_socks_port }} running (hev-socks5-server {{ gcs_gateway_server_version }})"
     else
       installed=0
-      say "SOCKS5 server on $gcs:{{ gcs_gateway_socks_port }} not running; retrying every {{ gcs_gateway_check_interval_s }} s"
     fi
   fi
   sleep {{ gcs_gateway_check_interval_s }}

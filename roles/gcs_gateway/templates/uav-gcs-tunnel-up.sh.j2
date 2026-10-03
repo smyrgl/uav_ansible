@@ -1,9 +1,12 @@
 #!/bin/sh
 # {{ ansible_managed }}
-# Run by hev-socks5-tunnel once {{ gcs_gateway_interface }} is up: the default route and DNS
+# Run by hev-socks5-tunnel once {{ gcs_gateway_interface }} is up: a default route and DNS
 # through the GCS. The drone LAN, the PTP segment and Docker keep their own,
 # more specific routes; resolved forgets the link's DNS when the device goes.
+# The route's metric loses to the wifi's whenever the dongle is in. DNS gets no
+# routing domain ('~.' would send every lookup here alone, even with wifi up and
+# this tunnel dead): resolved asks every default-route link at once and takes
+# the first answer, so lookups work over whichever path is alive.
 ip route replace default dev {{ gcs_gateway_interface }} metric {{ gcs_gateway_route_metric }}
 resolvectl dns {{ gcs_gateway_interface }} {{ gcs_gateway_dns | join(' ') }}
-resolvectl domain {{ gcs_gateway_interface }} '~.'
 resolvectl default-route {{ gcs_gateway_interface }} yes

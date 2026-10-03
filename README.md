@@ -239,7 +239,7 @@ discards anything written to it).
 |---|---|
 | `base` | apt baseline, locale/tz/hostname, swap, nvpmodel + jetson_clocks |
 | `dev_tools` | git, git-lfs (+`git lfs install`), nano, common CLI tools |
-| `networking` | netplan (networkd): wifi uplink first (gated; `wifi_enabled: false` since 2026-10-02), then the two un-bridged segments |
+| `networking` | netplan (networkd): wifi uplink first (gated; the dongle is in on the bench, out in flight, and its config stays installed either way), then the two un-bridged segments |
 | `gcs_gateway` | egress through the Siyi GCS: hev-socks5-server on its Android (no root; ADB-supervised from the Jetson) + hev-socks5-tunnel (`gcs0`, default route, DNS) |
 | `tailscale` | operator access from the tailnet over that egress (`jethawk`); pinned repository key |
 | `jtop` | jetson-stats + `jtop` group (non-sudo access; handles PEP 668) |

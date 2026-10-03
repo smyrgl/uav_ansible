@@ -1,13 +1,28 @@
 # Tailscale (tailscale)
 
-Operator access to the Jetson from the tailnet, over whatever egress it has.
-Since 2026-10-02 that is the Siyi GCS (`gcs_gateway` role): the Jetson has no
-Wi-Fi of its own, so nothing on the house network can reach it directly.
+Operator access to the Jetson from the tailnet, over whatever egress it has:
+its Wi-Fi dongle on the bench, the Siyi GCS (`gcs_gateway` role) in flight,
+when the dongle is out and nothing on the house network can reach it
+directly. With neither (dongle out, GCS off), it is unreachable except on
+the drone LAN.
 
 - Package `tailscale` from Tailscale's apt repository. The repository key is
   checked against a pinned fingerprint (`tailscale_key_fingerprint`,
   `2596A99EAAB33821893C0A79458CA832957F5868`, Tailscale Inc. package
   repository signing key, RSA 4096 from 2020) before it is trusted.
+- The Jetson's drone-LAN address as a tailnet route (`tailscale_advertise_routes`,
+  `192.168.144.1/32`). Anything the Jetson advertises by address, such as the
+  camera's RTSP URIs and so QGC's video, names `192.168.144.1`. That address is
+  native on the Siyi datalink. With this route, the same address also reaches
+  the Jetson from any tailnet client that accepts routes (macOS does by
+  default), over whatever underlay the Jetson has at the time: one URI, valid
+  on every path. It is only the /32 for the Jetson itself, not the drone LAN,
+  for two reasons: Siyi gear defaults to `192.168.144.x`, and a /24 would
+  capture a GCS's own datalink subnet if one ever joined the tailnet. The route
+  must be approved once in the admin console (Machines > jethawk > Edit route
+  settings), unless an autoApprover covers it. Check it with
+  `route -n get 192.168.144.1` on the Mac, which should show a `utun`
+  interface.
 - Flags (`tailscale_flags`): `--accept-dns=false`, so the Jetson keeps its own
   resolver (resolved, with DNS on `gcs0`); `--accept-routes=false`;
   `--operator=<target_user>`, so `tailscale` runs without sudo.

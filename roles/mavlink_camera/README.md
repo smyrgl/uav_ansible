@@ -158,26 +158,24 @@ orientation and INT32_MAX integer pose fields as application-level unavailable
 sentinels; MAVLink has no standard integer-invalid value for those fields. Do not
 interpret them as positions. Sidecars explicitly identify pose as unavailable.
 
-## Mac bench route
+## Reaching the drone-LAN address from a Mac
 
-No longer needed for the camera: the stream URI is advertised by hostname and
-the RTSP server binds every interface, so QGC on the house Wi-Fi reaches it
-directly. The helper below still adds a temporary host route to `192.168.144.1`
-via the Jetson's Wi-Fi address for drone-LAN-only services. Mind that the
-Jetson's Wi-Fi address is DHCP-assigned and has moved between `192.168.1.40`
-and `.42`: a route via a stale lease fails with "No route to host" (this is
-what broke Foxglove on 2026-09-30; the Foxglove role's README shows the SSH
-tunnel that avoids the route). Reserve the lease in the bench router, or pass
-the current address.
+Nothing to set up. The stream URIs name the drone-LAN address `192.168.144.1`.
+QGC on the Siyi GCS reaches it over the datalink. The Jetson also advertises
+that address to the tailnet as a /32 route (`tailscale` role), so QGC on any
+tailnet client reaches the same URIs over whatever underlay the Jetson has:
+Wi-Fi on the bench, the GCS in flight.
+
+The `bench-route-macos.sh` helper that used to add a static host route via the
+Jetson's Wi-Fi address is gone (2026-10-03). Its route outlived every lease
+change until the Mac rebooted: via the old `.40` lease, it shadowed the tailnet
+route and failed with "No route to host". If `route -n get 192.168.144.1` on the
+Mac shows a gateway on `en0` rather than a `utun` interface, delete the
+leftover:
 
 ```sh
-roles/mavlink_camera/files/bench-route-macos.sh status
-roles/mavlink_camera/files/bench-route-macos.sh up 192.168.1.40
-roles/mavlink_camera/files/bench-route-macos.sh down 192.168.1.40
+sudo route -n delete -host 192.168.144.1
 ```
-
-Remove this host route before connecting this Mac directly to the SIYI network.
-Nothing in this role installs a bench route on the aircraft or the handheld.
 
 ## Verification
 
