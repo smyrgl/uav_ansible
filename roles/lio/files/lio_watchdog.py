@@ -145,8 +145,14 @@ def create_watchdog_node(options):
                     save_restarts(options.state_file, self.policy.history)
                 exhausted, restart_in = self.policy.exhausted(now), self.policy.next_in(now, verdict)
             if verdict["state"] != self.logged_state:    # evidence moves the state between ticks too
-                log = self.get_logger().error if verdict["state"] == health.DIVERGED else self.get_logger().info
-                log(f"FAST-LIO {verdict['state']}: {verdict['reason'] or 'tracking'} (epoch {verdict['epoch']})")
+                text = f"FAST-LIO {verdict['state']}: {verdict['reason'] or 'tracking'} (epoch {verdict['epoch']})"
+                # rclpy caches every logging call site with its severity and raises if the
+                # severity changes there (2026-10-03: the process died on degraded -> diverged),
+                # so ERROR and INFO get call sites of their own.
+                if verdict["state"] == health.DIVERGED:
+                    self.get_logger().error(text)
+                else:
+                    self.get_logger().info(text)
                 self.logged_state = verdict["state"]
             if restart:
                 self._restart(verdict)
