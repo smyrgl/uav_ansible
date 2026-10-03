@@ -21,6 +21,7 @@ trail. The first RTSP client starts the rendering and the map, scan and E1R subs
 import argparse
 import collections
 import ctypes
+import json
 import math
 import os
 import signal
@@ -1286,6 +1287,7 @@ class Scene:
         self.speed = 0.0
         self.start_z = None
         self.jumps = collections.deque(maxlen=20)           # when the pose last leapt (restart, divergence)
+        self.health = None                                  # the lio watchdog's last verdict (a dict)
 
     def add_map(self, points):
         fresh = self.dedup.add(points)
@@ -1318,9 +1320,12 @@ def create_node(options, scene, stream):
     from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
     from nav_msgs.msg import Odometry
     from rclpy.node import Node
+    from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
     from sensor_msgs.msg import PointCloud2
+    from std_msgs.msg import String, UInt32
 
     lever_arm = np.asarray(options.imu_lever_arm, float)
+    latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
 
     class LidarView(Node):
         def __init__(self):
@@ -1329,6 +1334,11 @@ def create_node(options, scene, stream):
             self.last_odom = None
             self.stats = {}
             self.create_subscription(Odometry, options.odometry_topic, self._odom, 50)
+            # The lio watchdog's verdict (why the map stopped) and the map's epoch (when what
+            # this view accumulated must go: points taken back, or a new map).
+            self.map_epoch = None
+            self.create_subscription(String, options.health_topic, self._health, latched)
+            self.create_subscription(UInt32, options.map_topic_base + "/epoch", self._map_epoch, latched)
             self.create_timer(0.5, self._watch)
             self.diag_pub = self.create_publisher(DiagnosticArray, "/diagnostics", 10)
             self.create_timer(1.0, self._diagnose)
@@ -1357,6 +1367,20 @@ def create_node(options, scene, stream):
                     scene.start_z = float(base[2])
                 scene.trail.add(base)
             self.last_odom = time.monotonic()
+
+        def _health(self, message):
+            try:
+                verdict = json.loads(message.data)
+            except ValueError:
+                return
+            if isinstance(verdict, dict) and verdict.get("state") in ("ok", "degraded", "diverged"):
+                scene.health = verdict
+
+        def _map_epoch(self, message):
+            if self.map_epoch is not None and message.data != self.map_epoch and self.heavy:
+                scene.reset_map()                 # the whole map follows on /updates
+                self.get_logger().info(f"map epoch {message.data}: map reloaded")
+            self.map_epoch = message.data
 
         def _watch(self):
             want = options.always_on or (stream is not None and stream.active)
@@ -1539,8 +1563,16 @@ def _render(options, scene, stream, node, stop, snapshot, renderer, mesh, rotors
                      f"MAP {renderer.map_count / 1e6:4.2f} M   AVIA {avia_hz:4.1f} Hz   E1R {e1r_hz:4.1f} Hz"]
             legend = [("AVIA", style["avia_color"]), ("E1R", style["e1r_color"]), ("TRAIL", style["trail_color"])]
             footer = time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()) + ("    CUTAWAY" if enclosed else "")
+            verdict = scene.health
             if pose is None or not node.last_odom or now - node.last_odom > 2.0:
                 warning = "NO FAST-LIO POSE"
+            elif verdict and verdict.get("state") == "diverged":
+                if verdict.get("exhausted"):
+                    warning = "FAST-LIO DIVERGED \u00b7 MAP FROZEN \u00b7 AUTO-RESTART EXHAUSTED: REPOSITION, RESTART uav-lio"
+                elif verdict.get("restart_in_s") is not None:
+                    warning = f"FAST-LIO DIVERGED \u00b7 MAP FROZEN \u00b7 RESTARTING IT IN {verdict['restart_in_s']:.0f} s"
+                else:
+                    warning = "FAST-LIO DIVERGED \u00b7 MAP FROZEN"
             elif leaps >= 3:
                 warning = f"FAST-LIO DIVERGED ({leaps} pose leaps in 10 s): RESTART uav-lio"
             elif speed > options.diverged_speed:
@@ -1700,6 +1732,9 @@ def main():
     parser.add_argument("--scan-topic", default="/cloud_registered")
     parser.add_argument("--e1r-topic", default="/lio/registered/e1r")
     parser.add_argument("--odometry-topic", default="/Odometry", help="FAST-LIO's IMU pose")
+    parser.add_argument("--health-topic", default="/lio/health", help="the lio watchdog's verdict on FAST-LIO")
+    parser.add_argument("--map-topic-base", dest="map_topic_base", default="/lio/map",
+                        help="lio_map's base topic (its /epoch says when to reload)")
     parser.add_argument("--imu-lever-arm", type=float, nargs=3, default=[0.22035, -0.02626, 0.1384],
                         metavar=("X", "Y", "Z"), help="the Avia IMU in base_link (the lio bridge's)")
     parser.add_argument("--urdf", required=True)

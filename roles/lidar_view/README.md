@@ -12,7 +12,7 @@ MAVLink camera's second stream.
 | Service | `uav-lidar-view` (`uav-ros`, groups `video render`), `/usr/local/lib/uav/uav_lidar_view.py` |
 | Stream | `rtsp://192.168.144.1:8555/lidar`, H.265 1280×720 at 30 fps, 4 Mbit/s |
 | MAVLink | camera component 100, `VIDEO_STREAM_INFORMATION` stream 2 of 2, "LiDAR map" |
-| Inputs | `/lio/map/updates`, `/cloud_registered`, `/lio/registered/e1r`, `/Odometry` (all in FAST-LIO's `camera_init`) |
+| Inputs | `/lio/map/updates`, `/cloud_registered`, `/lio/registered/e1r`, `/Odometry` (all in FAST-LIO's `camera_init`); `/lio/map/epoch`, `/lio/health` |
 | Diagnostics | the `lidar_view` row: clients, fps, render time, map points, AGL and its source, boom length, cutaway |
 
 ## What is drawn
@@ -33,6 +33,9 @@ MAVLink camera's second stream.
     would write. The view has the same filter (`--promote`). The role turns
     it on only if lio_map's is off (`lidar_view_promote`), so one of the two
     is always active.
+  - When `/lio/map/epoch` changes, the view drops the map it holds and the
+    whole map follows on `/lio/map/updates`. lio_map bumps it when it takes
+    points back after a divergence and when it starts a new map.
 - **The live scans**: the current Avia scan in white and the current E1R scan
   in magenta, at 8 cm and at least 2.4 px. You can see at a glance what each
   sensor covers right now, including the gap between the E1R's forward edge
@@ -70,10 +73,14 @@ MAVLink camera's second stream.
   panel at the top right. Both sit inside `lidar_view_safe_area`: by default
   10 % of the frame at the top, 8 % at the sides and 16 % at the bottom. Those
   are the bands where QGC draws its own toolbar, tool strip, camera panel,
-  instruments and map thumbnail over the video. Two warnings, centred above
-  the bottom band:
+  instruments and map thumbnail over the video. One warning at a time,
+  centred above the bottom band:
   - "NO FAST-LIO POSE" when odometry has stopped;
-  - "FAST-LIO DIVERGED (… m/s): RESTART uav-lio" above 40 m/s
+  - "FAST-LIO DIVERGED · MAP FROZEN" once the lio watchdog has declared it
+    on `/lio/health` (lio README, *Divergence*), with the countdown to its
+    restart of FAST-LIO, or "AUTO-RESTART EXHAUSTED" once it has given up;
+  - otherwise the view's own evidence: "FAST-LIO DIVERGED (…): RESTART
+    uav-lio" after three pose leaps in 10 s, or above 40 m/s
     (`--diverged-speed`), which no X950 flies.
 - **The plumb line** is amber, so it can't be mistaken for the cyan trail when
   both run down the middle of the frame.
@@ -208,13 +215,15 @@ PYOPENGL_PLATFORM=egl python3 /usr/local/lib/uav/uav_lidar_view.py --snapshot /t
 
 ## Caveats
 
-- The view is only as good as FAST-LIO. A diverged FAST-LIO shows up here:
-  kilometres of trail, ALT in the thousands, the map filling to its 4 M cap.
-  On 2026-10-02 the Avia on the bench faced something about 1.1 m away. That
-  is inside its blind zone, and FAST-LIO got almost no usable returns from the
-  first scan. FAST-LIO does not recover by itself; restart `uav-lio` once the
-  Avia has a view. With the aircraft turned toward the room, it restarted
-  cleanly. Restart `uav-lio-map` too, or the old map stays.
+- The view is only as good as FAST-LIO. A diverged FAST-LIO shows up here as
+  kilometres of trail and ALT in the thousands. On 2026-10-02 the Avia on the
+  bench faced something about 1.1 m away. That is inside its blind zone, and
+  FAST-LIO got almost no usable returns from the first scan; the map filled
+  to its 4 M cap with the runaway. Since 2026-10-03 the lio watchdog freezes
+  the map, takes the runaway back out of it, and restarts `uav-lio` (lio
+  README, *Divergence*); the map starts over with it. FAST-LIO does not
+  recover by itself, and a restart helps only once the Avia has a view: with
+  the aircraft turned toward the room, it restarted cleanly.
 - The map is in FAST-LIO's start frame. Heights are coloured along its z,
   which is only as level as the aircraft was when FAST-LIO started.
 - The field-of-view mounts are the nominal ones (`lidar_view_*_mount`). The

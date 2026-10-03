@@ -1,0 +1,29 @@
+[Unit]
+Description=FAST-LIO watchdog (log + odometry -> /lio/health; restarts uav-lio when it stays diverged)
+After=network-online.target uav-lio.service
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ lio_service_user }}
+Group={{ lio_service_user }}
+# FAST-LIO's log is in the system journal.
+SupplementaryGroups=systemd-journal
+EnvironmentFile={{ lio_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/lio_watchdog.py --unit uav-lio.service --restart-unit uav-lio.service --sustain {{ lio_watchdog_sustain_s }} --restart-after {{ lio_watchdog_restart_after_s }} --restart-min-interval {{ lio_watchdog_restart_min_interval_s }} --restarts-per-hour {{ lio_watchdog_restarts_per_hour | int }}{{ '' if lio_watchdog_restart | bool else ' --no-restart' }}'
+Restart=on-failure
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=10
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

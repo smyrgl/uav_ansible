@@ -1,0 +1,11 @@
+// {{ ansible_managed }}
+// The LIO watchdog runs as {{ lio_service_user }} and may restart FAST-LIO's unit when
+// it stays diverged: that verb on that unit, nothing else (roles/lio README, Divergence).
+polkit.addRule(function (action, subject) {
+    if (action.id == "org.freedesktop.systemd1.manage-units" &&
+        action.lookup("unit") == "uav-lio.service" &&
+        action.lookup("verb") == "restart" &&
+        subject.user == "{{ lio_service_user }}") {
+        return polkit.Result.YES;
+    }
+});

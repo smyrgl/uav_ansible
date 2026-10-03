@@ -114,6 +114,33 @@ class Map(unittest.TestCase):
             direct.add(shown)
         self.assertEqual(coarse.keys, direct.keys)
 
+    def test_rollback_takes_back_what_arrived_since(self):
+        m = VoxelMap(0.1, 100)
+        for t, x in ((1.0, 0.0), (2.0, 1.0), (3.0, 2.0)):
+            m.add(np.array([[x, 0, 0, t], [x, 0.5, 0, t]], np.float32), now=t)
+        self.assertEqual(m.rollback(2.5), 2)                 # the two that arrived at 3.0
+        self.assertEqual((m.size, len(m.keys)), (4, 4))
+        self.assertEqual(sorted(m.points()[:, 3].tolist()), [1, 1, 2, 2])
+        self.assertEqual(len(m.add(np.array([[2.0, 0, 0, 9]], np.float32), now=4.0)), 1)   # its voxel is free again
+        self.assertEqual(m.rollback(100.0), 0)               # nothing after that
+        self.assertEqual(m.rollback(0.0), 5)                 # everything
+        self.assertEqual((m.size, len(m.keys), m.points().shape), (0, 0, (0, 4)))
+
+    def test_rollback_reopens_a_full_map_and_forgets_old_marks(self):
+        m = VoxelMap(0.1, 3, horizon_s=10.0)
+        m.add(np.array([[0, 0, 0, 0], [1, 0, 0, 0]], np.float32), now=0.0)
+        m.add(np.array([[2, 0, 0, 0], [3, 0, 0, 0]], np.float32), now=20.0)
+        self.assertTrue(m.full)
+        self.assertEqual(len(m.marks), 1)                    # the mark at 0 s is past the horizon
+        self.assertEqual(m.rollback(15.0), 1)
+        self.assertFalse(m.full)
+
+    def test_seeded_cells_pass_straight_through(self):
+        promoter = CellPromoter(3)
+        promoter.seed(np.array([[0.1, 0.1, 0.1, 0]], np.float32))
+        self.assertEqual(promoter.promoted_cells, 1)
+        self.assertEqual(len(promoter.filter(np.array([[0.3, 0.3, 0.2, 0]], np.float32))), 1)
+
     def test_pcd_is_header_plus_float32(self):
         pts = np.array([[1, 2, 3, 4], [5, 6, 7, 8]], np.float32)
         blob = pcd_bytes(pts)

@@ -72,3 +72,18 @@ lio_e1r_min_range_m: 0.1
 lio_e1r_max_range_m: 0.0
 lio_e1r_max_pose_gap_s: 0.25               # bracketing poses further apart: FAST-LIO stalled or restarted
 lio_e1r_max_wait_s: 0.5                    # for the first pose after a frame's last point
+
+# Divergence (README): the watchdog reads FAST-LIO's log ("No Effective Points!",
+# "No point, skip this scan!") and odometry (impossible speeds, leaps), publishes
+# /lio/health, and the E1R registration and the map stop on DIVERGED (the map
+# taking back what arrived since the onset). A run of evidence this long is a
+# divergence; shorter ones (a featureless moment) are only 'degraded'.
+lio_watchdog_enabled: true
+lio_watchdog_sustain_s: 2.0
+# Restart FAST-LIO (systemctl, allowed by a polkit rule for this unit alone) after
+# this long diverged, at most once per interval and this many times an hour; then
+# give up and say so (an aircraft facing a wall diverges again at once).
+lio_watchdog_restart: true
+lio_watchdog_restart_after_s: 10.0
+lio_watchdog_restart_min_interval_s: 120.0
+lio_watchdog_restarts_per_hour: 5

@@ -24,7 +24,9 @@ field).
 
 Output: the registered cloud in FAST-LIO's frame (x, y, z, intensity float32,
 stamped with the frame's first point), which the lio map adds to the same voxel
-map. Diagnostics: the "lio/<name>" row.
+map. Nothing is registered while the lio watchdog (/lio/health) says FAST-LIO has
+diverged, and its poses are forgotten when FAST-LIO starts over. Diagnostics:
+the "lio/<name>" row.
 """
 import argparse
 import math
@@ -32,6 +34,8 @@ import time
 from collections import deque
 
 import numpy as np
+
+import lio_health
 
 NUMPY_TYPES = {1: "i1", 2: "u1", 3: "i2", 4: "u2", 5: "i4", 6: "u4", 7: "f4", 8: "f8"}   # PointField datatypes
 
@@ -147,6 +151,7 @@ def create_register_node(options):
     from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy, qos_profile_sensor_data
     from rclpy.time import Time
     from sensor_msgs.msg import PointCloud2, PointField
+    from std_msgs.msg import String
     from tf2_msgs.msg import TFMessage
     from tf2_ros import Buffer, TransformException
 
@@ -161,12 +166,16 @@ def create_register_node(options):
             self.frame = None               # FAST-LIO's world frame, from its odometry
             self.counts = {k: 0 for k in ("frames_in", "frames_out", "frames_no_pose", "frames_no_extrinsic",
                                           "frames_empty", "frames_overflow", "points_in", "points_out",
-                                          "points_range_gated", "points_unbracketed", "pose_restarts")}
+                                          "points_range_gated", "points_unbracketed", "pose_restarts",
+                                          "frames_diverged")}
+            self.health = lio_health.HealthFollower()   # the watchdog's verdict on FAST-LIO
             self.last_input = self.last_pose = None
             self.outputs, self.waits, self.latencies = [], [], []
             self.tf_buffer = Buffer()                # static transforms only (the mount)
             latched = QoSProfile(depth=100, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
             self.create_subscription(TFMessage, "/tf_static", self._tf_static, latched)
+            health_qos = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL, reliability=ReliabilityPolicy.RELIABLE)
+            self.create_subscription(String, options.health_topic, self._health, health_qos)
             self.pub = self.create_publisher(PointCloud2, options.output_topic, 5)
             self.create_subscription(Odometry, options.odometry_topic, self._odom, 50)
             self.create_subscription(PointCloud2, options.input_topic, self._cloud, qos_profile_sensor_data)
@@ -185,6 +194,18 @@ def create_register_node(options):
                 self.counts["pose_restarts"] += 1
             self.frame, self.last_pose = message.header.frame_id, time.monotonic()
             self._flush()
+
+        def _health(self, message):
+            verdict = lio_health.decode(message.data)
+            if verdict is None:
+                return
+            event = self.health.update(verdict)
+            if event == "restarted":                  # a new origin: nothing old may bracket a new frame
+                self.poses.clear()
+                self.pending.clear()
+                self.get_logger().warning(f"FAST-LIO started over (epoch {verdict['epoch']}): pose buffer cleared")
+            elif event == "diverged":
+                self.get_logger().error(f"FAST-LIO diverged ({verdict['reason']}): not registering")
 
         def _tf_static(self, message):
             for transform in message.transforms:
@@ -249,6 +270,9 @@ def create_register_node(options):
                     break
 
         def _register(self, arrival, stamp, last, points, intensity, times, mount):
+            if self.health.diverged:                  # FAST-LIO's poses are garbage
+                self.counts["frames_diverged"] += 1
+                return
             world, kept = register(points, times, self.poses, *mount)
             self.counts["points_unbracketed"] += int(len(kept) - kept.sum())
             if not len(world):
@@ -277,7 +301,10 @@ def create_register_node(options):
             rate = len(self.outputs) / 5.0
             waits, self.waits = sorted(self.waits[-50:]), []
             latencies, self.latencies = sorted(self.latencies[-50:]), []
-            if self.last_input is None or mono - self.last_input > 2.0:
+            if self.health.diverged:
+                level = DiagnosticStatus_.ERROR
+                text = f"FAST-LIO diverged: not registering ({self.health.verdict['reason']})"
+            elif self.last_input is None or mono - self.last_input > 2.0:
                 level, text = DiagnosticStatus_.WARN, f"No {options.name} frames on {options.input_topic}"
             elif not self.extrinsics:
                 level, text = DiagnosticStatus_.WARN, f"No transform {options.base_frame} -> {options.name} frame"
@@ -311,6 +338,7 @@ def main():
     parser.add_argument("--time-field", default="timestamp", help="per-point absolute time, s (the E1R: UTC float64)")
     parser.add_argument("--output-topic", default="/lio/registered/e1r")
     parser.add_argument("--odometry-topic", default="/Odometry", help="FAST-LIO's IMU pose")
+    parser.add_argument("--health-topic", default="/lio/health", help="the lio watchdog's verdict on FAST-LIO")
     parser.add_argument("--base-frame", default="base_link")
     parser.add_argument("--imu-lever-arm", type=float, nargs=3, required=True, metavar=("X", "Y", "Z"),
                         help="the IMU's position in base_link, m")

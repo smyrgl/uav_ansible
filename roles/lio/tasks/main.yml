@@ -102,14 +102,18 @@
         - test_lio_map.py
         - lio_register.py
         - test_lio_register.py
+        - lio_health.py
+        - test_lio_health.py
+        - lio_watchdog.py
       notify:
         - Restart lio bridge
         - Restart lio map
         - Restart lio e1r
+        - Restart lio watchdog
 
     - name: Run the bridge, map and registration tests on the target
       ansible.builtin.command:
-        argv: [/usr/bin/python3, -m, unittest, -q, test_lio_bridge, test_lio_map, test_lio_register]
+        argv: [/usr/bin/python3, -m, unittest, -q, test_lio_bridge, test_lio_map, test_lio_register, test_lio_health]
         chdir: /usr/local/lib/uav
       environment:
         PYTHONDONTWRITEBYTECODE: "1"
@@ -166,6 +170,37 @@
         state: "{{ 'started' if lio_e1r_enabled | bool else 'stopped' }}"
         daemon_reload: true
 
+    # The watchdog runs as the service user; this rule lets that user restart
+    # FAST-LIO's unit and nothing else (polkit, so NoNewPrivileges services can).
+    - name: Allow the LIO watchdog to restart FAST-LIO
+      ansible.builtin.template:
+        src: 60-uav-lio-watchdog.rules.j2
+        dest: /etc/polkit-1/rules.d/60-uav-lio-watchdog.rules
+        owner: root
+        group: root
+        mode: "0644"
+      when: lio_watchdog_enabled | bool and lio_watchdog_restart | bool
+
+    - name: Remove the restart permission when the watchdog may not restart
+      ansible.builtin.file:
+        path: /etc/polkit-1/rules.d/60-uav-lio-watchdog.rules
+        state: absent
+      when: not (lio_watchdog_enabled | bool and lio_watchdog_restart | bool)
+
+    - name: Install the LIO watchdog unit
+      ansible.builtin.template:
+        src: uav-lio-watchdog.service.j2
+        dest: /etc/systemd/system/uav-lio-watchdog.service
+        mode: "0644"
+      notify: Restart lio watchdog
+
+    - name: Run the LIO watchdog at boot (or stop it when disabled)
+      ansible.builtin.systemd_service:
+        name: uav-lio-watchdog.service
+        enabled: "{{ lio_watchdog_enabled | bool }}"
+        state: "{{ 'started' if lio_watchdog_enabled | bool else 'stopped' }}"
+        daemon_reload: true
+
     - name: Configure FAST-LIO
       ansible.builtin.template:
         src: fast_lio.yaml.j2
@@ -200,6 +235,7 @@
         - uav-lio-bridge.service
         - uav-lio-map.service
         - uav-lio-e1r.service
+        - uav-lio-watchdog.service
       failed_when: false
 
     - name: Remove the FAST-LIO units, configuration and bridge
@@ -211,6 +247,8 @@
         - /etc/systemd/system/uav-lio-bridge.service
         - /etc/systemd/system/uav-lio-map.service
         - /etc/systemd/system/uav-lio-e1r.service
+        - /etc/systemd/system/uav-lio-watchdog.service
+        - /etc/polkit-1/rules.d/60-uav-lio-watchdog.rules
         - "{{ lio_config_path }}"
         - /usr/local/lib/uav/lio_bridge.py
         - /usr/local/lib/uav/test_lio_bridge.py
@@ -218,3 +256,6 @@
         - /usr/local/lib/uav/test_lio_map.py
         - /usr/local/lib/uav/lio_register.py
         - /usr/local/lib/uav/test_lio_register.py
+        - /usr/local/lib/uav/lio_health.py
+        - /usr/local/lib/uav/test_lio_health.py
+        - /usr/local/lib/uav/lio_watchdog.py

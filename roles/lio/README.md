@@ -207,6 +207,73 @@ Drawn over the raw `/e1r/points` it differs by the drift between the EKF and
 FAST-LIO (the raw cloud hangs off the EKF's `base_link`), not by the extrinsic;
 compare it with the map instead.
 
+## Divergence (`/lio/health`, `uav-lio-watchdog.service`)
+
+FAST-LIO does not say when it loses track, and it does not come back by itself.
+On 2026-10-02 the Avia on the bench faced an obstruction inside its blind
+zone, and FAST-LIO got almost nothing to match from its first scan. It
+propagated on the IMU alone and reached ALT −155 km. The bridge stopped
+publishing once the speed passed 30 m/s. But the E1R registration went on
+placing frames with the runaway poses and reported OK, and the map filled to
+its 4 M cap with them (3.94 M of the points).
+
+**Detection.** `lio_watchdog.py` follows two signals, through `lio_health.py`:
+- **FAST-LIO's log** (the unit's journal, hence `SupplementaryGroups=
+  systemd-journal`):
+  - "No Effective Points!" comes once per filter iteration of a scan whose
+    update found nothing to match;
+  - "No point, skip this scan!" comes for a scan without usable points.
+- **Its odometry:** a speed above 30 m/s, or a leap of more than 5 m between
+  consecutive poses.
+
+A run of evidence without a gap over 0.5 s is DEGRADED. A run sustained for
+`lio_watchdog_sustain_s` (2 s, about 20 failed scans) is DIVERGED. A
+featureless moment, or the usual "No point" of the first scan, stays
+DEGRADED. DIVERGED holds until FAST-LIO starts over: "IMU Initial Done" in
+its log, or its stamps going back or skipping more than 5 s. That starts a
+new epoch.
+
+**The verdict** is on `/lio/health`: `std_msgs/String`, JSON, latched,
+published on every change and every 2 s. It carries:
+- the state, the epoch and the reason;
+- the onset (the run's start less 1 s) and `since`, on the host's monotonic
+  clock, which every process on the Jetson shares;
+- the restart bookkeeping;
+- a watchdog session id, so a restarted watchdog's epoch 0 isn't read as
+  FAST-LIO restarting.
+
+**On DIVERGED:**
+- **lio_map** freezes: it refuses scans and takes back every point that
+  arrived since the onset. It keeps a mark at every addition of the last
+  10 minutes, then rebuilds the overview and the stray filter's cells from
+  what is left. It bumps `/lio/map/epoch` and sends the whole (clean) map on
+  `/lio/map/updates`.
+- **lio_register** stops registering E1R frames (`frames_diverged`).
+- **Both rows go ERROR.** The lidar view says "MAP FROZEN" and when the
+  restart comes.
+
+On a new epoch the map starts over and the registration forgets its poses: a
+restarted FAST-LIO has a new origin, and a systemd restart pauses the scans
+for only about 4 s, under the map's 10 s gap rule. The bridge's
+`/lio/odometry`, the EKF's input, is left as it was.
+
+**Recovery.** After `lio_watchdog_restart_after_s` (10 s) of divergence, the
+watchdog restarts `uav-lio` with `systemctl restart`. A polkit rule
+(`/etc/polkit-1/rules.d/60-uav-lio-watchdog.rules`) allows the service user
+that one verb on that one unit. Restarts are at least
+`lio_watchdog_restart_min_interval_s` (2 min) apart and at most
+`lio_watchdog_restarts_per_hour` (5) an hour. Past that the watchdog gives up
+and says so ("auto-restart exhausted: reposition, then restart uav-lio"):
+an aircraft facing a wall diverges again at once. FAST-LIO's IMU
+initialisation assumes the aircraft is still, so a restart in flight gives a
+degraded start. FAST-LIO is a shadow estimator here; nothing flies on it.
+`lio_watchdog_restart: false` reports only.
+
+- The `lio/watchdog` row shows the state, the reason, how long it has been
+  diverged, the restarts and the log lines read. "Blind to FAST-LIO's log"
+  means the journal can't be read.
+- `ros2 topic echo /lio/health` shows the verdict itself.
+
 ## Measured on the bench (2026-10-02, indoors, vehicle still)
 
 | Quantity | Value |

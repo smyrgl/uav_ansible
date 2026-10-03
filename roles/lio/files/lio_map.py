@@ -31,14 +31,23 @@ Foxglove client: the bridge shares one ROS subscription between clients, so
 only the first one is noticed). A
 gap in the scans longer than reset_gap_s (FAST-LIO restarted, new origin)
 clears them too.
+
+The lio watchdog's verdict (/lio/health) gates it: when FAST-LIO is declared
+diverged the map freezes (scans refused) and takes back every point that arrived
+since shortly before the onset; when FAST-LIO starts over (a new epoch) it
+starts a new map. Either way /lio/map/epoch is bumped, so a viewer that
+accumulates /updates drops what it holds, and the whole map follows.
 """
 import argparse
 import itertools
 import os
 import time
+from collections import deque
 from datetime import datetime, timezone
 
 import numpy as np
+
+import lio_health
 
 OFFSET = 1 << 20          # 21 bits per axis: +-1,048,576 voxels (+-210 km at 0.2 m)
 
@@ -52,11 +61,14 @@ def voxel_keys(xyz, voxel):
 
 
 class VoxelMap:
-    """One point (the first seen) per voxel; x, y, z, intensity as float32."""
+    """One point (the first seen) per voxel; x, y, z, intensity as float32. The points are
+    kept in arrival order, with a mark (monotonic s, size before) at every addition of the
+    last `horizon_s`, so what arrived after a moment can be taken back (rollback)."""
 
-    def __init__(self, voxel, max_points):
+    def __init__(self, voxel, max_points, horizon_s=600.0):
         self.voxel = float(voxel)
         self.max_points = int(max_points)
+        self.horizon_s = float(horizon_s)
         self.reset()
 
     def reset(self):
@@ -64,9 +76,11 @@ class VoxelMap:
         self.chunks = []
         self.size = 0
         self.full = False
+        self.marks = deque()
 
-    def add(self, points):
-        """points: (n, 4) float32 x, y, z, intensity. Returns the new points (m, 4)."""
+    def add(self, points, now=None):
+        """points: (n, 4) float32 x, y, z, intensity, arrived at monotonic `now`.
+        Returns the new points (m, 4)."""
         none = np.zeros((0, 4), np.float32)
         if self.full or not len(points):
             return none
@@ -80,11 +94,30 @@ class VoxelMap:
         room = self.max_points - self.size
         if len(fresh) > room:
             fresh, self.full = fresh[:room], True
+        if now is not None:
+            self.marks.append((now, self.size))
+            while len(self.marks) > 1 and now - self.marks[0][0] > self.horizon_s:
+                self.marks.popleft()
         self.keys.update(keys[fresh].tolist())
         new = points[first[fresh]].astype(np.float32)
         self.chunks.append(new)
         self.size += len(fresh)
         return new
+
+    def rollback(self, since):
+        """Take back every point that arrived at or after monotonic `since` (within the
+        horizon). Returns how many."""
+        keep = next((size for t, size in self.marks if t >= since), None)
+        if keep is None or keep >= self.size:
+            return 0
+        pts = self.points()
+        dropped = pts[keep:]
+        self.keys.difference_update(voxel_keys(dropped[:, :3].astype(np.float64), self.voxel).tolist())
+        self.chunks = [pts[:keep].copy()] if keep else []
+        self.size, self.full = keep, False
+        while self.marks and self.marks[-1][0] >= since:
+            self.marks.pop()
+        return len(dropped)
 
     def points(self):
         if len(self.chunks) > 1:
@@ -134,6 +167,11 @@ class CellPromoter:
                 at = np.minimum(np.searchsorted(known, cells), len(known) - 1)
                 mask |= known[at] == cells
         return mask
+
+    def seed(self, points):
+        """Count the cells of points already in the map as promoted (after a rollback)."""
+        if self.need > 1 and len(points):
+            self._main = np.union1d(self._main, np.unique(self.cell_keys(points[:, :3].astype(np.float64))))
 
     def _promote(self, cells):
         self._recent = np.union1d(self._recent, np.asarray(cells, np.int64))
@@ -216,6 +254,7 @@ def create_map_node(options):
     from rclpy.node import Node
     from rclpy.qos import DurabilityPolicy, QoSProfile, ReliabilityPolicy
     from sensor_msgs.msg import PointCloud2, PointField
+    from std_msgs.msg import String, UInt32
     from std_srvs.srv import Trigger
 
     class MapNode(Node):
@@ -228,8 +267,16 @@ def create_map_node(options):
             self.frame, self.last_scan, self.dirty, self.published = None, None, False, 0
             self.pending, self.updates_sent = [], 0
             self.subscribers, self.resend = 0, False
+            self.health = lio_health.HealthFollower()   # the watchdog's verdict on FAST-LIO
+            self.refused, self.rolled_back, self.map_epoch = 0, 0, 0
             latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
             self.pub = self.create_publisher(PointCloud2, options.map_topic, latched)
+            # Bumped whenever points are taken back or the map starts over: a viewer that
+            # accumulates /updates drops what it has (the whole map follows on /updates).
+            self.epoch_pub = self.create_publisher(UInt32, options.map_topic + "/epoch", latched)
+            self._UInt32 = UInt32
+            self.epoch_pub.publish(UInt32(data=0))
+            self.create_subscription(String, options.health_topic, self._health, latched)
             self.updates_pub = self.create_publisher(PointCloud2, options.map_topic + "/updates", 10)
             self.sources = dict.fromkeys(options.scan_topics, 0)      # fine voxels each input filled first
             for topic in options.scan_topics:
@@ -247,6 +294,9 @@ def create_map_node(options):
                                    f"latched, every {options.publish_period} s)")
 
         def _scan(self, message, topic):
+            if self.health.diverged:            # FAST-LIO's poses are garbage: map frozen
+                self.refused += 1
+                return
             now = time.monotonic()
             if self.last_scan is not None and now - self.last_scan > options.reset_gap_s and self.map.size:
                 self.get_logger().warning(f"no scan for {now - self.last_scan:.0f} s: new map (FAST-LIO restarted?)")
@@ -258,7 +308,7 @@ def create_map_node(options):
             self.last_scan, self.frame = now, message.header.frame_id
             try:
                 shown = self.promoter.filter(xyzi(message))     # stray returns never complete a cell
-                new = self.map.add(shown)
+                new = self.map.add(shown, now)
                 if len(new):
                     self.pending.append(new)
                     self.sources[topic] += len(new)
@@ -275,6 +325,39 @@ def create_map_node(options):
             self.promoter.reset()
             self.pending, self.dirty = [], True
             self.sources = dict.fromkeys(self.sources, 0)
+            self._bump_epoch()
+
+        def _bump_epoch(self):
+            self.map_epoch += 1
+            self.epoch_pub.publish(self._UInt32(data=self.map_epoch))
+
+        def _health(self, message):
+            verdict = lio_health.decode(message.data)
+            if verdict is None:
+                return
+            event = self.health.update(verdict)
+            if event == "restarted":
+                self.get_logger().warning(f"FAST-LIO started over (epoch {verdict['epoch']}): new map")
+                self._clear()
+            elif event == "diverged":
+                onset = verdict.get("onset_mono")
+                taken = self._rollback(onset) if onset is not None else 0
+                self.get_logger().error(f"FAST-LIO diverged ({verdict['reason']}): map frozen at {self.map.size} points, "
+                                        f"{taken} that arrived since the onset taken back")
+
+        def _rollback(self, since):
+            """Take back what arrived since `since` (monotonic s); rebuild what derives from it."""
+            taken = self.map.rollback(since)
+            if taken:
+                kept = self.map.points()
+                self.overview.reset()
+                self.overview.add(kept)
+                self.promoter.reset()
+                self.promoter.seed(kept)
+                self.pending, self.dirty, self.resend = [], True, True
+                self.rolled_back += taken
+                self._bump_epoch()
+            return taken
 
         def _cloud(self, pts):
             PointCloud2_, PointField_ = self._types[:2]
@@ -339,13 +422,18 @@ def create_map_node(options):
             level = DiagnosticStatus_.WARN if full else DiagnosticStatus_.OK
             text = ("Map full (no longer growing)" if full
                     else f"{self.map.size} points at {self.map.voxel} m, {self.overview.size} at {self.overview.voxel} m")
+            if self.health.diverged:
+                level = DiagnosticStatus_.ERROR
+                text = f"FAST-LIO diverged: map frozen at {self.map.size} points ({self.rolled_back} taken back)"
             values = {"points": self.map.size, "voxel_m": self.map.voxel, "max_points": self.map.max_points,
                       "overview_points": self.overview.size, "overview_voxel_m": self.overview.voxel,
                       "frame": self.frame, "overview_publishes": self.published, "updates_published": self.updates_sent,
                       **{f"points_from {topic}": n for topic, n in self.sources.items()},
                       "promote_after_voxels": self.promoter.need, "promoted_cells": self.promoter.promoted_cells,
                       "held_cells": len(self.promoter.held), "held_points": self.promoter.held_points,
-                      "held_points_dropped": self.promoter.dropped_points}
+                      "held_points_dropped": self.promoter.dropped_points,
+                      "fastlio": self.health.verdict["state"] if self.health.verdict else "no verdict",
+                      "scans_refused": self.refused, "points_taken_back": self.rolled_back, "map_epoch": self.map_epoch}
             out = DiagnosticArray_()
             out.header.stamp = self.get_clock().now().to_msg()
             out.status = [DiagnosticStatus_(level=level, name="lio/map", hardware_id="FAST-LIO voxel map",
@@ -372,6 +460,7 @@ def main():
     parser.add_argument("--promote-cell", type=float, default=0.5, help="promotion cell across, m")
     parser.add_argument("--promote-level", type=float, default=0.25, help="promotion cell height, m")
     parser.add_argument("--max-held-cells", type=int, default=100_000, help="cells held back at most")
+    parser.add_argument("--health-topic", default="/lio/health", help="the lio watchdog's verdict on FAST-LIO")
     parser.add_argument("--map-dir", default="/data/maps")
     options, ros_args = parser.parse_known_args()
     import rclpy

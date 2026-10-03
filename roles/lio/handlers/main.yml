@@ -23,3 +23,10 @@
     name: uav-lio-bridge.service
     state: restarted
     daemon_reload: true
+
+- name: Restart lio watchdog
+  ansible.builtin.systemd_service:
+    name: uav-lio-watchdog.service
+    state: restarted
+    daemon_reload: true
+  when: lio_watchdog_enabled | bool
