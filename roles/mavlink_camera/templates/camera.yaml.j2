@@ -22,3 +22,4 @@ uav_camera:
     rc_rate_hz: 20.0
     camera_name: "D555 RGB"
     vendor_name: "RealSense"
+    extra_streams: {{ mavlink_camera_extra_streams | default([]) | to_json | to_json }}

@@ -16,12 +16,14 @@ from __future__ import annotations
 from collections import OrderedDict, deque
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
+import json
 import logging
 import math
 import select
 import socket
 import threading
 import time
+from urllib.parse import urlsplit
 
 from pymavlink.dialects.v20 import common as mav
 
@@ -80,6 +82,8 @@ class CameraProtocol:
         if codec not in ("h264", "h265"):
             raise ValueError("codec must be h264 or h265")
         self.encoding = mav.VIDEO_STREAM_ENCODING_H265 if codec == "h265" else mav.VIDEO_STREAM_ENCODING_H264
+        self.extra_streams = self._parse_streams(config.get("extra_streams", ""))
+        self._probes = {}
         self._mav = mav.MAVLink(None, srcSystem=self.system_id, srcComponent=self.component_id)
         self._mav.robust_parsing = True
         self._socket = None
@@ -124,6 +128,36 @@ class CameraProtocol:
             mav.MAV_CMD_VIDEO_START_STREAMING,
             mav.MAV_CMD_VIDEO_STOP_STREAMING,
         }
+
+    @staticmethod
+    def _parse_streams(value):
+        """Further RTSP streams served beside the RGB one, as stream_id 2, 3, ... (the LiDAR
+        map view): a list of {name, uri, codec, width, height, fps, bitrate, hfov_deg,
+        thermal, probe}, or that list as JSON (a ROS parameter cannot hold a list of dicts).
+        Each is served by its own process; RUNNING is set while `probe` (host:port, by
+        default the URI's) accepts connections. A `thermal` stream is the one QGC overlays
+        on the main stream (picture-in-picture, blend, full) instead of listing it."""
+        if isinstance(value, str):
+            value = json.loads(value) if value.strip() else []
+        streams = []
+        for spec in value or []:
+            uri = str(spec["uri"])
+            if not uri.startswith("rtsp://") or len(uri.encode()) > 159:
+                raise ValueError(f"Extra stream URI must be rtsp:// and at most 159 bytes: {uri}")
+            codec = str(spec.get("codec", "h265")).lower()
+            if codec not in ("h264", "h265"):
+                raise ValueError("Extra stream codec must be h264 or h265")
+            host, _, port = str(spec.get("probe") or urlsplit(uri).netloc).rpartition(":")
+            streams.append({
+                "name": str(spec.get("name") or f"Stream {len(streams) + 2}")[:31],
+                "uri": uri,
+                "encoding": mav.VIDEO_STREAM_ENCODING_H265 if codec == "h265" else mav.VIDEO_STREAM_ENCODING_H264,
+                "width": int(spec.get("width", 0)), "height": int(spec.get("height", 0)),
+                "fps": float(spec.get("fps", 0)), "bitrate": int(spec.get("bitrate", 0)),
+                "hfov": int(spec.get("hfov_deg", 0)), "thermal": bool(spec.get("thermal", False)),
+                "probe": (host or "127.0.0.1", int(port or 554)),
+            })
+        return streams
 
     @staticmethod
     def _boot_ms():
@@ -294,6 +328,18 @@ class CameraProtocol:
                 if self._integer(message.param1, 0, 255) != 0:
                     self._finish(transaction, mav.MAV_RESULT_DENIED)
                     return
+            elif command in (mav.MAV_CMD_VIDEO_START_STREAMING, mav.MAV_CMD_VIDEO_STOP_STREAMING):
+                stream = self._integer(message.param1, 0, 255)
+                if stream > 1 + len(self.extra_streams):
+                    self._finish(transaction, mav.MAV_RESULT_DENIED)
+                    return
+                if stream >= 2:
+                    # QGC sends START for the stream it switches to. An extra stream is
+                    # served on demand by its own process: nothing to switch here, and
+                    # the RGB stream stays as it is.
+                    self._finish(transaction, mav.MAV_RESULT_ACCEPTED)
+                    self._send(self._stream_status(stream))
+                    return
             else:
                 if self._integer(message.param1, 0, 255) not in (0, 1):
                     self._finish(transaction, mav.MAV_RESULT_DENIED)
@@ -350,9 +396,18 @@ class CameraProtocol:
                     self._finish(transaction, mav.MAV_RESULT_ACCEPTED)
                 else:
                     self._submit("record_stop", self.backend.stop_recording, transaction, now)
-            elif command in (mav.MAV_CMD_VIDEO_START_STREAMING, mav.MAV_CMD_VIDEO_STOP_STREAMING):
-                enabled = command == mav.MAV_CMD_VIDEO_START_STREAMING
-                self._submit("stream", lambda: self.backend.set_streaming(enabled), transaction, now)
+            elif command == mav.MAV_CMD_VIDEO_STOP_STREAMING:
+                # Acknowledged, not obeyed. QGC sends STOP for the stream it leaves
+                # and START for the one it shows, so honouring STOP would cut the
+                # RGB for every other viewer (the GCS, another QGC) the moment one
+                # switches to the LiDAR view, until someone switched back. And it
+                # saves nothing: RTSP sends only to clients that PLAY, and the
+                # encoder runs regardless (recordings, Foxglove).
+                self._finish(transaction, mav.MAV_RESULT_ACCEPTED)
+                self._send(self._stream_status())
+            elif command == mav.MAV_CMD_VIDEO_START_STREAMING:
+                # Also requests a keyframe, so the viewer that switched starts at once.
+                self._submit("stream", lambda: self.backend.set_streaming(True), transaction, now)
         except (ValueError, OverflowError) as exc:
             self._finish(transaction, mav.MAV_RESULT_DENIED)
             self._status_text(f"Camera: {exc}")
@@ -436,11 +491,22 @@ class CameraProtocol:
             generic = message.command == mav.MAV_CMD_REQUEST_MESSAGE
             msg_id = self._integer(message.param1) if generic else legacy[message.command]
             selector = message.param2 if generic else message.param1
-            if msg_id in (mav.MAVLINK_MSG_ID_VIDEO_STREAM_INFORMATION, mav.MAVLINK_MSG_ID_VIDEO_STREAM_STATUS,
-                          mav.MAVLINK_MSG_ID_STORAGE_INFORMATION):
-                if self._integer(selector) not in (0, 1):
+            if msg_id in (mav.MAVLINK_MSG_ID_VIDEO_STREAM_INFORMATION, mav.MAVLINK_MSG_ID_VIDEO_STREAM_STATUS):
+                # Stream 0 is all of them: QGC asks so, then once per stream still missing.
+                stream = self._integer(selector)
+                if stream > 1 + len(self.extra_streams):
                     self._ack(message, mav.MAV_RESULT_DENIED)
                     return
+                build = (self._stream_information if msg_id == mav.MAVLINK_MSG_ID_VIDEO_STREAM_INFORMATION
+                         else self._stream_status)
+                responses = [build(i) for i in (range(1, 2 + len(self.extra_streams)) if stream == 0 else (stream,))]
+                self._ack(message, mav.MAV_RESULT_ACCEPTED)
+                for response in responses:
+                    self._send(response)
+                return
+            if msg_id == mav.MAVLINK_MSG_ID_STORAGE_INFORMATION and self._integer(selector) not in (0, 1):
+                self._ack(message, mav.MAV_RESULT_DENIED)
+                return
             builders = {
                 mav.MAVLINK_MSG_ID_CAMERA_INFORMATION: self._information,
                 mav.MAVLINK_MSG_ID_CAMERA_SETTINGS: self._settings,
@@ -588,14 +654,42 @@ class CameraProtocol:
             float(status.get("fps", 0)), int(status.get("width", 0)), int(status.get("height", 0)),
             int(status.get("bitrate", 0)), 0, int(float(self.config.get("hfov_deg", 90))))
 
-    def _stream_information(self):
-        flags, fps, width, height, bitrate, rotation, hfov = self._stream_values()
-        return mav.MAVLink_video_stream_information_message(
-            1, 1, mav.VIDEO_STREAM_TYPE_RTSP, flags, fps, width, height, bitrate, rotation, hfov,
-            b"D555 RGB", self.uri.encode(), self.encoding)
+    def _reachable(self, stream, now=None):
+        """Whether an extra stream's RTSP server accepts connections (cached for 5 s; the
+        probe is a local address, so it connects or is refused at once)."""
+        now = time.monotonic() if now is None else now
+        cached = self._probes.get(stream["probe"])
+        if cached and now - cached[0] < 5.0:
+            return cached[1]
+        try:
+            with socket.create_connection(stream["probe"], timeout=0.25):
+                up = True
+        except OSError:
+            up = False
+        self._probes[stream["probe"]] = (now, up)
+        return up
 
-    def _stream_status(self):
-        return mav.MAVLink_video_stream_status_message(1, *self._stream_values())
+    def _extra_values(self, stream):
+        flags = mav.VIDEO_STREAM_STATUS_FLAGS_RUNNING if self._reachable(stream) else 0
+        if stream["thermal"]:
+            flags |= mav.VIDEO_STREAM_STATUS_FLAGS_THERMAL
+        return flags, stream["fps"], stream["width"], stream["height"], stream["bitrate"], 0, stream["hfov"]
+
+    def _stream_information(self, stream_id=1):
+        if stream_id == 1:
+            flags, fps, width, height, bitrate, rotation, hfov = self._stream_values()
+            name, uri, encoding = b"D555 RGB", self.uri.encode(), self.encoding
+        else:
+            stream = self.extra_streams[stream_id - 2]
+            flags, fps, width, height, bitrate, rotation, hfov = self._extra_values(stream)
+            name, uri, encoding = stream["name"].encode(), stream["uri"].encode(), stream["encoding"]
+        return mav.MAVLink_video_stream_information_message(
+            stream_id, 1 + len(self.extra_streams), mav.VIDEO_STREAM_TYPE_RTSP, flags, fps, width, height,
+            bitrate, rotation, hfov, name, uri, encoding)
+
+    def _stream_status(self, stream_id=1):
+        values = self._stream_values() if stream_id == 1 else self._extra_values(self.extra_streams[stream_id - 2])
+        return mav.MAVLink_video_stream_status_message(stream_id, *values)
 
     def _image_captured(self, result):
         unknown = 0x7FFFFFFF

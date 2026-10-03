@@ -379,6 +379,31 @@ mavlink_camera_rc_photo_channel: 12
 mavlink_camera_rc_video_channel: 13
 mavlink_camera_rc_button_mode: button
 
+# The camera's second stream: the LiDAR map view (roles/lidar_view). FAST-LIO's
+# map, the live Avia and E1R scans and the X950 seen from a chase camera,
+# rendered on the GPU and NVENC-encoded like the RGB stream; rendered only
+# while a client plays it. QGC lists both streams in the camera's stream
+# selector (one at a time). With lidar_view_qgc_overlay the stream is flagged
+# "thermal" instead, and QGC overlays it on the RGB stream, both at once, in
+# the camera's thermal view mode (picture-in-picture, blend or full).
+lidar_view_state: present
+lidar_view_rtsp_port: 8555
+lidar_view_rtsp_path: /lidar
+lidar_view_width: 1280
+lidar_view_height: 720
+lidar_view_fps: 30
+lidar_view_bitrate: 4000000
+lidar_view_fovy_deg: 50
+lidar_view_hfov_deg: 79                  # 2 atan(tan(fovy / 2) * width / height)
+lidar_view_qgc_overlay: false
+mavlink_camera_extra_streams: >-
+  {{ [] if lidar_view_state != 'present' else [{
+  'name': 'LiDAR map',
+  'uri': 'rtsp://' ~ mavlink_camera_rtsp_host ~ ':' ~ lidar_view_rtsp_port ~ lidar_view_rtsp_path,
+  'codec': mavlink_camera_codec, 'width': lidar_view_width | int, 'height': lidar_view_height | int,
+  'fps': lidar_view_fps | int, 'bitrate': lidar_view_bitrate | int, 'hfov_deg': lidar_view_hfov_deg | int,
+  'thermal': lidar_view_qgc_overlay | bool, 'probe': '127.0.0.1:' ~ lidar_view_rtsp_port}] }}
+
 # =============================================================================
 # px4_bridge  (uORB -> ROS-native ENU/FLU), gnss_ros (Septentrio ROS 2 driver
 # on the SBF fan-out), localization (robot_localization, informational).

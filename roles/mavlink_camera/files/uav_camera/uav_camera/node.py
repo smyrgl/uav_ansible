@@ -42,6 +42,9 @@ DEFAULTS = {
     # Transmitter buttons from the autopilot's RC_CHANNELS (channel 0 = off).
     # 'button' acts on a momentary press, 'toggle' on every flip of a latching one.
     'rc_photo_channel': 0, 'rc_video_channel': 0, 'rc_button_mode': 'button', 'rc_rate_hz': 20.0,
+    # Further RTSP streams of this camera (stream_id 2, 3, ...), served by other
+    # processes (the LiDAR map view), as a JSON list: see CameraProtocol._parse_streams.
+    'extra_streams': '',
 }
 
 

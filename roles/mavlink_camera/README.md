@@ -79,6 +79,30 @@ systemctl --user restart uav-camera
 systemctl --user stop uav-camera
 ```
 
+## Further streams
+
+The camera component can advertise streams that other processes serve, as
+stream_id 2, 3 and so on. Today there is one, the LiDAR map view
+(`roles/lidar_view`): `mavlink_camera_extra_streams` in group_vars builds it,
+and it reaches the node as a JSON `extra_streams` parameter. Each stream's
+`VIDEO_STREAM_INFORMATION` carries `count` = 1 + extras. A request for stream
+0 returns every stream; that is how QGC asks, and it then retries any that are
+missing.
+
+`RUNNING` is set while the stream's server accepts a TCP connection on its
+probe address. The probe result is cached for 5 s.
+
+`VIDEO_STOP_STREAMING` is acknowledged and not obeyed, for every stream.
+Switching streams, QGC sends STOP for the stream it leaves and START for the
+one it shows. Honouring STOP for the RGB would cut it for every other viewer
+the moment one QGC switched to the LiDAR view, and keep it cut until someone
+switched back (seen on 2026-10-03: the RGB RTSP stalled with the D555 at
+30 fps). It also saved nothing: RTSP sends only to clients that PLAY, and the
+encoder runs regardless for recordings and Foxglove. `VIDEO_START_STREAMING`
+forces a keyframe for the new viewer. An extra stream flagged
+`thermal` is the one QGC overlays on the main stream instead of listing it in
+the selector (see the lidar_view README).
+
 ## Photos and recordings
 
 QGC can take single photos, request interval capture, and start/stop recording.
@@ -179,7 +203,8 @@ Bench verification on 2026-09-24:
 - Recorded H.265 MKV decoded completely: 179 frames over 6.06 seconds at
   896x504; JPEG and source calibration/rotation sidecar inspected.
 - H.264 and H.265 hardware encode, one-second IDR cadence, TCP/UDP decoding, and
-  stream pause/resume tested on the Jetson.
+  stream pause/resume tested on the Jetson. Pause is gone since 2026-10-03 (STOP
+  is ignored, above).
 
 Flight radio bandwidth, glass-to-glass latency and the UniRC's decoder still need
 validation with the actual SIYI link. The bitrate is a bench starting point, not

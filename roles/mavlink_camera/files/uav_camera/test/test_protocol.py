@@ -1,5 +1,7 @@
 """Protocol boundary tests use real generated MAVLink 2 wire messages."""
+import json
 import math
+import socket
 import threading
 import time
 
@@ -155,6 +157,94 @@ def test_bad_stream_id_denied(camera):
     assert not messages(sent, "VIDEO_STREAM_INFORMATION")
 
 
+@pytest.fixture
+def multi():
+    """The camera with a second stream (the LiDAR map view) whose RTSP server is up."""
+    backend = Backend()
+    server = socket.socket()
+    server.bind(("127.0.0.1", 0))
+    server.listen()
+    lidar = {"name": "LiDAR map", "uri": f"rtsp://127.0.0.1:{server.getsockname()[1]}/lidar", "codec": "h265",
+             "width": 1280, "height": 720, "fps": 30, "bitrate": 4000000, "hfov_deg": 79}
+    protocol = CameraProtocol(backend, {"extra_streams": json.dumps([lidar])})
+    sent = []
+    protocol._send = sent.append
+    yield protocol, backend, sent, server
+    server.close()
+    protocol.close()
+
+
+def test_stream_zero_requests_every_stream(multi):
+    p, _, sent, _ = multi
+    p.handle_message(command(mav.MAV_CMD_REQUEST_MESSAGE, mav.MAVLINK_MSG_ID_VIDEO_STREAM_INFORMATION, 0))
+    assert acks(sent)[-1].result == mav.MAV_RESULT_ACCEPTED
+    infos = messages(sent, "VIDEO_STREAM_INFORMATION")
+    assert [(i.stream_id, i.count) for i in infos] == [(1, 2), (2, 2)]
+    lidar = infos[1]
+    assert lidar.name == "LiDAR map" and lidar.uri.endswith("/lidar") and lidar.type == mav.VIDEO_STREAM_TYPE_RTSP
+    assert lidar.encoding == mav.VIDEO_STREAM_ENCODING_H265
+    assert (lidar.resolution_h, lidar.resolution_v, lidar.framerate, lidar.hfov) == (1280, 720, 30, 79)
+    assert lidar.flags & mav.VIDEO_STREAM_STATUS_FLAGS_RUNNING
+    assert not lidar.flags & mav.VIDEO_STREAM_STATUS_FLAGS_THERMAL
+    for m in sent:
+        assert mav.MAVLink(None).parse_char(m.pack(p._mav)).get_type() == m.get_type()
+
+
+def test_one_extra_stream_and_one_too_many(multi):
+    p, _, sent, _ = multi
+    p.handle_message(command(mav.MAV_CMD_REQUEST_VIDEO_STREAM_STATUS, 2))
+    assert acks(sent)[-1].result == mav.MAV_RESULT_ACCEPTED
+    assert [s.stream_id for s in messages(sent, "VIDEO_STREAM_STATUS")] == [2]
+    p.handle_message(command(mav.MAV_CMD_REQUEST_MESSAGE, mav.MAVLINK_MSG_ID_VIDEO_STREAM_INFORMATION, 3, seq=11))
+    assert acks(sent)[-1].result == mav.MAV_RESULT_DENIED
+
+
+def test_extra_stream_not_running_while_its_server_is_down(multi):
+    p, _, _, server = multi
+    server.close()
+    p._probes.clear()
+    assert not p._stream_information(2).flags & mav.VIDEO_STREAM_STATUS_FLAGS_RUNNING
+    assert p._stream_information(1).flags & mav.VIDEO_STREAM_STATUS_FLAGS_RUNNING
+
+
+def test_switching_to_the_extra_stream_leaves_rgb_streaming(multi):
+    p, b, sent, _ = multi
+    p.handle_message(command(mav.MAV_CMD_VIDEO_START_STREAMING, 2))
+    assert acks(sent)[-1].result == mav.MAV_RESULT_ACCEPTED
+    assert messages(sent, "VIDEO_STREAM_STATUS")[-1].stream_id == 2
+    p.handle_message(command(mav.MAV_CMD_VIDEO_STOP_STREAMING, 2, seq=11))
+    assert acks(sent)[-1].result == mav.MAV_RESULT_ACCEPTED
+    assert b.streaming and p._pending is None
+    p.handle_message(command(mav.MAV_CMD_VIDEO_START_STREAMING, 3, seq=12))
+    assert acks(sent)[-1].result == mav.MAV_RESULT_DENIED
+
+
+def test_qgc_stream_switching_never_cuts_the_rgb(multi):
+    """QGC switching 1 -> 2 -> 1 sends STOP 1, START 2, STOP 2, START 1: the RGB must keep
+    flowing throughout, for whoever else is watching it."""
+    p, b, sent, _ = multi
+    for seq, (cmd, stream) in enumerate(((mav.MAV_CMD_VIDEO_STOP_STREAMING, 1), (mav.MAV_CMD_VIDEO_START_STREAMING, 2),
+                                         (mav.MAV_CMD_VIDEO_STOP_STREAMING, 2), (mav.MAV_CMD_VIDEO_START_STREAMING, 1)),
+                                        start=20):
+        p.handle_message(command(cmd, stream, seq=seq))
+        settle(p)
+        assert acks(sent)[-1].result == mav.MAV_RESULT_ACCEPTED
+        assert b.streaming, (cmd, stream)
+
+
+def test_thermal_extra_stream_and_invalid_ones():
+    b = Backend()
+    p = CameraProtocol(b, {"extra_streams": [{"name": "LiDAR", "uri": "rtsp://127.0.0.1:1/x", "thermal": True}]})
+    info = p._stream_information(2)
+    assert info.flags & mav.VIDEO_STREAM_STATUS_FLAGS_THERMAL
+    assert not info.flags & mav.VIDEO_STREAM_STATUS_FLAGS_RUNNING      # nothing listens on port 1
+    p.close()
+    for bad in ([{"uri": "http://x/y"}], [{"uri": "rtsp://x/" + "a" * 200}],
+                [{"uri": "rtsp://x:1/y", "codec": "vp9"}], [{"name": "no uri"}], "not json"):
+        with pytest.raises((ValueError, KeyError)):
+            CameraProtocol(b, {"extra_streams": bad})
+
+
 def test_photo_completion_ack_deduplication_and_no_fabricated_pose(camera):
     p, b, sent = camera
     b.block = threading.Event()
@@ -243,7 +333,8 @@ def test_record_commands_idempotent_and_streaming_independent(camera):
     assert b.record_starts == 1
     p.handle_message(command(mav.MAV_CMD_VIDEO_STOP_STREAMING, 1, seq=12))
     settle(p)
-    assert not b.streaming and b.recording
+    assert acks(sent)[-1].result == mav.MAV_RESULT_ACCEPTED
+    assert b.streaming and b.recording                         # STOP is acknowledged, not obeyed
     p.handle_message(command(mav.MAV_CMD_IMAGE_START_CAPTURE, 0, 0, 1, 1, seq=13))
     settle(p)
     assert b.photos == 1 and b.recording

@@ -254,6 +254,7 @@ discards anything written to it).
 | `localization` | robot_localization REP-105 dual EKF (`ekf_odom`: odom→base_link, `ekf_map`: map→odom) + navsat_transform (utm→map, GNSS); PX4's own estimate stays in `px4_local`, informational |
 | `vslam` | Isaac ROS cuVSLAM on the D555 stereo IR → `/vslam/odometry` (UTC, base_link twist); shadow source, nothing fuses it yet |
 | `lio` | FAST-LIO2 on the Avia + its built-in IMU (GPL-2.0, fetched and built at a pinned commit) → `/lio/odometry`; shadow source, primary candidate; voxel map of the Avia and the E1R (registered with FAST-LIO's poses and the nominal extrinsic) |
+| `lidar_view` | GPU (EGL) chase-camera render of the LIO map, the live Avia and E1R scans and the X950's URDF → NVENC RTSP `:8555/lidar`, the camera's stream 2 in QGC; rendered only while watched |
 | `hflow` | H-Flow over the FC's CAN2 bus, read listen-only on the Jetson's can0 → PX4-typed ROS 2 topics + Range |
 | `mavlink_router` | MAVLink hub: PX4 (TELEM2 UART) ↔ QGC (TCP 5760) ↔ onboard apps (UDP 14540) |
 | `rt_tuning` | soft-RT: isolation, SCHED_FIFO, mlock, IRQ affinity, governor |
@@ -266,6 +267,9 @@ discards anything written to it).
 The `mavlink_camera` role provides native ROS2 RGB, H.265 RTSP video, photos, and
 onboard recording through MAVLink Camera Protocol v2. It runs as a persistent
 user service on jethawk. See [camera operation and bench routing](roles/mavlink_camera/README.md).
+The same camera component advertises a second stream, the LiDAR map view: a
+third-person render of what the Avia and the E1R see
+([lidar_view](roles/lidar_view/README.md)). QGC lists it in its stream selector.
 
 ## ROS sensor bench and visualization
 

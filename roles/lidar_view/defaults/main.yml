@@ -1,0 +1,43 @@
+---
+# The LiDAR map view: FAST-LIO's voxel map, the live Avia and E1R scans,
+# both sensors' fields of view, the flight trail and the X950's URDF, seen
+# from a chase camera behind the aircraft, rendered headless on the GPU
+# (EGL, OpenGL 4.3 core) and served over RTSP (NVENC) as the MAVLink camera's
+# second video stream. The stream's shape (port, path, size, rate, bitrate,
+# lidar_view_state) is in group_vars, where the camera role advertises it.
+lidar_view_service_user: "{{ uav_ros_user | default('uav-ros') }}"
+lidar_view_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
+lidar_view_workspace: "{{ uav_ros_workspace | default('/opt/uav/ros') }}"
+lidar_view_description_share: "{{ lidar_view_workspace }}/install/share/x950_description"
+lidar_view_codec: "{{ mavlink_camera_codec | default('h265') }}"
+lidar_view_advertised_uri: "rtsp://{{ mavlink_camera_rtsp_host }}:{{ lidar_view_rtsp_port }}{{ lidar_view_rtsp_path }}"
+
+# Inputs (FAST-LIO's frame, camera_init, throughout).
+lidar_view_map_topic: /lio/map/updates     # lio_map's 5 cm voxels; the whole map arrives on subscribing
+lidar_view_scan_topic: /cloud_registered   # the live Avia scan (white)
+lidar_view_e1r_topic: "{{ lio_e1r_registered_topic | default('/lio/registered/e1r') }}"   # the live E1R scan (magenta)
+lidar_view_odometry_topic: /Odometry       # FAST-LIO's IMU pose, moved to base_link here
+lidar_view_imu_lever_arm: "{{ lio_imu_lever_arm | default([0.22035, -0.02626, 0.1384]) }}"
+# Field-of-view outlines: base_link -> each LiDAR frame (x y z roll pitch yaw),
+# the nominal mounts (avia_nominal_lidar_frame from robot_description's Avia
+# datum; e1r_nominal_lidar_frame from the URDF: under the body, looking down).
+lidar_view_avia_mount: [0.262, -0.003, 0.110, 0, 0, 0]
+lidar_view_e1r_mount: [-0.084, 0, -0.0793, 0, 1.570796, 0]
+
+# The chase camera: a boom behind the aircraft, at least this long, that
+# lengthens and steepens with height above the ground (from the E1R's
+# returns below the aircraft) to keep the ground under it in the frame.
+lidar_view_chase_distance_m: 7.0
+lidar_view_chase_max_distance_m: 90.0
+# While the aircraft is enclosed (a ceiling or a canopy over most of the
+# 4 m around it), map points more than this above it are cut away.
+lidar_view_cutaway_above_m: 1.0
+lidar_view_edl_strength: 12.0              # eye-dome lighting (0 = flat)
+# Exactly one stray-return filter: lio_map's at the source (lio_map_promote_voxels),
+# so the view shows what the saved map holds; the view's own only if that is off.
+lidar_view_promote: "{{ 1 if (lio_map_promote_voxels | default(1) | int) > 1 else 3 }}"
+# Overlay-free margins (top, right, bottom, left; fractions of the frame): the
+# ground station draws its own bars over the video (QGC: the toolbar, the tool
+# strip, the camera panel, the instruments and the map thumbnail), so the HUD
+# text, the legend and the warning stay inside them.
+lidar_view_safe_area: [0.10, 0.08, 0.16, 0.08]

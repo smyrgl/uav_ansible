@@ -80,6 +80,8 @@
       tags: ['vslam']
     - role: lio                  # FAST-LIO2 on the Avia + its IMU (GPL-2.0 source fetched at build time); needs avia
       tags: ['lio']
+    - role: lidar_view           # GPU chase-camera render of the LIO map -> RTSP, the camera's stream 2; needs lio, robot_description
+      tags: ['lidar_view']
     - role: localization         # robot_localization EKF + navsat_transform (informational)
       tags: ['localization', 'ros_inspection']
     - role: nvblox               # D555 + Avia -> GPU TSDF; needs isaac_ros, description, foxglove adapters

@@ -1,0 +1,78 @@
+---
+# The LiDAR map view: a ROS node that renders on the GPU and serves RTSP.
+# The camera role advertises it as stream 2 (mavlink_camera_extra_streams).
+
+- name: Install and run the LiDAR map view
+  when: lidar_view_state == 'present'
+  block:
+    - name: Install the renderer's dependencies (PyOpenGL over EGL, Pillow + DejaVu for the overlay, GStreamer's RTSP server)
+      ansible.builtin.apt:
+        name:
+          - python3-opengl
+          - python3-pil
+          - fonts-dejavu-core
+          - python3-gi
+          - gir1.2-gstreamer-1.0
+          - gir1.2-gst-rtsp-server-1.0
+        state: present
+
+    - name: Check that the X950 description is installed (robot_description role)
+      ansible.builtin.stat:
+        path: "{{ lidar_view_description_share }}/urdf/x950.urdf"
+      register: lidar_view_urdf
+
+    - name: Refuse to run without the URDF
+      ansible.builtin.fail:
+        msg: "{{ lidar_view_description_share }}/urdf/x950.urdf is missing: run the robot_description role first."
+      when: not lidar_view_urdf.stat.exists
+
+    - name: Install the LiDAR view and its tests
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/usr/local/lib/uav/{{ item }}"
+        mode: "0755"
+      loop:
+        - uav_lidar_view.py
+        - test_uav_lidar_view.py
+      notify: Restart lidar view
+
+    - name: Run the LiDAR view tests on the target
+      ansible.builtin.command:
+        argv: [/usr/bin/python3, -m, unittest, -q, test_uav_lidar_view]
+        chdir: /usr/local/lib/uav
+      environment:
+        PYTHONDONTWRITEBYTECODE: "1"
+      changed_when: false
+
+    - name: Install the LiDAR view unit
+      ansible.builtin.template:
+        src: uav-lidar-view.service.j2
+        dest: /etc/systemd/system/uav-lidar-view.service
+        mode: "0644"
+      notify: Restart lidar view
+
+    - name: Run the LiDAR view at boot
+      ansible.builtin.systemd_service:
+        name: uav-lidar-view.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+- name: Stop and remove the LiDAR map view
+  when: lidar_view_state == 'absent'
+  block:
+    - name: Stop and disable the LiDAR view
+      ansible.builtin.systemd_service:
+        name: uav-lidar-view.service
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Remove the LiDAR view unit and files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/uav-lidar-view.service
+        - /usr/local/lib/uav/uav_lidar_view.py
+        - /usr/local/lib/uav/test_uav_lidar_view.py
