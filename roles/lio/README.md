@@ -123,6 +123,33 @@ of index) and the `lio/map` diagnostic says so.
   for the first time (they nest), so it ends up with the same voxels for a
   fraction of the work (back to every scan once the fine map is full).
 
+### Stray returns
+
+Indoors, about 0.3 % of the Avia's points (measured 2026-10-02) are strays: at
+random ranges along real beam directions, out to ~430 m and from −160 to
++125 m in height, mean reflectivity 12.8 against 24.6 for real returns. The
+Livox tag doesn't flag them; its noise bits are 0 on every one. Each lands in a
+5 cm voxel of its own and never deduplicates. After ten minutes on the bench
+they were 36 % of the fine map and 93 % of the overview: a dust over every
+viewer, the saved PCDs, and any height-coloured range.
+
+So a point joins the map only once its cell (0.5 m across, 0.25 m tall) holds
+`lio_map_promote_voxels` (3) distinct fine voxels. Then the cell's held points
+join together, and its later points go straight in. A surface fills its cells
+within a scan or two; a stray never completes one. That holds for the fine map,
+`/lio/map/updates`, the overview and `/lio/map/save` alike.
+
+- The filter keeps only the voxels of cells still waiting. It caps them at
+  100k cells (`--max-held-cells`) and gives up the oldest first: strays never
+  complete, and a real cell completes within seconds. Promoted cells are kept
+  in a sorted int64 index, 8 bytes a cell.
+- The cost is a short delay. A cell's first voxels show once it holds three,
+  usually in the same scan. A thin, sparse thing (a wire, a far branch) may
+  never fill three voxels of one cell and stays out.
+- The `lio/map` diagnostic shows it at work: `promoted_cells`, `held_cells`,
+  `held_points` (mostly strays) and `held_points_dropped`.
+- `lio_map_promote_voxels: 1` maps every point, as before.
+
 ## The E1R in the same map (`/lio/registered/e1r`)
 
 The E1R looks straight down and never shares a field of view with the Avia, so

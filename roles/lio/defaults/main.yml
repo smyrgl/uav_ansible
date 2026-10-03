@@ -43,6 +43,11 @@ lio_map_update_period_s: 1.0
 lio_map_overview_voxel_m: 0.2
 lio_map_overview_max_points: 2000000
 lio_map_publish_period_s: 10.0             # overview
+# A point joins the map only once its cell (0.5 m across, 0.25 m tall) holds
+# this many distinct fine voxels: surfaces fill cells within a scan or two, the
+# Avia's stray far returns (untagged, random range along real beams) never do.
+# 1 maps every point.
+lio_map_promote_voxels: 3
 lio_map_dir: /data/maps
 
 # Bridge: FAST-LIO's IMU pose -> base_link odometry on lio_odometry_topic.

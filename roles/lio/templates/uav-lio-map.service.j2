@@ -12,7 +12,7 @@ Group={{ lio_service_user }}
 UMask=0002
 EnvironmentFile={{ lio_environment_file }}
 Environment=ROS_LOG_DIR=/var/log/uav-ros
-ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/lio_map.py --scan-topics /cloud_registered{{ (' ' ~ lio_e1r_registered_topic) if lio_e1r_enabled else '' }} --voxel {{ lio_map_voxel_m }} --max-points {{ lio_map_max_points | int }} --update-period {{ lio_map_update_period_s }} --overview-voxel {{ lio_map_overview_voxel_m }} --overview-max-points {{ lio_map_overview_max_points | int }} --publish-period {{ lio_map_publish_period_s }} --map-dir {{ lio_map_dir }}'
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/lio_map.py --scan-topics /cloud_registered{{ (' ' ~ lio_e1r_registered_topic) if lio_e1r_enabled else '' }} --voxel {{ lio_map_voxel_m }} --max-points {{ lio_map_max_points | int }} --update-period {{ lio_map_update_period_s }} --overview-voxel {{ lio_map_overview_voxel_m }} --overview-max-points {{ lio_map_overview_max_points | int }} --publish-period {{ lio_map_publish_period_s }} --map-dir {{ lio_map_dir }} --promote {{ lio_map_promote_voxels | int }}'
 Restart=on-failure
 RestartSec=5
 KillSignal=SIGINT

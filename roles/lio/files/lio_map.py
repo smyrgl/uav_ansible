@@ -19,6 +19,11 @@ resolutions:
 - overview (20 cm): the whole map, latched on /lio/map every few seconds, so a
   viewer that connects late still sees everything at once.
 
+Stray returns are kept out of both: a point joins only once its cell (0.5 m
+across, 0.25 m tall) holds three distinct fine voxels (CellPromoter). Surfaces
+fill their cells within a scan or two; the Avia's untagged stray far returns, at
+random ranges along real beams, never do.
+
 Services: /lio/map/save (std_srvs/Trigger) writes the fine map as a binary PCD
 (x, y, z, intensity) into the map directory; /lio/map/reset clears both;
 /lio/map/resend sends the whole fine map on /lio/map/updates again (a second
@@ -28,6 +33,7 @@ gap in the scans longer than reset_gap_s (FAST-LIO restarted, new origin)
 clears them too.
 """
 import argparse
+import itertools
 import os
 import time
 from datetime import datetime, timezone
@@ -86,6 +92,106 @@ class VoxelMap:
         return self.chunks[0] if self.chunks else np.zeros((0, 4), np.float32)
 
 
+class CellPromoter:
+    """Keeps stray returns out of the map. A new point joins it only once its cell (`cell` m
+    across, `level` m tall) holds `need` distinct fine voxels; then the cell's held points
+    join together, and its later points go straight through. A surface fills its cells
+    within a scan or two. The Avia's stray returns never do: about 0.3 % of its points
+    indoors (2026-10-02), at random ranges along real beams out to ~430 m, not flagged by
+    the Livox tag's noise bits. Each lands in a voxel of its own and deduplicates against
+    nothing; they had become 36 % of the 5 cm map and 93 % of the overview. Held cells are
+    capped, the oldest given up first (strays never complete a cell). need=1 passes everything."""
+
+    MERGE = 50_000                      # promoted cells gathered before a bulk merge into the sorted index
+
+    def __init__(self, need=3, cell=0.5, level=0.25, voxel=0.05, max_held_cells=100_000):
+        self.need, self.cell, self.level, self.voxel = int(need), float(cell), float(level), float(voxel)
+        self.max_held_cells = int(max_held_cells)
+        self.reset()
+
+    def reset(self):
+        self.held = {}                  # cell -> [(fine voxel key, 16 bytes of x, y, z, intensity)]
+        self.held_points = 0
+        self.dropped_points = 0         # held points given up to the cap
+        self._main = np.zeros(0, np.int64)      # promoted cells, sorted (8 bytes a cell)
+        self._recent = np.zeros(0, np.int64)    # promoted since the last merge, sorted
+
+    @property
+    def promoted_cells(self):
+        return len(self._main) + len(self._recent)
+
+    def cell_keys(self, xyz):
+        """One int64 per point: its cell's (ix, iy, iz), packed 21 bits each."""
+        idx = np.floor(xyz / np.array([self.cell, self.cell, self.level])).astype(np.int64) + OFFSET
+        if idx.size and (idx.min() < 0 or idx.max() >= 1 << 21):
+            raise ValueError("point outside the map's index range")
+        return (idx[:, 0] << 42) | (idx[:, 1] << 21) | idx[:, 2]
+
+    def _is_promoted(self, cells):
+        mask = np.zeros(len(cells), bool)
+        for known in (self._main, self._recent):
+            if len(known):
+                at = np.minimum(np.searchsorted(known, cells), len(known) - 1)
+                mask |= known[at] == cells
+        return mask
+
+    def _promote(self, cells):
+        self._recent = np.union1d(self._recent, np.asarray(cells, np.int64))
+        if len(self._recent) > self.MERGE:      # an insert copies the whole index: merge in bulk
+            self._main, self._recent = np.union1d(self._main, self._recent), np.zeros(0, np.int64)
+
+    def filter(self, points):
+        """points (n, 4) float32 -> those the map may take now: in promoted cells, or completing one."""
+        if self.need <= 1 or not len(points):
+            return points
+        points = points[np.isfinite(points[:, :3]).all(axis=1)]
+        if not len(points):
+            return points
+        xyz = points[:, :3].astype(np.float64)
+        cells = self.cell_keys(xyz)
+        unique, inverse = np.unique(cells, return_inverse=True)
+        promoted = self._is_promoted(unique)[inverse]
+        out = [points[promoted]]
+        if promoted.all():
+            return out[0]
+        waiting = ~promoted
+        pts, wcells, voxels = points[waiting], cells[waiting], voxel_keys(xyz[waiting], self.voxel)
+        order = np.lexsort((voxels, wcells))                        # by cell, then voxel
+        pts, wcells, voxels = pts[order], wcells[order], voxels[order]
+        first = np.r_[True, (wcells[1:] != wcells[:-1]) | (voxels[1:] != voxels[:-1])]
+        pts, wcells, voxels = pts[first], wcells[first], voxels[first]      # one point per voxel
+        starts = np.flatnonzero(np.r_[True, wcells[1:] != wcells[:-1]])
+        newly = []
+        for s, e, c in zip(starts.tolist(), np.r_[starts[1:], len(wcells)].tolist(), wcells[starts].tolist()):
+            entry = self.held.get(c)
+            if entry is None and e - s >= self.need:                # a surface, complete in one scan
+                out.append(pts[s:e])
+                newly.append(c)
+                continue
+            if entry is None:
+                entry = self.held[c] = []
+            seen = {k for k, _ in entry}
+            for k, row in zip(voxels[s:e].tolist(), pts[s:e]):
+                if k not in seen:
+                    seen.add(k)
+                    entry.append((k, row.tobytes()))
+                    self.held_points += 1
+            if len(entry) >= self.need:
+                out.append(np.frombuffer(b"".join(b for _, b in entry), np.float32).reshape(-1, 4))
+                self.held_points -= len(entry)
+                del self.held[c]
+                newly.append(c)
+        if newly:
+            self._promote(newly)
+        excess = len(self.held) - self.max_held_cells
+        if excess > 0:                                              # oldest first (insertion order)
+            for c in list(itertools.islice(self.held, excess + self.max_held_cells // 10)):
+                n = len(self.held.pop(c))
+                self.held_points -= n
+                self.dropped_points += n
+        return np.concatenate(out)
+
+
 def pcd_bytes(points):
     """A binary PCD (x, y, z, intensity float32) of an (n, 4) float32 array."""
     n = len(points)
@@ -117,6 +223,8 @@ def create_map_node(options):
             super().__init__("lio_map")
             self.map = VoxelMap(options.voxel, options.max_points)
             self.overview = VoxelMap(options.overview_voxel, options.overview_max_points)
+            self.promoter = CellPromoter(options.promote, options.promote_cell, options.promote_level, options.voxel,
+                                         options.max_held_cells)
             self.frame, self.last_scan, self.dirty, self.published = None, None, False, 0
             self.pending, self.updates_sent = [], 0
             self.subscribers, self.resend = 0, False
@@ -149,14 +257,14 @@ def create_map_node(options):
                 return
             self.last_scan, self.frame = now, message.header.frame_id
             try:
-                scan = xyzi(message)
-                new = self.map.add(scan)
+                shown = self.promoter.filter(xyzi(message))     # stray returns never complete a cell
+                new = self.map.add(shown)
                 if len(new):
                     self.pending.append(new)
                     self.sources[topic] += len(new)
                 # A coarse voxel seen for the first time holds a fine voxel seen for the first time (the
                 # voxels nest), so the overview needs only the fine map's new points, until that is full.
-                if len(self.overview.add(scan if self.map.full else new)):
+                if len(self.overview.add(shown if self.map.full else new)):
                     self.dirty = True
             except (KeyError, ValueError) as exc:
                 self.get_logger().warning(f"scan skipped: {exc}", throttle_duration_sec=10)
@@ -164,6 +272,7 @@ def create_map_node(options):
         def _clear(self):
             self.map.reset()
             self.overview.reset()
+            self.promoter.reset()
             self.pending, self.dirty = [], True
             self.sources = dict.fromkeys(self.sources, 0)
 
@@ -233,7 +342,10 @@ def create_map_node(options):
             values = {"points": self.map.size, "voxel_m": self.map.voxel, "max_points": self.map.max_points,
                       "overview_points": self.overview.size, "overview_voxel_m": self.overview.voxel,
                       "frame": self.frame, "overview_publishes": self.published, "updates_published": self.updates_sent,
-                      **{f"points_from {topic}": n for topic, n in self.sources.items()}}
+                      **{f"points_from {topic}": n for topic, n in self.sources.items()},
+                      "promote_after_voxels": self.promoter.need, "promoted_cells": self.promoter.promoted_cells,
+                      "held_cells": len(self.promoter.held), "held_points": self.promoter.held_points,
+                      "held_points_dropped": self.promoter.dropped_points}
             out = DiagnosticArray_()
             out.header.stamp = self.get_clock().now().to_msg()
             out.status = [DiagnosticStatus_(level=level, name="lio/map", hardware_id="FAST-LIO voxel map",
@@ -255,6 +367,11 @@ def main():
     parser.add_argument("--overview-max-points", type=int, default=2_000_000)
     parser.add_argument("--publish-period", type=float, default=10.0, help="s between overview messages")
     parser.add_argument("--reset-gap-s", type=float, default=10.0)
+    parser.add_argument("--promote", type=int, default=3,
+                        help="map a cell's points only once it holds this many fine voxels (1 = every point)")
+    parser.add_argument("--promote-cell", type=float, default=0.5, help="promotion cell across, m")
+    parser.add_argument("--promote-level", type=float, default=0.25, help="promotion cell height, m")
+    parser.add_argument("--max-held-cells", type=int, default=100_000, help="cells held back at most")
     parser.add_argument("--map-dir", default="/data/maps")
     options, ros_args = parser.parse_known_args()
     import rclpy
