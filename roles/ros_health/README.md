@@ -82,6 +82,22 @@ PX4 / MAVLink, PX4 / DDS, and Jetson Companion. `hardware_id` is deliberately em
 Foxglove prefixes it to every title. Technical identifiers remain under
 `Identity/source_id` in the details.
 
+The GNSS Receiver row carries, besides the PVT and the host's PPS/chrony
+state, the receiver's own clock state from SBF `ReceiverTime` (5914) and its
+`ReceiverStatus` (4014):
+
+- `Receiver time/sync_level` (`0x03` = WNSET,TOWSET: coarse time from the RTC;
+  `0x07` adds FINETIME) with `finetime`, `receiver_utc` and `leap_seconds`. The
+  receiver outputs its PPS, and `uav-gnss-time` feeds chrony, only once FINETIME
+  is set, which needs a first fix: a cold start shows as "Coarse time only ...
+  no FINETIME yet, so no PPS and no chrony feed" until then (on 2026-10-04,
+  under an awning, that lasted ten minutes; the PPS started about 90 s after
+  FINETIME).
+- `Receiver status/rx_state` (WNSET, TOWSET, FINETIME, DIFFCORR_IN when
+  corrections arrive, ACTIVEANTENNA ...), `rx_error` (ANTENNA = antenna power
+  fault, CPUOVERLOAD, INVALIDCONFIG ...), `ext_error`, `cpu_load_pct` and
+  `uptime_s`. Any error flag is a WARN with the flags named.
+
 The role builds the official `PX4/px4_msgs` release/1.17 at pinned commit
 `86d8239e962f6939e05c3737784f60c02fa884db` in `/opt/uav/px4_msgs`.
 The health service uses the shared ROS middleware configuration (Cyclone DDS).

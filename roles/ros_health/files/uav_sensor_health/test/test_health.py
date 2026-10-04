@@ -4,7 +4,8 @@ import unittest
 
 from uav_sensor_health.core import Assessment, ERROR, OK, WARN
 from uav_sensor_health.health import Sample, check, d555_timing, grouped, lidar_health, px4_health, hflow_health, jetson_health, jetson_identity
-from uav_sensor_health.observers import sbf_blocks, chrony_assessment, ptp_assessment, gnss_health, parse_pvt_geodetic
+from uav_sensor_health.observers import (sbf_blocks, chrony_assessment, ptp_assessment, gnss_health, parse_pvt_geodetic,
+                                         parse_receiver_time, parse_receiver_status)
 
 
 def sample(values, now=20, stamp=None):
@@ -322,3 +323,74 @@ class GnssRtkTests(unittest.TestCase):
         self.assertEqual(alone.values["Position/mean_corr_age_sec"], "n/a")
         self.assertEqual(self.health(5, require=False).level, OK)
         self.assertEqual(self.health(7).level, OK)   # moving-base RTK fixed counts as fixed
+
+
+def receiver_time_block(sync=0x07, year=26, month=10, day=4, hour=1, minute=48, second=11, delta_ls=18):
+    block = bytearray(24)
+    block[:2] = b"$@"
+    struct.pack_into("<HH", block, 4, 5914, 24)
+    struct.pack_into("<IH", block, 8, 6491000, 2386)
+    struct.pack_into("<bbbbbbbB", block, 14, year, month, day, hour, minute, second, delta_ls, sync)
+    struct.pack_into("<H", block, 2, binascii.crc_hqx(block[4:], 0))
+    return bytes(block)
+
+
+def receiver_status_block(rx_state=0x00020070, rx_error=0, ext_error=0, cpu=14, uptime=903):
+    block = bytearray(32)
+    block[:2] = b"$@"
+    struct.pack_into("<HH", block, 4, 4014, 32)
+    struct.pack_into("<IH", block, 8, 6491000, 2386)
+    struct.pack_into("<BBIII", block, 14, cpu, ext_error, uptime, rx_state, rx_error)
+    struct.pack_into("<H", block, 2, binascii.crc_hqx(block[4:], 0))
+    return bytes(block)
+
+
+class GnssTimeTests(unittest.TestCase):
+    """The receiver's FINETIME gates its PPS and the chrony feed (seen on
+    2026-10-04: a cold start under an awning sat at WNSET+TOWSET for ten
+    minutes while nothing pulsed); the row must say so."""
+    timing = {"received": 20, "checks": {"PPS": check(False, "PPS not selected")}}
+
+    def test_parse_receiver_time_and_status(self):
+        values, stamp = parse_receiver_time(receiver_time_block(sync=0x03))
+        self.assertEqual((values["sync_level"], values["sync_level_text"], values["wnset"], values["towset"], values["finetime"]),
+                         ("0x03", "WNSET,TOWSET", True, True, False))
+        self.assertEqual((values["receiver_utc"], values["leap_seconds"], stamp), ("2026-10-04 01:48:11", 18, (6491000, 2386)))
+        self.assertIsNone(parse_receiver_time(receiver_time_block(year=-128, delta_ls=-128))[0]["receiver_utc"])
+        status, _ = parse_receiver_status(receiver_status_block())
+        self.assertEqual((status["rx_state"], status["rx_error"], status["ext_error"], status["finetime"], status["corrections_in"]),
+                         ("WNSET,TOWSET,FINETIME,DIFFCORR_IN", "none", "none", True, True))
+        self.assertEqual((status["cpu_load_pct"], status["uptime_s"]), (14, 903))
+        self.assertEqual(parse_receiver_status(receiver_status_block(rx_error=1 << 5, ext_error=1))[0]["rx_error"], "ANTENNA")
+        self.assertEqual([bid for bid, _ in sbf_blocks(receiver_time_block() + receiver_status_block())[0]], [5914, 4014])
+
+    def health(self, sync, now=20, **status):
+        samples = {"GNSS": sample({}), "GNSS_PVT": sample({"mode": 0, "error": 1}),
+                   "GNSS_TIME": sample(parse_receiver_time(receiver_time_block(sync=sync))[0])}
+        if status:
+            samples["GNSS_STATUS"] = sample(parse_receiver_status(receiver_status_block(**status))[0])
+        return gnss_health(samples, self.timing, "broker", now)
+
+    def test_coarse_time_is_named_as_the_reason_for_no_pps(self):
+        coarse = self.health(0x03)
+        self.assertEqual(coarse.values["Receiver time/status"], "WARN")
+        self.assertIn("Coarse time only (WNSET,TOWSET): no FINETIME yet", coarse.values["Receiver time/message"])
+        self.assertEqual((coarse.values["Receiver time/finetime"], coarse.values["Receiver time/sync_level"]), (False, "0x03"))
+        self.assertTrue(coarse.message.endswith("; coarse time"))
+        fine = self.health(0x07)
+        self.assertEqual(fine.values["Receiver time/status"], "OK")
+        self.assertTrue(fine.message.endswith("; fine time"))
+        self.assertEqual(fine.values["Receiver time/receiver_utc"], "2026-10-04 01:48:11")
+        stale = self.health(0x07, now=30)
+        self.assertEqual(stale.values["Receiver time/status"], "WARN")
+        self.assertIn("No ReceiverTime block", stale.values["Receiver time/message"])
+
+    def test_receiver_errors_are_flagged_and_absence_of_the_block_is_silent(self):
+        clean = self.health(0x07, rx_state=0x00020070)
+        self.assertEqual(clean.values["Receiver status/status"], "OK")
+        self.assertEqual(clean.values["Receiver status/message"], "No receiver errors; CPU 14 %; up 903 s; state WNSET,TOWSET,FINETIME,DIFFCORR_IN")
+        bad = self.health(0x07, rx_error=1 << 5)
+        self.assertEqual(bad.values["Receiver status/status"], "WARN")
+        self.assertEqual(bad.values["Receiver status/message"], "Receiver error flags: RxError ANTENNA, ExtError none")
+        self.assertIn("Receiver status: Receiver error flags", bad.values["Attention"])
+        self.assertNotIn("Receiver status/status", self.health(0x07).values)

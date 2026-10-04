@@ -23,6 +23,45 @@ PVT_MODES = {0: "no PVT", 1: "stand-alone", 2: "differential", 3: "fixed locatio
              5: "RTK float", 6: "SBAS aided", 7: "moving-base RTK fixed", 8: "moving-base RTK float", 10: "PPP"}
 RTK_FIXED_MODES = (4, 7)
 
+# ReceiverStatus (4014) and ReceiverTime (5914) bit names, SBF Reference Guide.
+# The receiver only outputs its PPS, and only feeds chrony here, once FINETIME is
+# set, which needs a first fix: the time sections exist to make that visible.
+RX_STATE_BITS = {1: "ACTIVEANTENNA", 2: "EXT_FREQ", 3: "EXT_TIME", 4: "WNSET", 5: "TOWSET", 6: "FINETIME",
+                 7: "INTERNALDISK_ACTIVITY", 8: "INTERNALDISK_FULL", 9: "INTERNALDISK_MOUNTED", 10: "INT_ANT",
+                 11: "REFOUT_LOCKED", 13: "EXTERNALDISK_ACTIVITY", 14: "EXTERNALDISK_FULL", 15: "EXTERNALDISK_MOUNTED",
+                 16: "PPS_IN_CAL", 17: "DIFFCORR_IN", 18: "INTERNET"}
+RX_ERROR_BITS = {3: "SOFTWARE", 4: "WATCHDOG", 5: "ANTENNA", 6: "CONGESTION", 8: "MISSEDEVENT", 9: "CPUOVERLOAD",
+                 10: "INVALIDCONFIG", 11: "OUTOFGEOFENCE"}
+EXT_ERROR_BITS = {0: "SISERROR", 1: "DIFFCORRERROR", 2: "EXTSENSORERROR", 3: "SETUPERROR"}
+SYNC_LEVEL_BITS = {0: "WNSET", 1: "TOWSET", 2: "FINETIME"}
+
+
+def flag_names(value, names, width=32):
+    return ",".join(names.get(bit, f"bit{bit}") for bit in range(width) if value >> bit & 1) or "none"
+
+
+def parse_receiver_time(block):
+    """SBF ReceiverTime (5914): the receiver's UTC and its SyncLevel (WNSET,
+    TOWSET, FINETIME). Returns (values, stamp)."""
+    year, month, day, hour, minute, second, delta_ls, sync = struct.unpack_from("<bbbbbbbB", block, 14)
+    values = {"sync_level": f"0x{sync:02x}", "sync_level_text": flag_names(sync, SYNC_LEVEL_BITS, 8),
+              "wnset": bool(sync & 1), "towset": bool(sync & 2), "finetime": bool(sync & 4),
+              "receiver_utc": None if year == -128 else f"20{year:02d}-{month:02d}-{day:02d} {hour:02d}:{minute:02d}:{second:02d}",
+              "leap_seconds": None if delta_ls == -128 else delta_ls}
+    return values, struct.unpack_from("<IH", block, 8)
+
+
+def parse_receiver_status(block):
+    """SBF ReceiverStatus (4014): CPU load, uptime and the RxState / RxError /
+    ExtError flags. Returns (values, stamp)."""
+    cpu, ext_error, uptime, rx_state, rx_error = struct.unpack_from("<BBIII", block, 14)
+    values = {"cpu_load_pct": cpu, "uptime_s": uptime,
+              "rx_state": flag_names(rx_state, RX_STATE_BITS), "rx_error": flag_names(rx_error, RX_ERROR_BITS),
+              "ext_error": flag_names(ext_error, EXT_ERROR_BITS, 8),
+              "rx_error_raw": f"0x{rx_error:08x}", "rx_state_raw": f"0x{rx_state:08x}",
+              "finetime": bool(rx_state & 1 << 6), "corrections_in": bool(rx_state & 1 << 17)}
+    return values, struct.unpack_from("<IH", block, 8)
+
 
 def parse_pvt_geodetic(block):
     """SBF PVTGeodetic (4007), revision-2 layout: the fields the health row
@@ -187,7 +226,9 @@ class Observers:
                             if bid == 4007 and len(block) >= 80:
                                 self._record("GNSS_PVT", *parse_pvt_geodetic(block))
                             elif bid == 5914 and len(block) >= 24:
-                                self._record("GNSS_TIME", {"sync_level": block[21]}, struct.unpack_from("<IH", block, 8))
+                                self._record("GNSS_TIME", *parse_receiver_time(block))
+                            elif bid == 4014 and len(block) >= 32:
+                                self._record("GNSS_STATUS", *parse_receiver_status(block))
             except OSError as exc:
                 with self.lock:
                     self.gnss_transport = str(exc)
@@ -247,8 +288,36 @@ def gnss_health(samples, timing, transport, now, require_rtk_fixed=True):
     if clock.level == 0:
         message += "; PPS locked"
     metrics = {key: ("n/a" if value is None else value) for key, value in pvt.metrics(now).items()}
-    return grouped(connection, message, {
+    sections = {
         "Receiver": check(live, transport, **receiver.metrics(now)),
         "Position": check(position_ok, position_text, **metrics),
         "Timing": clock,
-    })
+    }
+    # The receiver's own clock state (ReceiverTime): FINETIME is what gates its
+    # PPS output and the chrony feed, so a cold start shows here as coarse time.
+    rx_time = samples.get("GNSS_TIME")
+    if rx_time is not None and rx_time.received >= 0:
+        time_fresh = rx_time.fresh(now, 3)
+        fine = bool(time_fresh and rx_time.values.get("finetime"))
+        if not time_fresh:
+            time_text = "No ReceiverTime block for over 3 s"
+        elif fine:
+            time_text = "Fine time: PPS output and the chrony feed are possible"
+        else:
+            time_text = ("Coarse time only (%s): no FINETIME yet, so no PPS and no chrony feed; needs a first fix"
+                         % rx_time.values.get("sync_level_text", "?"))
+        sections["Receiver time"] = check(fine, time_text, **{k: ("n/a" if v is None else v) for k, v in rx_time.metrics(now).items()})
+        message += "; fine time" if fine else "; coarse time" if time_fresh else "; receiver time unknown"
+    rx_status = samples.get("GNSS_STATUS")
+    if rx_status is not None and rx_status.received >= 0:
+        status_fresh = rx_status.fresh(now, 3)
+        sv = rx_status.values
+        errors = sv.get("rx_error", "none") != "none" or sv.get("ext_error", "none") != "none"
+        if not status_fresh:
+            status_text = "No ReceiverStatus block for over 3 s"
+        elif errors:
+            status_text = "Receiver error flags: RxError %s, ExtError %s" % (sv.get("rx_error"), sv.get("ext_error"))
+        else:
+            status_text = "No receiver errors; CPU %s %%; up %s s; state %s" % (sv.get("cpu_load_pct"), sv.get("uptime_s"), sv.get("rx_state"))
+        sections["Receiver status"] = check(status_fresh and not errors, status_text, **rx_status.metrics(now))
+    return grouped(connection, message, sections)
