@@ -3,7 +3,7 @@
 
 The card's manoeuvres become mission items PX4 flies on its own under
 supervision, identically every flight: takeoff, timed hovers at 3/10/20 m,
-slow 360-degree yaws in place at 5 and 20 m (MAV_CMD_CONDITION_YAW), legs out
+full turns in place at 5 and 20 m as eight held headings, legs out
 and back at 2 and 5 m/s (and 8 m/s with --fast), a figure-8, a pass over
 featureless ground, a low pass over ground mapped earlier, a small survey
 grid, then a landing at home. The FC's MISSION_CURRENT stream marks every item
@@ -21,7 +21,7 @@ import argparse
 import json
 import math
 
-NAV_WAYPOINT, NAV_LAND, NAV_TAKEOFF, CONDITION_YAW, DO_CHANGE_SPEED = 16, 21, 22, 115, 178
+NAV_WAYPOINT, NAV_LAND, NAV_TAKEOFF, DO_CHANGE_SPEED = 16, 21, 22, 178
 
 
 class Plan:
@@ -50,8 +50,14 @@ class Plan:
     def speed(self, mps):
         self.add(DO_CHANGE_SPEED, [1, mps, -1, 0, 0, 0, 0], frame=2, altitude=0, altitude_mode=0)
 
-    def yaw_turn(self, degrees=360.0, rate=10.0):
-        self.add(CONDITION_YAW, [degrees, rate, 1, 1, 0, 0, 0], frame=2, altitude=0, altitude_mode=0)
+    def yaw_sweep(self, alt, steps=8, hold=6.0):
+        """A full turn in place as waypoints at the same spot with the heading in
+        the waypoint's yaw field (PX4 does not execute the condition-yaw command
+        in missions; QGC shows it as "Waiting For Yaw", unsupported). Static
+        holds at several headings are what the antenna lever arm needs anyway."""
+        base = math.degrees(self.heading)
+        for k in range(steps + 1):
+            self.waypoint(0, 0, alt, hold=hold, yaw=round((base + 360.0 * k / steps) % 360.0, 1))
 
     def takeoff(self, alt):
         self.add(NAV_TAKEOFF, [0, 0, 0, None, self.lat, self.lon, alt], altitude=alt)
@@ -68,7 +74,7 @@ class Plan:
                             "plannedHomePosition": [self.lat, self.lon, self.alt], "items": self.items}}
 
 
-def shakedown(plan, leg, fast=False, hover_s=30.0, yaw_rate=10.0, fig8_r=10.0, survey_spacing=10.0):
+def shakedown(plan, leg, fast=False, hover_s=30.0, fig8_r=10.0, survey_spacing=10.0):
     manifest = []
     def mark(label):
         manifest.append((len(plan.items) + 1, label))
@@ -76,11 +82,9 @@ def shakedown(plan, leg, fast=False, hover_s=30.0, yaw_rate=10.0, fig8_r=10.0, s
     mark("hover 3 m"); plan.waypoint(0, 0, 3, hold=hover_s)
     mark("hover 10 m"); plan.waypoint(0, 0, 10, hold=hover_s)
     mark("descend to 5 m"); plan.waypoint(0, 0, 5, hold=5)
-    mark("yaw 360 in place at 5 m"); plan.yaw_turn(360, yaw_rate)
-    plan.waypoint(0, 0, 5, hold=5)
+    mark("turn in place at 5 m: 8 held headings"); plan.yaw_sweep(5)
     mark("hover 20 m"); plan.waypoint(0, 0, 20, hold=hover_s)
-    mark("yaw 360 in place at 20 m"); plan.yaw_turn(360, yaw_rate)
-    plan.waypoint(0, 0, 20, hold=5)
+    mark("turn in place at 20 m: 8 held headings"); plan.yaw_sweep(20)
     for speed in ([2.0, 5.0] + ([8.0] if fast else [])):
         mark("leg out and back at %.0f m/s, 20 m" % speed); plan.speed(speed)
         plan.waypoint(leg, 0, 20, hold=3, radius=2.0)
