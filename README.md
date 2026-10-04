@@ -237,7 +237,7 @@ discards anything written to it).
 
 | Role | Purpose |
 |---|---|
-| `base` | apt baseline, locale/tz/hostname, swap, nvpmodel + jetson_clocks |
+| `base` | apt baseline, locale/tz/hostname, swap, nvpmodel (MAXN) + jetson_clocks, fan profile (`max`: the thermal limit is the fan, set explicitly) |
 | `dev_tools` | git, git-lfs (+`git lfs install`), nano, common CLI tools |
 | `networking` | netplan (networkd): wifi uplink first (gated; the dongle is in on the bench, out in flight, and its config stays installed either way), then the two un-bridged segments |
 | `gcs_gateway` | egress through the Siyi GCS: hev-socks5-server on its Android (no root; ADB-supervised from the Jetson) + hev-socks5-tunnel (`gcs0`, default route, DNS) |
@@ -274,6 +274,8 @@ third-person render of what the Avia and the E1R see
 ## ROS sensor bench and visualization
 
 The X950 description, E1R driver, Foxglove bridge and sensor diagnostics run as persistent systemd services on Jazzy. See [the ROS bench guide](docs/ros-bench.md) for the dashboard, timing limits, service controls and deployment steps.
+
+The autonomy programme (shadow mode first, authority one firmware flash at a time) is planned in [the autonomy roadmap](docs/autonomy-roadmap.md), with the verified open-source landscape in [autonomy-landscape.md](docs/autonomy-landscape.md) and the Hadron thermal camera's integration notes in [hadron-thermal.md](docs/hadron-thermal.md).
 
 ## Airframe description (`x950_description/`)
 
