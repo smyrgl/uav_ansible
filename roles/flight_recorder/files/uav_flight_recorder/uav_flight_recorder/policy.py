@@ -72,3 +72,29 @@ class FlightPolicy:
 
     def tick(self, now):
         return self.update(now)
+
+
+class GrowthWatch:
+    """A bag that stops growing is a recorder that stopped writing while its
+    process stays alive (rosbag2 Jazzy issue #2463). rosbag2 hands data to the
+    storage in max_cache_size steps, so the bag grows in bursts: `stall_sec` must
+    exceed cache size / data rate (256 MB at the bench's ~5 MB/s is ~50 s; in
+    flight ~18 s) or a quiet bench looks stalled."""
+
+    def __init__(self, stall_sec=120.0):
+        self.stall_sec = float(stall_sec)
+        self.reset(0.0)
+
+    def reset(self, now):
+        self.last_size = 0
+        self.last_growth = now
+
+    def sample(self, now, size):
+        """Record the bag's size at `now`; returns the seconds since it last grew."""
+        if size > self.last_size:
+            self.last_size = size
+            self.last_growth = now
+        return now - self.last_growth
+
+    def stalled(self, now):
+        return now - self.last_growth > self.stall_sec

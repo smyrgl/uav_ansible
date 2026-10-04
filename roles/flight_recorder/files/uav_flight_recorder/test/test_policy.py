@@ -1,6 +1,23 @@
 import unittest
 
-from uav_flight_recorder.policy import FlightPolicy, IDLE, RECORDING, POST_ROLL
+from uav_flight_recorder.policy import FlightPolicy, GrowthWatch, IDLE, RECORDING, POST_ROLL
+
+
+class GrowthTests(unittest.TestCase):
+    def test_stall_is_no_growth_for_stall_sec(self):
+        g = GrowthWatch(stall_sec=60)
+        g.reset(0)
+        self.assertEqual(g.sample(5, 0), 5)                   # an empty bag is not growth
+        self.assertFalse(g.stalled(59))
+        self.assertTrue(g.stalled(61))                        # nothing was ever written
+        g.sample(70, 1_000_000)                               # the first cache flush lands
+        self.assertFalse(g.stalled(120))
+        g.sample(125, 1_000_000)                              # same size: no growth
+        self.assertFalse(g.stalled(129))
+        self.assertTrue(g.stalled(131))
+        self.assertEqual(g.sample(135, 2_000_000), 0)         # grew again: the clock restarts
+        self.assertFalse(g.stalled(190))
+        self.assertEqual(g.sample(140, 2_000_000), 5)
 
 
 class PolicyTests(unittest.TestCase):

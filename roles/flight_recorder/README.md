@@ -12,6 +12,7 @@ disarm, and stops it after a post-roll:
 | re-arm during post-roll | the same bag continues |
 | manual request withdrawn, never armed | stop immediately |
 | free space under `flight_recorder_min_free_gb` (50 GB) | refuse to start; stop a running bag |
+| the bag grows nothing for `flight_recorder_stall_sec` (120 s) | finish it and start a new bag: rosbag2 on Jazzy can stop writing without exiting (ros2/rosbag2#2463); keep this above `max_cache_size` divided by the data rate |
 
 ## Armed state
 

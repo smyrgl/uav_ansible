@@ -8,7 +8,9 @@ or from the PX4 bridge's /px4/armed and /px4/safety_off, which can also stop
 the bag early once the vehicle is safed. The raw
 D555 streams are excluded by regex: the camera unicasts a copy per subscriber
 and a second copy would starve the encoder's link; the H.265 video topic and
-the throttled depth are recorded instead.
+the throttled depth are recorded instead. A bag that stops growing while the
+recorder process lives (rosbag2 Jazzy issue #2463) is caught after `stall_sec`:
+the recorder is stopped and restarted into a new bag, and the stop reason says so.
 """
 import json
 import os
@@ -26,7 +28,7 @@ from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPo
 from std_msgs.msg import Bool
 
 from .mavlink_arm import AutopilotLink
-from .policy import FlightPolicy, IDLE, RECORDING, POST_ROLL
+from .policy import FlightPolicy, GrowthWatch, IDLE, RECORDING, POST_ROLL
 
 DEFAULTS = {
     "bag_dir": "/data/flights",
@@ -34,6 +36,10 @@ DEFAULTS = {
     "post_roll_sec": 30.0, "safed_grace_sec": 5.0, "min_free_gb": 50.0,
     "exclude_regex": "^/realsense/", "storage_preset": "zstd_fast", "max_cache_size": 268435456,
     "stop_timeout_sec": 45.0,
+    # A bag that grows nothing for this long while the recorder lives is a
+    # stalled recorder: it is restarted into a new bag. rosbag2 writes in
+    # max_cache_size bursts, so this must exceed cache size / data rate.
+    "stall_sec": 120.0,
     # Where the armed state comes from: "mavlink" (the autopilot's HEARTBEAT
     # through mavlink-router, i.e. over TELEM2) or "ros" (/px4/armed and
     # /px4/safety_off from the PX4 bridge, i.e. over the FC's Ethernet).
@@ -91,6 +97,7 @@ class FlightRecorder(Node):
         self.last_error = None
         self.last_size = 0
         self.size_checked = 0.0
+        self.growth = GrowthWatch(self.p["stall_sec"])
         os.makedirs(self.p["bag_dir"], exist_ok=True)
         self.create_timer(1.0, self._tick)
         self.get_logger().info("flight recorder: %s, armed state from %s, post-roll %.0f s, excluding %r%s" % (
@@ -142,11 +149,18 @@ class FlightRecorder(Node):
         if self.proc is not None and now - self.size_checked > 5:
             self.size_checked = now
             self.last_size = dir_bytes(self.bag["path"])
+            self.growth.sample(now, self.last_size)
             if self._free_gb() < float(self.p["min_free_gb"]):
                 self.last_error = "stopped: free space below %.0f GB" % self.p["min_free_gb"]
                 self.get_logger().error(self.last_error)
                 self._finish("disk full guard")
                 self.policy.state = IDLE
+            elif self.growth.stalled(now):
+                self.last_error = "stalled: the bag grew nothing for %.0f s; restarting the recorder" % self.growth.stall_sec
+                self.get_logger().error(self.last_error)
+                self._finish("stalled bag")
+                if self.policy.state in (RECORDING, POST_ROLL):
+                    self._start("restart after a stalled bag")
         self._publish_diagnostics()
 
     def _act(self, decision):
@@ -179,6 +193,7 @@ class FlightRecorder(Node):
         self.bag = {"path": path, "started_at": stamp.isoformat(), "started_mono": time.monotonic(), "reason": reason,
                     "armed_at": stamp.isoformat() if self.policy.armed else None, "log": log}
         self.last_size = 0
+        self.growth.reset(self.bag["started_mono"])
         self.get_logger().info("recording %s (%s)" % (path, reason))
 
     def _finish(self, reason):
@@ -231,7 +246,8 @@ class FlightRecorder(Node):
                   "flights_this_boot": self.flights, "last_error": self.last_error}
         if self.bag:
             values.update({"bag": self.bag["path"], "bag_mb": round(self.last_size / 1e6, 1),
-                           "duration_s": round(time.monotonic() - self.bag["started_mono"]), "start_reason": self.bag["reason"]})
+                           "duration_s": round(time.monotonic() - self.bag["started_mono"]), "start_reason": self.bag["reason"],
+                           "bag_growth_age_s": round(time.monotonic() - self.growth.last_growth)})
         if self.last_flight:
             values.update({"last_flight/" + k: v for k, v in self.last_flight.items() if k in ("bag", "duration_sec", "bytes", "stop_reason")})
         values["arm_source"] = self.p["arm_source"]
