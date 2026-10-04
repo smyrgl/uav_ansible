@@ -1,0 +1,42 @@
+---
+# Bag offload to the replay host (roles/replay): a dedicated key for the
+# recorder's owner, whose public half is fetched to the control machine
+# (.offload-keys/, gitignored) and installed on the replay host restricted to
+# rrsync into its flights dataset; a timer pushes every signed-off bag.
+- name: Create the offload key
+  community.crypto.openssh_keypair:
+    path: "{{ flight_recorder_offload_key }}"
+    type: ed25519
+    comment: "uav-offload {{ inventory_hostname }}"
+    owner: "{{ target_user }}"
+    group: "{{ target_user }}"
+    mode: "0600"
+
+- name: Fetch the offload public key for the replay host
+  ansible.builtin.fetch:
+    src: "{{ flight_recorder_offload_key }}.pub"
+    dest: "{{ playbook_dir }}/.offload-keys/{{ inventory_hostname }}.pub"
+    flat: true
+
+- name: Install the offload script
+  ansible.builtin.template:
+    src: uav-offload-bags.j2
+    dest: /usr/local/bin/uav-offload-bags
+    mode: "0755"
+
+- name: Install the offload service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop:
+    - uav-offload-bags.service
+    - uav-offload-bags.timer
+  register: flight_recorder_offload_units
+
+- name: Run the offload timer (or stop it when disabled)
+  ansible.builtin.systemd_service:
+    name: uav-offload-bags.timer
+    enabled: "{{ flight_recorder_offload_enabled | bool }}"
+    state: "{{ 'started' if flight_recorder_offload_enabled | bool else 'stopped' }}"
+    daemon_reload: true

@@ -1,0 +1,9 @@
+[Unit]
+Description=Flight archive automount
+
+[Automount]
+Where={{ replay_archive_dir }}
+TimeoutIdleSec=600
+
+[Install]
+WantedBy=multi-user.target

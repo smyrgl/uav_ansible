@@ -26,3 +26,14 @@ replay_map_jaccard_min: 0.98
 # Set 0 to gate on Jaccard.
 replay_map_recall_min: 0.98
 replay_match_window_ms: 20.0
+# Offload from the aircraft: its key (fetched by the aircraft play into
+# .offload-keys/<host>.pub) is installed restricted to rrsync into the dataset.
+replay_offload_source_host: jethawk
+# Archive tier: the TrueNAS SMB share, user "uav" (password in the vault as
+# truenas_uav_password), mounted on demand and mirrored one way by a timer.
+replay_archive_share: //10.0.0.15/flight      # truenas.local, /mnt/main/flight
+replay_archive_user: uav
+replay_archive_dir: /srv/archive
+replay_archive_unit: srv-archive              # systemd needs the unit named after the path
+replay_archive_credentials: /etc/uav/truenas.cred
+replay_archive_interval: 1h

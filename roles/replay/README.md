@@ -70,3 +70,19 @@ A bench bag of a stationary aircraft cannot validate fidelity: the trajectory
 has no extent, so the alignment's rotation is unobservable. Replay-against-
 replay of the same bag (a common origin) is the determinism check; a flight bag
 is the fidelity check.
+
+## Offload and archive
+
+The aircraft pushes signed-off bags here itself (flight_recorder role,
+`uav-offload-bags.timer`): its key, fetched by the aircraft play into the
+control machine's gitignored `.offload-keys/`, is installed for `replay_user`
+restricted to `rrsync -wo` into the flights dataset, so it can write bags and
+nothing else. Run the aircraft play before this one when the key changes.
+
+Behind the NVMe sits the TrueNAS share (`replay_archive_share`, user
+`replay_archive_user`): with `truenas_uav_password` in the vault the role
+installs a root-only credentials file, a systemd mount/automount at
+`replay_archive_dir`, and `uav-archive-bags.timer`, which mirrors the dataset
+to the share one way every `replay_archive_interval` (replay outputs and
+offload stamps excluded, nothing deleted on either side). Without the vault
+entry those steps are skipped and reported.

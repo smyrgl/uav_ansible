@@ -1,0 +1,10 @@
+[Unit]
+Description=Flight archive (TrueNAS {{ replay_archive_share }})
+After=network-online.target
+Wants=network-online.target
+
+[Mount]
+What={{ replay_archive_share }}
+Where={{ replay_archive_dir }}
+Type=cifs
+Options=credentials={{ replay_archive_credentials }},vers=3.1.1,uid={{ replay_user }},gid={{ replay_group }},file_mode=0664,dir_mode=0775,_netdev,nofail,x-systemd.automount

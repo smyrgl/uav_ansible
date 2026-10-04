@@ -1,0 +1,11 @@
+[Unit]
+Description=Mirror the flights dataset to the archive share
+After=network-online.target
+
+[Service]
+Type=oneshot
+User={{ replay_user }}
+Group={{ replay_group }}
+ExecStart=/usr/local/bin/uav-archive-bags
+Nice=10
+IOSchedulingClass=idle

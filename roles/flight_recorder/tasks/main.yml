@@ -96,3 +96,6 @@
     enabled: true
     state: started
     daemon_reload: true
+
+- name: Offload bags to the replay host
+  ansible.builtin.include_tasks: offload.yml

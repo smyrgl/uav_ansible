@@ -45,6 +45,19 @@ seconds) on the recorder's diagnostics row; exit code 3 means a FAIL verdict
 with the reasons in flight.json, anything else non-zero is a checker error.
 Set `flight_recorder_postflight_enabled: false` to record only.
 
+## Offload to the replay host
+
+`uav-offload-bags.timer` (every `flight_recorder_offload_interval`, as the
+owner) rsyncs every bag whose post-flight checks have signed it off
+(`"signoff"` in flight.json) to `flight_recorder_offload_host` with a
+dedicated ed25519 key (`flight_recorder_offload_key`, created by the role; its
+public half is fetched to the control machine's gitignored `.offload-keys/`
+and installed by the replay role restricted to `rrsync -wo` into the flights
+dataset, so this key can write bags there and nothing else). A pushed bag gets
+a `.offloaded` stamp and is never pushed or deleted again; `offload.log` beside
+the bags records every attempt. In the field the host is unreachable and the
+timer just fails quietly until the aircraft is back on the bench network.
+
 ## Armed state
 
 By default (`flight_recorder_arm_source: mavlink`) the armed flag is bit 7

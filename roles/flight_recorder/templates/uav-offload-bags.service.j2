@@ -1,0 +1,12 @@
+[Unit]
+Description=Push signed-off flight bags to the replay host
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User={{ target_user }}
+Group={{ target_user }}
+ExecStart=/usr/local/bin/uav-offload-bags
+Nice=10
+IOSchedulingClass=idle

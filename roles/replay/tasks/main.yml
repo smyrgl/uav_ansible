@@ -138,3 +138,6 @@
     src: uav-replay.j2
     dest: /usr/local/bin/uav-replay
     mode: "0755"
+
+- name: Offload key and archive tier
+  ansible.builtin.include_tasks: offload.yml

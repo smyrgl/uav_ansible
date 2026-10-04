@@ -1,0 +1,7 @@
+#!/bin/bash
+# Managed by uav_ansible (replay). Mirror the flights dataset to the archive
+# share (one way, nothing deleted on either side); the NVMe stays the working set.
+set -eo pipefail
+[ -d {{ replay_archive_dir }} ] || { echo "archive not mounted"; exit 1; }
+ls {{ replay_archive_dir }} >/dev/null   # triggers the automount
+rsync -a --partial --timeout=120 --exclude '*_replay_*' --exclude '.offloaded' {{ replay_flights_dir }}/ {{ replay_archive_dir }}/ && echo "archive mirrored $(date -u +%FT%TZ)"

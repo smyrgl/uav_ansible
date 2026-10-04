@@ -1,0 +1,10 @@
+[Unit]
+Description=Mirror the flights dataset to the archive share every {{ replay_archive_interval }}
+
+[Timer]
+OnBootSec=10min
+OnUnitActiveSec={{ replay_archive_interval }}
+RandomizedDelaySec=120
+
+[Install]
+WantedBy=timers.target

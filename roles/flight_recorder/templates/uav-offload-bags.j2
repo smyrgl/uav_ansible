@@ -1,0 +1,28 @@
+#!/bin/bash
+# Managed by uav_ansible (flight_recorder). Push every signed-off bag (its
+# post-flight checks wrote "signoff" into flight.json) to the replay host, once.
+# The key on the other side is restricted to rrsync into the flights dataset,
+# so the remote path is relative to it. Bags stay here; nothing is deleted.
+set -eo pipefail
+BAGS={{ flight_recorder_dir }}
+HOST="{{ flight_recorder_offload_user }}@{{ flight_recorder_offload_host }}"
+KEY={{ flight_recorder_offload_key }}
+SSH="ssh -i $KEY -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=accept-new"
+LIMIT="{{ ('--bwlimit=' ~ flight_recorder_offload_bandwidth_kbps) if (flight_recorder_offload_bandwidth_kbps | int) > 0 else '' }}"
+pushed=0; failed=0; skipped=0
+for dir in "$BAGS"/flight_*/; do
+  dir="${dir%/}"; name=$(basename "$dir")
+  [ -f "$dir/flight.json" ] || { skipped=$((skipped+1)); continue; }
+  grep -q '"signoff"' "$dir/flight.json" || { skipped=$((skipped+1)); continue; }   # post-flight not done yet
+  [ -f "$dir/.offloaded" ] && continue
+  items=("$dir")
+  for extra in "$dir.log" "$dir.postflight.log"; do [ -f "$extra" ] && items+=("$extra"); done   # older bags lack them
+  if rsync -a --partial --timeout=60 $LIMIT -e "$SSH" "${items[@]}" "$HOST:./" 2>>"$BAGS/offload.log"; then
+    date -u +%FT%TZ > "$dir/.offloaded"; pushed=$((pushed+1))
+    echo "$(date -u +%FT%TZ) pushed $name" >> "$BAGS/offload.log"
+  else
+    status=$?; failed=$((failed+1)); echo "$(date -u +%FT%TZ) FAILED $name (rsync exit $status)" >> "$BAGS/offload.log"
+  fi
+done
+echo "offload: $pushed pushed, $failed failed, $skipped without sign-off"
+[ "$failed" = 0 ]

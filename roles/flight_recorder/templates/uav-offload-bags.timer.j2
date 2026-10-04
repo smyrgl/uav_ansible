@@ -1,0 +1,10 @@
+[Unit]
+Description=Push signed-off flight bags to the replay host every {{ flight_recorder_offload_interval }}
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec={{ flight_recorder_offload_interval }}
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

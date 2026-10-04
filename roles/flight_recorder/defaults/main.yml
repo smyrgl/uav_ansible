@@ -44,3 +44,13 @@ flight_recorder_mcap_version: "1.5.0"
 # PCD postflight saves covers exactly the bag and a replay can be compared to it.
 flight_recorder_reset_map_on_start: true
 flight_recorder_map_reset_service: /lio/map/reset
+# Offload: push every signed-off bag to the replay host (roles/replay) with a
+# dedicated key restricted there to rrsync into its flights dataset. The host
+# name resolves on the bench LAN; in the field there is no route and the timer
+# simply logs a failure and tries again later. Bags are never deleted here.
+flight_recorder_offload_enabled: true
+flight_recorder_offload_host: atomic
+flight_recorder_offload_user: john
+flight_recorder_offload_key: "/home/{{ target_user }}/.ssh/uav-offload"
+flight_recorder_offload_interval: 15min
+flight_recorder_offload_bandwidth_kbps: 0      # 0 = unlimited

@@ -1,0 +1,91 @@
+---
+# The aircraft's offload key, restricted to writing bags into the flights
+# dataset (rrsync -wo), and the archive tier behind the NVMe: the TrueNAS SMB
+# share, mounted on demand and mirrored by a timer. The archive needs the share
+# user's password in the vault (truenas_uav_password); without it that part is
+# skipped and reported.
+- name: Look for the aircraft's offload public key (fetched by the aircraft play)
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/.offload-keys/{{ replay_offload_source_host }}.pub"
+  delegate_to: localhost
+  become: false
+  register: replay_offload_key
+
+- name: Allow the aircraft to push bags into the flights dataset
+  ansible.posix.authorized_key:
+    user: "{{ replay_user }}"
+    key: "{{ lookup('file', playbook_dir ~ '/.offload-keys/' ~ replay_offload_source_host ~ '.pub') }}"
+    key_options: 'restrict,command="/usr/bin/rrsync -wo {{ replay_flights_dir }}"'
+    comment: "uav-offload {{ replay_offload_source_host }}"
+  when: replay_offload_key.stat.exists
+
+- name: Report a missing offload key
+  ansible.builtin.debug:
+    msg: "No .offload-keys/{{ replay_offload_source_host }}.pub yet: run the aircraft play (flight_recorder) first."
+  when: not replay_offload_key.stat.exists
+
+- name: Install the SMB client
+  ansible.builtin.apt:
+    name: cifs-utils
+    state: present
+
+- name: Report the archive tier waiting for its credential
+  ansible.builtin.debug:
+    msg: "truenas_uav_password is not in the vault: the archive mount and mirror are skipped."
+  when: truenas_uav_password is not defined
+
+- name: Archive tier (TrueNAS SMB share)
+  when: truenas_uav_password is defined
+  block:
+    - name: Install the share credentials
+      ansible.builtin.copy:
+        dest: "{{ replay_archive_credentials }}"
+        content: "username={{ replay_archive_user }}\npassword={{ truenas_uav_password }}\n"
+        owner: root
+        group: root
+        mode: "0600"
+      no_log: true
+
+    - name: Create the archive mount point
+      ansible.builtin.file:
+        path: "{{ replay_archive_dir }}"
+        state: directory
+        mode: "0755"
+
+    - name: Install the archive mount and automount units
+      ansible.builtin.template:
+        src: "{{ item.src }}"
+        dest: "/etc/systemd/system/{{ item.dest }}"
+        mode: "0644"
+      loop:
+        - { src: srv-archive.mount.j2, dest: "{{ replay_archive_unit }}.mount" }
+        - { src: srv-archive.automount.j2, dest: "{{ replay_archive_unit }}.automount" }
+
+    - name: Mount the archive on demand
+      ansible.builtin.systemd_service:
+        name: "{{ replay_archive_unit }}.automount"
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Install the archive mirror
+      ansible.builtin.template:
+        src: uav-archive-bags.j2
+        dest: /usr/local/bin/uav-archive-bags
+        mode: "0755"
+
+    - name: Install the archive mirror service and timer
+      ansible.builtin.template:
+        src: "{{ item }}.j2"
+        dest: "/etc/systemd/system/{{ item }}"
+        mode: "0644"
+      loop:
+        - uav-archive-bags.service
+        - uav-archive-bags.timer
+
+    - name: Run the archive mirror timer
+      ansible.builtin.systemd_service:
+        name: uav-archive-bags.timer
+        enabled: true
+        state: started
+        daemon_reload: true
