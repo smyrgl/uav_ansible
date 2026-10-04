@@ -32,3 +32,7 @@ x950_description/*_backup_*.blend
 
 # Bag offload: the aircraft's public key fetched for the replay host
 .offload-keys/
+
+# Mission plans and their item tables carry launch coordinates: never in a public repo
+docs/flight-cards/*.plan
+docs/flight-cards/*.items.md

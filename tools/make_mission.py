@@ -9,8 +9,8 @@ featureless ground, a low pass over ground mapped earlier, a small survey
 grid, then a landing at home. The FC's MISSION_CURRENT stream marks every item
 in the bag's flight.json (flight recorder), so no marker switch is needed.
 
-    make_mission.py --home <lat> <lon> --home-alt 1536.8 \
-        --heading 0 --leg 30 -o docs/flight-cards/2026-10-05-shakedown-1.plan
+    make_mission.py --home <lat> <lon> --home-alt <m AMSL> \
+        --heading 0 --leg 30 -o docs/flight-cards/<date>-<name>.plan
 
 Review it in QGC (drag the featureless and mapped-ground passes onto the right
 ground, check the legs fit the yard) before uploading. PX4: multicopter
