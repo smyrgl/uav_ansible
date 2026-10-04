@@ -1,7 +1,14 @@
 # PX4 configuration for the X950 maiden flight
 
 State of the Pixhawk 6X on 2026-10-01, firmware `v1.17.0-1-g27174e09f5`
-(`uav/v1.17.0-pps`, worktree `PX4-Autopilot-fc`). The parameter set, applied and
+(`uav/v1.17.0-pps`, worktree `PX4-Autopilot-fc`). That branch has since grown:
+three Septentrio heading fixes (2026-10-02) and, on 2026-10-04, the
+uXRCE-DDS topic change for the autonomy programme (`trajectory_setpoint` and
+`vehicle_local_position_setpoint` published at 50 Hz; every `/fmu/in`
+subscription except `message_format_request` removed, see
+[the autonomy roadmap](autonomy-roadmap.md)). The flashed version is read back
+with `ver all` before each campaign and recorded here; the FC may lag the
+worktree. The parameter set, applied and
 proposed, is in [px4/x950-maiden.params](px4/x950-maiden.params). A full dump of
 the 1161 parameters as they were before this pass is on the Jetson at
 `/home/john/uav-probes/params.json` (made with `uav-probes/paramdump.py`).

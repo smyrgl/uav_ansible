@@ -69,8 +69,9 @@ setFrontendMode, DualAnt
   went back to 5 ms on 2026-10-02: the Avia syncs over PTP, and the FC's
   Ethernet failed to link at boot with the PPS on its capture pin, the same
   fault as 2026-09-30. A longer pulse keeps that pin high 20 times longer.
-  If the Avia moves to PPS, give it the G5's second PPS output at 100 ms, or
-  buffer the FC's capture input first.
+  2026-10-04: the Avia moved to PPS plus UTC on this 5 ms pulse and reached GPS
+  sync mode 2 (its manual asks for 20-200 ms; see the avia role README), so
+  the width stays at the default and the FC's capture pin is untouched.
 - **Frontend mode.** `Nominal`, the default, resolves to SingleAnt on this
   product, which leaves the Aux1 front end off: no Aux1 measurements and no
   multi-antenna attitude. `setFrontendMode` takes effect only after a reset,

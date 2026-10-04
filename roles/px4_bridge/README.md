@@ -46,4 +46,9 @@ about 21 ppm off the delivered stamps were 3.5 to 4.7 ms behind UTC and
 drifting 21 us every second with no correction step in a minute; the linear
 model leaves microseconds. A stamp more than 10 s past the last edge gets no
 correction. Its
-`rtc_timestamp` field is ignored: there is no GPS on the FC to fill it.
+`rtc_timestamp` field (the receiver's UTC for the edge: PX4 reads the mosaic-G5
+on the FC's GPS2 port, the v1.17 Septentrio driver sets the FC's CLOCK_REALTIME
+and fills `sensor_gps.time_utc_usec`, and `PPSCapture` copies that into the
+field) is not used by the residual: the edge's UTC second is unambiguous from
+the synced stamp itself, and the ulog carries its own UTC anchors
+(`vehicle_gps_position.time_utc_usec`, `boot_time_utc_us`) for offline alignment.

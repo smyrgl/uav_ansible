@@ -117,8 +117,9 @@ CPU 10–25 % per core. Check it again with:
 python3 /usr/local/lib/uav/verify_nvblox.py --wait 60 --save-ply /var/lib/uav-ros/nvblox/bench.ply
 ```
 
-Time bases are UTC: the Avia stamps its own PTP-synchronized sample time (the
-time_sync role's ptpd master), the D555 adapter maps the camera's hardware clock
+Time bases are UTC: the Avia stamps its own sample time synchronized by the
+receiver's PPS plus the driver's UTC push (GPS sync mode; the ptpd master was
+retired on 2026-10-04), the D555 adapter maps the camera's hardware clock
 to UTC from its IMU stream, and the PX4 bridge corrects FC stamps with the PPS.
 See the avia and foxglove role READMEs for how each is validated.
 
