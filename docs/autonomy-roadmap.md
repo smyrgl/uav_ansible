@@ -181,19 +181,29 @@ estimates.
   `message_format_request`.
 - `shadow_guard` and the MAVLink-source check; a `px4_msgs` FNV-1a message-hash
   check at `uav-ros.target` start that **retries until the client is connected**
-  and reports "unknown" in diagnostics until then.
+  and reports "unknown" in diagnostics until then. *Done 2026-10-04 as the
+  health node's "PX4 / Guard" row (rclpy, not rclcpp: a 1 Hz graph query):
+  16/16 hashes matched the FC on first contact; the router forwards all MAVLink
+  to the node (`SnifferSysid`).*
 - Recorder hardening: stalled-growth alarm (open rosbag2 Jazzy #2463 at our
   ~14 MB/s), per-topic gap scan and topic-count check written into `flight.json`,
-  end-of-flight `/lio/map/save` PCD, flight card per flight.
+  end-of-flight `/lio/map/save` PCD, flight card per flight. *Done 2026-10-04:
+  the stall alarm fired in the SIGSTOP test at 120 s; `postflight.py` (recorder
+  role README); a gap is a missed message, nominal period + 100 ms.*
 - ulog → MCAP UTC converter (pyulog + mcap): `UTC_us = hrt_us −
   timesync_status.estimated_offset`, cross-checked against
-  `vehicle_gps_position.time_utc_usec` and `pps_capture`.
+  `vehicle_gps_position.time_utc_usec` and `pps_capture`. *Written 2026-10-04:
+  `tools/ulog2mcap.py`; the UTC path waits for a log from this FC.*
 - Storage and offload plan: ~50 GB per flight hour; where bags go, which host
   replays them (the Mac cannot run Jazzy rclcpp natively).
 - Compute recovery, measured: `rclpy.experimental.EventsExecutor` on every Python
   node with a jtop A/B per node; the camera node's 1.2 cores are a Python
   GStreamer buffer problem, not executor polling, and need a C++ or zero-copy
-  path (Stage 2).
+  path (Stage 2). *2026-10-04: health node 58 % → 14.5 % of a core, all Python
+  services 124 % → 55 %; the camera node 105 % → 22 % by feeding the D555's
+  native YUY2 to nvvidconv instead of converting twice on the CPU (the Stage 2
+  zero-copy item is now about the remaining copies, not the conversion); the
+  rest in docs/ros-bench.md "Executor A/B".*
 - Decision recorded: a throttled D555 IR/depth copy in the bag, or LiDAR-first.
 - Fix the stale README lines (FC GNSS; four-commit branch).
 - **Gate:** 3 bags with zero gaps > 100 ms on `/fmu/out/vehicle_odometry`,

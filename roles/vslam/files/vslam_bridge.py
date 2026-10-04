@@ -18,6 +18,7 @@
   restarted its coordinate system) so that its base_link pose coincides with
   the EKF's at that instant; otherwise that frame has no place in the TF tree.
 """
+import os
 import argparse
 import json
 import math
@@ -291,6 +292,27 @@ def create_bridge_node(options):
     return rclpy, Bridge()
 
 
+def _spin(node):
+    """rclpy's default executor, or the experimental EventsExecutor when
+    UAV_EVENTS_EXECUTOR=1 (uav_ansible: ros_events_executor), the A/B of the
+    autonomy roadmap's compute-recovery item."""
+    import rclpy     # some nodes import it inside main()
+    if os.environ.get("UAV_EVENTS_EXECUTOR", "0") == "1":
+        try:
+            from rclpy.experimental.events_executor import EventsExecutor
+        except ImportError:
+            EventsExecutor = None
+        if EventsExecutor is not None:
+            executor = EventsExecutor()
+            executor.add_node(node)
+            try:
+                executor.spin()
+            finally:
+                executor.remove_node(node)
+                executor.shutdown()
+            return
+    rclpy.spin(node)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--odometry-topic", default="/vslam/odometry")
@@ -309,7 +331,7 @@ def main():
         import rclpy
         rclpy.init(args=ros_args)
         rclpy, node = create_bridge_node(options)
-        rclpy.spin(node)
+        _spin(node)
     except KeyboardInterrupt:
         pass
     finally:

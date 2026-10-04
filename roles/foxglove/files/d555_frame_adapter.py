@@ -13,6 +13,7 @@ carries the model (and how good it is) for other processes and for the
 flight bags. Calibration and image payloads are never changed.
 """
 
+import os
 import argparse
 import json
 import re
@@ -207,6 +208,27 @@ def create_adapter_node(serial, depth_hz=2.0, clock_window_s=60.0):
     return D555FrameAdapter()
 
 
+def _spin(node):
+    """rclpy's default executor, or the experimental EventsExecutor when
+    UAV_EVENTS_EXECUTOR=1 (uav_ansible: ros_events_executor), the A/B of the
+    autonomy roadmap's compute-recovery item."""
+    import rclpy     # some nodes import it inside main()
+    if os.environ.get("UAV_EVENTS_EXECUTOR", "0") == "1":
+        try:
+            from rclpy.experimental.events_executor import EventsExecutor
+        except ImportError:
+            EventsExecutor = None
+        if EventsExecutor is not None:
+            executor = EventsExecutor()
+            executor.add_node(node)
+            try:
+                executor.spin()
+            finally:
+                executor.remove_node(node)
+                executor.shutdown()
+            return
+    rclpy.spin(node)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--serial", default="261622302751", help="D555 native topic serial number")
@@ -225,7 +247,7 @@ def main():
     node = None
     try:
         node = create_adapter_node(options.serial, options.depth_hz, options.clock_window_s)
-        rclpy.spin(node)
+        _spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:

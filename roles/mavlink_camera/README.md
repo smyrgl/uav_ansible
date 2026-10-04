@@ -225,7 +225,23 @@ reports `clock_model`. Photos use the same capture time for MAVLink
 `time_utc_us` and record `capture_utc_us` beside `received_utc_us` in their JSON
 sidecar. Measured: a video message arrives about 113 ms after its capture time
 (transfer, conversion, NVENC). `video_frame_id` is a label for overlays, and the picture is already
-rotated by `rotation_degrees`, so a panel should not rotate it again. `~/status`
+rotated by `rotation_degrees`, so a panel should not rotate it again.
+
+Since 2026-10-04 the frame enters GStreamer in the format it arrives in
+(`raw_frame`: the D555's `yuv422_yuy2` becomes appsrc `YUY2`, stride padding
+trimmed, nothing else touched), nvvidconv converts it to NV12 in NVMM on the
+VIC and applies the 180-degree flip (`flip-method=2`), and NVENC encodes. The
+CPU colour conversion (OpenCV YUY2 to RGB in the worker, then `videoconvert` RGB
+to NV12 inside the pipeline) is gone, as are two of the five per-frame copies.
+Formats nvvidconv does not take from system memory (24-bit BGR) still pass
+through `videoconvert`. Measured on the bench, YUY2 1280x800 at 30 Hz: the node
+fell from about 105 % of a core to 22 % (an early version rebuilt the encoder on
+every frame because the rebuild key ignored the format; 980 NVENC inits a
+minute is the symptom). Photos convert the stored native frame on demand
+(`frame_to_bgr`) and are flipped the same way as the stream, so a JPEG matches
+what the viewer saw. The node still runs its pipeline with no RTSP client, no
+video-topic subscriber and no recording; gating it on consumers is the next
+step if the bench cost matters. `~/status`
 reports `video_frames_published` and `video_frames_dropped`. The publisher is
 best effort and fed through a small queue drained by the node's executor: a
 reliable writer can block in `publish()` while a slow or departing reader is

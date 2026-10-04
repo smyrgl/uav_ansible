@@ -7,6 +7,7 @@ the H-Flow's DroneCAN timestamps are zero (no time sync). The flow integrals
 are in the sensor's FRD axes (hflow_nominal_frd_frame), exactly as PX4 would
 publish them; use TF or px4_ros_com frame_transforms to reach FLU.
 """
+import os
 import collections
 import math
 import threading
@@ -222,12 +223,33 @@ class HFlowObserver(Node):
         return super().destroy_node()
 
 
+def _spin(node):
+    """rclpy's default executor, or the experimental EventsExecutor when
+    UAV_EVENTS_EXECUTOR=1 (uav_ansible: ros_events_executor), the A/B of the
+    autonomy roadmap's compute-recovery item."""
+    import rclpy     # some nodes import it inside main()
+    if os.environ.get("UAV_EVENTS_EXECUTOR", "0") == "1":
+        try:
+            from rclpy.experimental.events_executor import EventsExecutor
+        except ImportError:
+            EventsExecutor = None
+        if EventsExecutor is not None:
+            executor = EventsExecutor()
+            executor.add_node(node)
+            try:
+                executor.spin()
+            finally:
+                executor.remove_node(node)
+                executor.shutdown()
+            return
+    rclpy.spin(node)
+
 def main(args=None):
     rclpy.init(args=args)
     node = None
     try:
         node = HFlowObserver()
-        rclpy.spin(node)
+        _spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:

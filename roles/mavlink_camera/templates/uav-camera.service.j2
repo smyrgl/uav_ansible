@@ -4,6 +4,7 @@ Description=D555 ROS2 RGB, NVENC RTSP and MAVLink camera
 StartLimitIntervalSec=0
 
 [Service]
+Environment=UAV_EVENTS_EXECUTOR={{ '1' if (ros_events_executor | default(false) | bool) else '0' }}
 Type=simple
 WorkingDirectory={{ mavlink_camera_root }}
 Environment=ROS_DOMAIN_ID={{ mavlink_camera_ros_domain }}

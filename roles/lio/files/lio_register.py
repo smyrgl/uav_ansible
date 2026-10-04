@@ -28,6 +28,7 @@ map. Nothing is registered while the lio watchdog (/lio/health) says FAST-LIO ha
 diverged, and its poses are forgotten when FAST-LIO starts over. Diagnostics:
 the "lio/<name>" row.
 """
+import os
 import argparse
 import math
 import time
@@ -331,6 +332,27 @@ def create_register_node(options):
     return Register()
 
 
+def _spin(node):
+    """rclpy's default executor, or the experimental EventsExecutor when
+    UAV_EVENTS_EXECUTOR=1 (uav_ansible: ros_events_executor), the A/B of the
+    autonomy roadmap's compute-recovery item."""
+    import rclpy     # some nodes import it inside main()
+    if os.environ.get("UAV_EVENTS_EXECUTOR", "0") == "1":
+        try:
+            from rclpy.experimental.events_executor import EventsExecutor
+        except ImportError:
+            EventsExecutor = None
+        if EventsExecutor is not None:
+            executor = EventsExecutor()
+            executor.add_node(node)
+            try:
+                executor.spin()
+            finally:
+                executor.remove_node(node)
+                executor.shutdown()
+            return
+    rclpy.spin(node)
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--name", default="e1r", help="diagnostic row lio/<name>")
@@ -355,7 +377,7 @@ def main():
     rclpy.init(args=ros_args)
     try:
         node = create_register_node(options)
-        rclpy.spin(node)
+        _spin(node)
     except KeyboardInterrupt:
         pass
     finally:

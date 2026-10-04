@@ -155,3 +155,32 @@ This localizes the interruption upstream of the router; it does not establish
 the internal PX4 cause. Console access during the failure was unavailable.
 No Pixhawk reboot, firmware change, or flight-control parameter change was made
 during this diagnosis. Fresh PX4 delivery/recovery validation remains pending.
+
+## Executor A/B (2026-10-04)
+
+Autonomy roadmap Stage 0b, "compute recovery, measured". Every Python node
+spins through a small `_spin()` helper: rclpy's default executor, or the
+experimental `EventsExecutor` (callbacks run from DDS events instead of a wait
+set rebuilt on every wake-up) when its unit carries `UAV_EVENTS_EXECUTOR=1`
+(`ros_events_executor` in group_vars, on by default since this measurement).
+CPU is utime+stime of each service's Python processes from `/proc` over 60 s,
+sampled with `/home/john/uav-probes/cpu_by_unit.py` on the Jetson, bench
+load (every sensor streaming, no bag). Baseline before any change
+(`cpu_baseline_20261004T181138Z.json`), then the health node alone, then all:
+
+| Service | Default executor, % of a core | EventsExecutor | Note |
+|---|---|---|---|
+| uav-ros-health | 58.0 | 14.5 | the guard's graph scan is 4.7 ms/s; raw cloud subscriptions changed nothing (kept: no 2.5 MB deserialization) |
+| uav-vslam-bridge | 24.6 | 7.5 | |
+| uav-lio-bridge | 10.1 | 3.9 | |
+| uav-lio-map | 4.2 | 2.8 | |
+| uav-lio-e1r | 2.3 | 1.2 | |
+| uav-lio-watchdog | 1.8 | 1.0 | |
+| uav-hflow | 16.7 | 16.8 | its cost is the CAN frame parsing thread, not the executor |
+| uav-flight-recorder | 1.5 | 1.3 | |
+| uav-d555-frames | 18.3 | crash-loops | rclpy 7.1.12 "SystemError: null argument to internal routine" at start; pinned to the default executor (`foxglove_d555_frames_events_executor: false`) |
+| all Python services | 124.2 | 54.6 | without the camera node, below |
+| uav-camera (user unit) | ~105 | 22.0 | not the executor: the frame now enters GStreamer as the D555's native YUY2 and nvvidconv converts and flips on the VIC; the CPU YUY2→RGB→NV12 double conversion is gone (mavlink_camera README) |
+
+Not in the table: the gnss broker/time feeders, jetson stats and lidar_view
+(unchanged, not rclpy executors in the hot path).

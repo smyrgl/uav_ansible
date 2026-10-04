@@ -21,7 +21,7 @@ from typing import Any
 
 @dataclass(frozen=True)
 class _Frame:
-    rgb: bytes
+    rgb: bytes                  # the pixels as they arrived (any format in BYTES_PER_PIXEL)
     width: int
     height: int
     stamp_ns: int
@@ -30,6 +30,24 @@ class _Frame:
     sequence: int
     received_mono: float
     received_utc_us: int
+    fmt: str = "RGB"
+
+
+BYTES_PER_PIXEL = {"RGB": 3, "BGR": 3, "RGBA": 4, "BGRx": 4, "GRAY8": 1, "YUY2": 2, "UYVY": 2, "NV12": 1.5}
+# What nvvidconv takes straight from system memory on this JetPack (gst-inspect
+# nvvidconv, 2026-10-04); anything else goes through videoconvert first.
+NVVIDCONV_FORMATS = frozenset(("YUY2", "UYVY", "NV12", "I420", "GRAY8", "RGB", "RGBA", "BGRx"))
+
+
+def frame_to_bgr(pixels, width, height, fmt):
+    """A photo's BGR array from a frame in any supported format (OpenCV, on demand)."""
+    import cv2
+    import numpy as np
+    channels = {"RGB": 3, "BGR": 3, "RGBA": 4, "BGRx": 4, "GRAY8": 1, "YUY2": 2, "UYVY": 2}[fmt]
+    img = np.frombuffer(pixels, dtype=np.uint8).reshape(height, width, channels)
+    code = {"RGB": cv2.COLOR_RGB2BGR, "RGBA": cv2.COLOR_RGBA2BGR, "BGRx": cv2.COLOR_BGRA2BGR,
+            "GRAY8": cv2.COLOR_GRAY2BGR, "YUY2": cv2.COLOR_YUV2BGR_YUY2, "UYVY": cv2.COLOR_YUV2BGR_UYVY}.get(fmt)
+    return cv2.cvtColor(img, code) if code is not None else img
 
 
 class MediaManager:
@@ -47,6 +65,9 @@ class MediaManager:
         self.codec = str(config.get("codec", "h265")).lower()
         if self.codec not in {"h264", "h265"}:
             raise ValueError("codec must be h264 or h265")
+        self.rotation = int(config.get("rotation_degrees", 0))
+        if self.rotation not in (0, 180):
+            raise ValueError("rotation_degrees must be 0 or 180")
         self.fps = int(config.get("fps", 30))
         self.bitrate = int(config.get("bitrate", 4_000_000))
         if not 1 <= self.fps <= 120 or not 100_000 <= self.bitrate <= 100_000_000:
@@ -137,18 +158,21 @@ class MediaManager:
         self._worker.start()
 
     def submit_frame(self, rgb: bytes, width: int, height: int, stamp_ns: int,
-                     frame_id: str, camera_info: dict | None):
+                     frame_id: str, camera_info: dict | None, fmt: str = "RGB"):
         if width < 2 or height < 2 or width % 2 or height % 2:
             self._error("NVENC requires positive, even image dimensions")
             return
-        if len(rgb) != width * height * 3:
-            self._error("RGB frame byte count does not match dimensions")
+        if fmt not in BYTES_PER_PIXEL:
+            self._error(f"unsupported frame format {fmt!r}")
+            return
+        if len(rgb) != int(width * height * BYTES_PER_PIXEL[fmt]):
+            self._error("frame byte count does not match dimensions")
             return
         with self._condition:
             self._sequence += 1
             frame = _Frame(bytes(rgb), width, height, int(stamp_ns), str(frame_id),
                            copy.deepcopy(camera_info), self._sequence,
-                           time.monotonic(), time.time_ns() // 1000)
+                           time.monotonic(), time.time_ns() // 1000, str(fmt))
             self._latest = self._pending = frame
             self._condition.notify_all()
 
@@ -222,10 +246,10 @@ class MediaManager:
     def _write_photo(self, path: Path, frame: _Frame):
         import cv2
         import numpy as np
-        rgb = np.frombuffer(frame.rgb, dtype=np.uint8).reshape(
-            frame.height, frame.width, 3)
-        ok, encoded = cv2.imencode(".jpg", cv2.cvtColor(rgb, cv2.COLOR_RGB2BGR),
-                                   [cv2.IMWRITE_JPEG_QUALITY, 95])
+        bgr = frame_to_bgr(frame.rgb, frame.width, frame.height, frame.fmt)
+        if self.rotation == 180:
+            bgr = np.ascontiguousarray(bgr[::-1, ::-1])
+        ok, encoded = cv2.imencode(".jpg", bgr, [cv2.IMWRITE_JPEG_QUALITY, 95])
         if not ok:
             raise RuntimeError("JPEG encoder failed")
         sidecar = path.with_suffix(".json")
@@ -236,7 +260,7 @@ class MediaManager:
                         capture_utc_us=(frame.camera_info or {}).get("capture_utc_us"),
                         received_monotonic_ns=int(frame.received_mono * 1e9),
                         width=frame.width, height=frame.height,
-                        encoding="rgb8", camera_info=frame.camera_info,
+                        encoding="rgb8", source_format=frame.fmt, camera_info=frame.camera_info,
                         timestamp_note="source_stamp_ns is the original ROS header stamp (device clock); "
                                        "capture_utc_us is that stamp mapped to UTC via /d555/clock "
                                        "(null without a valid model); received_utc_us is host receipt time")
@@ -259,15 +283,19 @@ class MediaManager:
             handle.flush()
             os.fsync(handle.fileno())
 
-    def _pipeline_description(self, width, height):
-        # CPU RGB conversion is one bounded copy; NV12 upload + encode use Jetson.
+    def _pipeline_description(self, width, height, fmt="RGB"):
+        # The frame enters in its source format; nvvidconv (the VIC) converts to
+        # NV12 in NVMM and applies the 180-degree flip, so no CPU colour
+        # conversion for formats it accepts (the D555's YUY2 among them).
         profile = "0" if self.codec == "h265" else "4"  # Main / High
+        convert = "" if fmt in NVVIDCONV_FORMATS else "! videoconvert ! video/x-raw,format=NV12 "
+        flip = " flip-method=2" if self.rotation == 180 else ""
         return (
             "appsrc name=raw_source is-live=true format=time block=false "
             "max-buffers=2 max-bytes=0 leaky-type=downstream "
-            f"caps=video/x-raw,format=RGB,width={width},height={height},framerate={self.fps}/1 "
-            "! videoconvert ! video/x-raw,format=NV12 "
-            "! nvvidconv ! video/x-raw(memory:NVMM),format=NV12 "
+            f"caps=video/x-raw,format={fmt},width={width},height={height},framerate={self.fps}/1 "
+            f"{convert}"
+            f"! nvvidconv{flip} ! video/x-raw(memory:NVMM),format=NV12 "
             f"! nvv4l2{self.codec}enc name=encoder bitrate={self.bitrate} "
             f"control-rate=1 num-B-Frames=0 iframeinterval={self.fps} "
             f"idrinterval={self.fps} insert-sps-pps=true preset-level=1 profile={profile} "
@@ -285,11 +313,15 @@ class MediaManager:
                 if self._record:
                     self.stop_recording()
             self._pipeline.set_state(Gst.State.NULL)
-        self._pipeline = Gst.parse_launch(self._pipeline_description(frame.width, frame.height))
+        description = self._pipeline_description(frame.width, frame.height, frame.fmt)
+        if self.logger:
+            self.logger.info("NVENC pipeline (%dx%d %s, rotation %d): %s" % (frame.width, frame.height, frame.fmt,
+                                                                           self.rotation, description))
+        self._pipeline = Gst.parse_launch(description)
         self._source = self._pipeline.get_by_name("raw_source")
         self._encoder = self._pipeline.get_by_name("encoder")
         self._pipeline.get_by_name("encoded_sink").connect("new-sample", self._on_encoded)
-        self._shape = (frame.width, frame.height)
+        self._shape = (frame.width, frame.height, frame.fmt)   # the rebuild key _run compares
         if not self._start_mono_ns:
             self._start_mono_ns = time.monotonic_ns()
         with self._condition:
@@ -333,7 +365,7 @@ class MediaManager:
                     continue
                 if frame.sequence == last_encoded_sequence:
                     continue
-                if self._shape != (frame.width, frame.height):
+                if self._shape != (frame.width, frame.height, frame.fmt):
                     self._build_encoder(frame)
                 payload = self.Gst.Buffer.new_allocate(None, len(frame.rgb), None)
                 payload.fill(0, frame.rgb)

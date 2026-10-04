@@ -1,6 +1,6 @@
 from types import SimpleNamespace
 import pytest
-from uav_camera.node import rgb_bytes
+from uav_camera.node import rgb_bytes, raw_frame
 
 
 def test_rgb_rows_discard_padding():
@@ -30,3 +30,13 @@ def test_rotation_180_preserves_rgb_channels():
     msg = SimpleNamespace(encoding='rgb8', width=2, height=2, step=6,
                           data=bytes([255,0,0, 0,255,0, 0,0,255, 255,255,255]))
     assert rgb_bytes(msg, 180) == bytes([255,255,255, 0,0,255, 0,255,0, 255,0,0])
+
+
+def test_raw_frame_passes_yuy2_through_and_trims_stride():
+    from types import SimpleNamespace
+    data = bytes(range(16)) + b"\xff\xff" + bytes(range(16, 32)) + b"\xee\xee"    # 8 px wide, 2 rows, 2 B pad
+    msg = SimpleNamespace(encoding="yuv422_yuy2", width=8, height=2, step=18, data=data)
+    pixels, fmt = raw_frame(msg)
+    assert fmt == "YUY2" and pixels == bytes(range(16)) + bytes(range(16, 32))
+    tight = SimpleNamespace(encoding="rgb8", width=2, height=1, step=6, data=bytes(6))
+    assert raw_frame(tight) == (bytes(6), "RGB")

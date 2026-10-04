@@ -5,6 +5,7 @@ PX4's NED/FRD conventions to ENU/FLU (REP-103), stamped with PX4's XRCE-synced
 epoch timestamps. GNSS data from PX4 is deliberately not republished: the
 Jetson has its own receiver with full covariances (gnss_ros role).
 """
+import os
 import collections
 import math
 import time
@@ -298,12 +299,33 @@ class Px4Bridge(Node):
         self.pub["diag"].publish(d)
 
 
+def _spin(node):
+    """rclpy's default executor, or the experimental EventsExecutor when
+    UAV_EVENTS_EXECUTOR=1 (uav_ansible: ros_events_executor), the A/B of the
+    autonomy roadmap's compute-recovery item."""
+    import rclpy     # some nodes import it inside main()
+    if os.environ.get("UAV_EVENTS_EXECUTOR", "0") == "1":
+        try:
+            from rclpy.experimental.events_executor import EventsExecutor
+        except ImportError:
+            EventsExecutor = None
+        if EventsExecutor is not None:
+            executor = EventsExecutor()
+            executor.add_node(node)
+            try:
+                executor.spin()
+            finally:
+                executor.remove_node(node)
+                executor.shutdown()
+            return
+    rclpy.spin(node)
+
 def main(args=None):
     rclpy.init(args=args)
     node = None
     try:
         node = Px4Bridge()
-        rclpy.spin(node)
+        _spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:

@@ -1,4 +1,5 @@
 """ROS 2 native-DDS RGB consumer and MAVLink camera application."""
+import os
 import collections
 import json
 import logging
@@ -46,6 +47,31 @@ DEFAULTS = {
     # processes (the LiDAR map view), as a JSON list: see CameraProtocol._parse_streams.
     'extra_streams': '',
 }
+
+
+# sensor_msgs/Image encoding -> (bytes per pixel, GStreamer raw format). The
+# frame goes to the encoder pipeline as it arrives; nvvidconv converts it on the
+# VIC (YUY2 is what the D555 sends: 2 bytes per pixel, no CPU colour conversion).
+NATIVE_FORMATS = {'yuv422_yuy2': (2, 'YUY2'), 'yuv422': (2, 'UYVY'), 'rgb8': (3, 'RGB'),
+                  'rgba8': (4, 'RGBA'), 'bgra8': (4, 'BGRx'), 'mono8': (1, 'GRAY8'), 'bgr8': (3, 'BGR')}
+
+
+def raw_frame(msg):
+    """(pixel bytes, GStreamer format) of an Image, stride trimmed, no conversion
+    and no rotation (nvvidconv flips in hardware). One copy when the stride
+    carries padding, none otherwise."""
+    enc = msg.encoding.lower()
+    if enc not in NATIVE_FORMATS:
+        raise ValueError(f'Unsupported RGB source encoding {msg.encoding!r}')
+    channels, fmt = NATIVE_FORMATS[enc]
+    if msg.width <= 0 or msg.height <= 0 or msg.step < msg.width * channels:
+        raise ValueError('Invalid image dimensions or stride')
+    if len(msg.data) != msg.step * msg.height:
+        raise ValueError('Image data length does not match stride and height')
+    if msg.step == msg.width * channels:
+        return bytes(msg.data), fmt
+    rows = np.frombuffer(msg.data, dtype=np.uint8).reshape(msg.height, msg.step)
+    return rows[:, :msg.width * channels].tobytes(), fmt
 
 
 def rgb_bytes(msg, rotation_degrees=0):
@@ -220,9 +246,10 @@ class CameraNode(Node):
                 info['source_to_saved_pixel_transform'] = (
                     [[-1, 0, msg.width-1], [0, -1, msg.height-1], [0, 0, 1]]
                     if rotation == 180 else [[1, 0, 0], [0, 1, 0], [0, 0, 1]])
-                self.media.submit_frame(rgb_bytes(msg, rotation), msg.width, msg.height,
+                pixels, fmt = raw_frame(msg)
+                self.media.submit_frame(pixels, msg.width, msg.height,
                                         msg.header.stamp.sec * 1000000000 + msg.header.stamp.nanosec,
-                                        msg.header.frame_id, info)
+                                        msg.header.frame_id, info, fmt)
                 self._converted += 1
                 self._conversion_error = ''
             except Exception as exc:
@@ -253,13 +280,34 @@ class CameraNode(Node):
         self.media.close()
 
 
+def _spin(node):
+    """rclpy's default executor, or the experimental EventsExecutor when
+    UAV_EVENTS_EXECUTOR=1 (uav_ansible: ros_events_executor), the A/B of the
+    autonomy roadmap's compute-recovery item."""
+    import rclpy     # some nodes import it inside main()
+    if os.environ.get("UAV_EVENTS_EXECUTOR", "0") == "1":
+        try:
+            from rclpy.experimental.events_executor import EventsExecutor
+        except ImportError:
+            EventsExecutor = None
+        if EventsExecutor is not None:
+            executor = EventsExecutor()
+            executor.add_node(node)
+            try:
+                executor.spin()
+            finally:
+                executor.remove_node(node)
+                executor.shutdown()
+            return
+    rclpy.spin(node)
+
 def main(args=None):
     logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s %(name)s: %(message)s')
     rclpy.init(args=args)
     node = None
     try:
         node = CameraNode()
-        rclpy.spin(node)
+        _spin(node)
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         pass
     finally:

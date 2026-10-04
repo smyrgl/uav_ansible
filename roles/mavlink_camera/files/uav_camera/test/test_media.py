@@ -110,6 +110,11 @@ def test_stop_unblocks_waiting_photo(tmp_path):
 def test_pipeline_uses_bounded_hardware_encode_without_b_frames(tmp_path, codec):
     media = manager(tmp_path, codec=codec)
     description = media._pipeline_description(896, 504)
+    assert "format=RGB" in description and "videoconvert" not in description   # nvvidconv takes RGB itself
+    yuy2 = media._pipeline_description(1280, 800, "YUY2")
+    assert "format=YUY2,width=1280,height=800" in yuy2 and "videoconvert" not in yuy2
+    assert ("flip-method=2" in yuy2) == (media.rotation == 180)
+    assert "videoconvert" in media._pipeline_description(4, 2, "BGR")
     assert f"nvv4l2{codec}enc" in description
     assert "num-B-Frames=0" in description
     assert "max-buffers=2" in description

@@ -6,6 +6,7 @@ PartOf=uav-ros.target
 StartLimitIntervalSec=0
 
 [Service]
+Environment=UAV_EVENTS_EXECUTOR={{ '1' if (foxglove_d555_frames_events_executor | default(ros_events_executor) | default(false) | bool) else '0' }}
 Type=simple
 User={{ uav_ros_user }}
 Group={{ uav_ros_user }}
