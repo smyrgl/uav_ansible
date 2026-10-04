@@ -323,6 +323,11 @@ mavlink_router_px4_port: 14550      # udp link only: = PX4 MAV_n_REMOTE_PRT (whe
 mavlink_router_tcp_port: 5760       # GCS: QGC -> Comm Links -> TCP -> <jethawk>:5760
 mavlink_router_onboard_port: 14540  # onboard apps listen on 127.0.0.1:14540 (MAVSDK default)
 mavlink_router_dedup_ms: 100        # udp link only: PX4 unicast + broadcast copies (main.conf.j2)
+# The endpoint whose heartbeat carries this system id receives every message the
+# router sees (mavlink-router SnifferSysid): the health node's PX4 input guard
+# uses it to report any command, mode, parameter or setpoint written by a
+# companion-side source. Must equal ros_health_mavlink_source_system.
+mavlink_router_sniffer_sysid: "{{ ros_health_mavlink_source_system | default(254) }}"
 # UDP GCS targets the router pushes to; QGC auto-connects on its default 14550.
 # For the flight GCS on the drone segment (read the handheld's own address):
 #   - { name: "siyi", address: "192.168.144.X", port: 14550 }
@@ -563,3 +568,14 @@ nvblox_lidar_height: 200                  # = vfov / (360 / width)
 nvblox_lidar_vertical_fov_deg: 80.0
 nvblox_depth_max_integration_distance_m: 6.0    # D555 stereo depth trust horizon
 nvblox_lidar_max_integration_distance_m: 20.0   # Avia (450 m spec; bench room ~4 m)
+
+# rclpy's experimental EventsExecutor on every Python node (UAV_EVENTS_EXECUTOR=1
+# in their units): callbacks run from DDS events instead of a polled wait set.
+# Measured 2026-10-04 on the health node: 58 % of a core with the default
+# executor, 15.7 % with this one, every row unchanged (per-node figures in
+# docs/ros-bench.md, "Executor A/B").
+ros_events_executor: true
+# The D555 frame adapter crash-loops under the EventsExecutor (rclpy 7.1.12:
+# "SystemError: null argument to internal routine" on start, 2026-10-04); it
+# keeps the default executor until that is understood.
+foxglove_d555_frames_events_executor: false

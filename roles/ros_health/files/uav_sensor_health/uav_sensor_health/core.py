@@ -157,3 +157,48 @@ class StreamMonitor:
         else:
             clock = Assessment(WARN, message, clock_values)
         return stream, clock
+
+
+def cloud_header(buffer):
+    """The header of a serialized sensor_msgs/PointCloud2 without deserializing
+    its points: (stamp_ns, frame_id, height, width, point_step, row_step,
+    data_bytes). CDR little-endian, 4-byte encapsulation; strings are a uint32
+    length including the NUL, sequences a uint32 count; 4-byte alignment counts
+    from the start of the payload. ~2 µs instead of ~15 ms for a 2.5 MB cloud.
+    """
+    import struct
+    big = buffer[1] == 0        # representation identifier 0x0000/0x0001 = CDR_BE/CDR_LE
+    end = ">" if big else "<"
+    pos = 4
+    def align(n):
+        nonlocal pos
+        rem = (pos - 4) % n
+        if rem:
+            pos += n - rem
+    def u32():
+        nonlocal pos
+        align(4)
+        value = struct.unpack_from(end + "I", buffer, pos)[0]
+        pos += 4
+        return value
+    def i32():
+        nonlocal pos
+        align(4)
+        value = struct.unpack_from(end + "i", buffer, pos)[0]
+        pos += 4
+        return value
+    def text():
+        nonlocal pos
+        length = u32()
+        value = bytes(buffer[pos:pos + max(length - 1, 0)]).decode("utf-8", "replace")
+        pos += length
+        return value
+    sec, nanosec = i32(), u32()
+    frame_id = text()
+    height, width = u32(), u32()
+    for _ in range(u32()):          # fields: name, offset, datatype, count
+        text(); u32(); pos += 1; u32()
+    pos += 1                        # is_bigendian
+    point_step, row_step = u32(), u32()
+    data_bytes = u32()
+    return sec * 1_000_000_000 + nanosec, frame_id, height, width, point_step, row_step, data_bytes

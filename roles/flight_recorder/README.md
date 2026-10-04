@@ -14,6 +14,36 @@ disarm, and stops it after a post-roll:
 | free space under `flight_recorder_min_free_gb` (50 GB) | refuse to start; stop a running bag |
 | the bag grows nothing for `flight_recorder_stall_sec` (120 s) | finish it and start a new bag: rosbag2 on Jazzy can stop writing without exiting (ros2/rosbag2#2463); keep this above `max_cache_size` divided by the data rate |
 
+## Post-flight checks
+
+When a bag closes the node starts `python -m uav_flight_recorder.postflight`
+on it (nice 10, its own process group, log beside the bag as
+`<bag>.postflight.log`) and goes on recording; the node never blocks on it.
+The checker:
+
+- calls `/lio/map/save` (std_srvs/Trigger) and copies the PCD the map node
+  wrote to `<bag>/lio_map.pcd`;
+- reads the topic counts from rosbag2's `metadata.yaml`, or from the MCAP
+  summary when the recorder was killed before writing it;
+- scans the message log times of `flight_recorder_postflight_gap_topics` with
+  the `mcap` library (pinned `flight_recorder_mcap_version`), over the armed
+  interval when the bag has one (`armed_at`/`disarmed_at` in flight.json),
+  else the whole bag: count, rate, nominal period (the median interval),
+  worst interval, and gaps, where a gap is a missed message: an interval over
+  the nominal period plus `flight_recorder_postflight_max_gap_ms` (100 ms, the
+  Stage 0b gate read per topic: 110 ms for the 100 Hz odometry, 200 ms for a
+  10 Hz lidar, whose own jitter reaches 135 ms);
+- signs the flight off: every `flight_recorder_postflight_required_topics`
+  topic present, zero messages on any `/fmu/in` topic (the roadmap's
+  inertness rule), no gap over the limit on the scanned topics;
+- writes `postflight` and `signoff` into `flight.json` and a `flight_card.md`
+  (facts filled in, site/pattern/firmware lines left for the pilot).
+
+The result shows as `postflight/signoff` (and the map message, exit code and
+seconds) on the recorder's diagnostics row; exit code 3 means a FAIL verdict
+with the reasons in flight.json, anything else non-zero is a checker error.
+Set `flight_recorder_postflight_enabled: false` to record only.
+
 ## Armed state
 
 By default (`flight_recorder_arm_source: mavlink`) the armed flag is bit 7

@@ -6,6 +6,7 @@ PartOf=uav-ros.target
 StartLimitIntervalSec=0
 
 [Service]
+Environment=UAV_EVENTS_EXECUTOR={{ '1' if (ros_events_executor | default(false) | bool) else '0' }}
 Type=simple
 User={{ flight_recorder_user }}
 Group={{ flight_recorder_user }}

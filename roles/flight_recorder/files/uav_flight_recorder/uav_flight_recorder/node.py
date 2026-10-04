@@ -17,6 +17,7 @@ import os
 import shutil
 import signal
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 
@@ -40,6 +41,12 @@ DEFAULTS = {
     # stalled recorder: it is restarted into a new bag. rosbag2 writes in
     # max_cache_size bursts, so this must exceed cache size / data rate.
     "stall_sec": 120.0,
+    # Post-flight checks (postflight.py) in a separate low-priority process.
+    "postflight_enabled": True,
+    "postflight_required_topics": ["/fmu/out/vehicle_odometry", "/avia/points", "/e1r/points", "/gnss/navsatfix"],
+    "postflight_gap_topics": ["/fmu/out/vehicle_odometry", "/avia/points", "/e1r/points", "/gnss/navsatfix",
+                              "/fmu/out/trajectory_setpoint"],
+    "postflight_max_gap_ms": 100.0, "postflight_map_service": "/lio/map/save", "postflight_timeout_sec": 1800.0,
     # Where the armed state comes from: "mavlink" (the autopilot's HEARTBEAT
     # through mavlink-router, i.e. over TELEM2) or "ros" (/px4/armed and
     # /px4/safety_off from the PX4 bridge, i.e. over the FC's Ethernet).
@@ -98,6 +105,8 @@ class FlightRecorder(Node):
         self.last_size = 0
         self.size_checked = 0.0
         self.growth = GrowthWatch(self.p["stall_sec"])
+        self.posts = []             # running post-flight checks: dict(proc, bag, started, log)
+        self.last_postflight = None
         os.makedirs(self.p["bag_dir"], exist_ok=True)
         self.create_timer(1.0, self._tick)
         self.get_logger().info("flight recorder: %s, armed state from %s, post-roll %.0f s, excluding %r%s" % (
@@ -140,6 +149,7 @@ class FlightRecorder(Node):
     def _tick(self):
         now = time.monotonic()
         self._act(self.policy.tick(now))
+        self._poll_postflight(now)
         if self.proc is not None and self.proc.poll() is not None:
             self.last_error = "ros2 bag record exited with %s while %s" % (self.proc.returncode, self.policy.state)
             self.get_logger().error(self.last_error)
@@ -170,6 +180,10 @@ class FlightRecorder(Node):
             self._finish(decision.reason)
         elif decision.reason:
             self.get_logger().info(decision.reason)
+        if self.bag is not None and self.policy.state == POST_ROLL and not self.bag.get("disarmed_at"):
+            self.bag["disarmed_at"] = datetime.now(timezone.utc).isoformat()
+        elif self.bag is not None and self.policy.state == RECORDING and self.policy.armed and not self.bag.get("armed_at"):
+            self.bag["armed_at"] = datetime.now(timezone.utc).isoformat()
 
     # --- recorder process ---------------------------------------------------
     def _start(self, reason):
@@ -203,6 +217,10 @@ class FlightRecorder(Node):
             return
         if proc.poll() is None:
             try:
+                # A stopped recorder (SIGSTOP, a debugger) cannot act on SIGINT:
+                # resume it first so it closes the bag instead of being killed
+                # 55 s later with the index unwritten.
+                os.killpg(os.getpgid(proc.pid), signal.SIGCONT)
                 os.killpg(os.getpgid(proc.pid), signal.SIGINT)
                 proc.wait(timeout=float(self.p["stop_timeout_sec"]))
             except subprocess.TimeoutExpired:
@@ -218,6 +236,7 @@ class FlightRecorder(Node):
         size = dir_bytes(bag["path"])
         duration = round(time.monotonic() - bag["started_mono"], 1)
         meta = {"bag": bag["path"], "started_at": bag["started_at"], "armed_at": bag["armed_at"],
+                "disarmed_at": bag.get("disarmed_at"),
                 "stopped_at": datetime.now(timezone.utc).isoformat(), "duration_sec": duration,
                 "bytes": size, "start_reason": bag["reason"], "stop_reason": reason,
                 "recorder_exit_code": proc.returncode}
@@ -230,6 +249,51 @@ class FlightRecorder(Node):
         self.last_flight = meta
         self.bag = None
         self.get_logger().info("stopped %s after %.0f s, %.1f MB (%s)" % (bag["path"], duration, size / 1e6, reason))
+        self._postflight(bag["path"])
+
+    # --- post-flight checks -------------------------------------------------
+    def _postflight(self, path):
+        if not self.p["postflight_enabled"]:
+            return
+        cmd = [sys.executable, "-m", "uav_flight_recorder.postflight", path,
+               "--max-gap-ms", str(float(self.p["postflight_max_gap_ms"])), "--map-timeout", "30"]
+        if self.p["postflight_map_service"]:
+            cmd += ["--map-service", str(self.p["postflight_map_service"])]
+        cmd += ["--required"] + [str(t) for t in self.p["postflight_required_topics"]]
+        cmd += ["--gap-topics"] + [str(t) for t in self.p["postflight_gap_topics"]]
+        try:
+            log = open(path + ".postflight.log", "ab")
+            proc = subprocess.Popen(cmd, stdout=log, stderr=subprocess.STDOUT, start_new_session=True)
+        except OSError as exc:
+            self.get_logger().error("post-flight checks not started for %s: %s" % (path, exc))
+            return
+        self.posts.append({"proc": proc, "bag": path, "started": time.monotonic(), "log": log})
+        self.get_logger().info("post-flight checks started for %s" % path)
+
+    def _poll_postflight(self, now):
+        for post in list(self.posts):
+            code = post["proc"].poll()
+            if code is None:
+                if now - post["started"] > float(self.p["postflight_timeout_sec"]):
+                    os.killpg(os.getpgid(post["proc"].pid), signal.SIGKILL)
+                    self.get_logger().error("post-flight checks for %s killed after %.0f s" % (post["bag"], now - post["started"]))
+                continue
+            post["log"].close()
+            self.posts.remove(post)
+            result = {"bag": post["bag"], "exit_code": code, "seconds": round(now - post["started"])}
+            try:
+                with open(os.path.join(post["bag"], "flight.json")) as f:
+                    meta = json.load(f)
+                verdict = meta.get("signoff", {})
+                result["signoff"] = "PASS" if verdict.get("pass") else "FAIL: " + "; ".join(verdict.get("reasons", ["no verdict"]))
+                result["map"] = (meta.get("postflight", {}).get("map") or {}).get("message", "not saved")
+                if self.last_flight and self.last_flight.get("bag") == post["bag"]:
+                    self.last_flight.update({"signoff": verdict, "postflight": meta.get("postflight")})
+            except (OSError, ValueError) as exc:
+                result["signoff"] = "unknown: %s" % exc
+            self.last_postflight = result
+            (self.get_logger().info if code in (0, 3) else self.get_logger().error)(
+                "post-flight checks for %s: %s (exit %s, %s s)" % (post["bag"], result["signoff"], code, result["seconds"]))
 
     def _free_gb(self):
         try:
@@ -250,6 +314,9 @@ class FlightRecorder(Node):
                            "bag_growth_age_s": round(time.monotonic() - self.growth.last_growth)})
         if self.last_flight:
             values.update({"last_flight/" + k: v for k, v in self.last_flight.items() if k in ("bag", "duration_sec", "bytes", "stop_reason")})
+        values["postflight/running"] = len(self.posts)
+        if self.last_postflight:
+            values.update({"postflight/" + k: v for k, v in self.last_postflight.items() if k in ("bag", "signoff", "map", "seconds", "exit_code")})
         values["arm_source"] = self.p["arm_source"]
         link_problem = None
         if self.rc_channel:
@@ -290,12 +357,33 @@ class FlightRecorder(Node):
             self._finish("recorder shutting down")
 
 
+def _spin(node):
+    """rclpy's default executor, or the experimental EventsExecutor when
+    UAV_EVENTS_EXECUTOR=1 (uav_ansible: ros_events_executor), the A/B of the
+    autonomy roadmap's compute-recovery item."""
+    import rclpy     # some nodes import it inside main()
+    if os.environ.get("UAV_EVENTS_EXECUTOR", "0") == "1":
+        try:
+            from rclpy.experimental.events_executor import EventsExecutor
+        except ImportError:
+            EventsExecutor = None
+        if EventsExecutor is not None:
+            executor = EventsExecutor()
+            executor.add_node(node)
+            try:
+                executor.spin()
+            finally:
+                executor.remove_node(node)
+                executor.shutdown()
+            return
+    rclpy.spin(node)
+
 def main(args=None):
     rclpy.init(args=args)
     node = None
     try:
         node = FlightRecorder()
-        rclpy.spin(node)
+        _spin(node)
     except (KeyboardInterrupt, ExternalShutdownException):
         pass
     finally:

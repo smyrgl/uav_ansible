@@ -17,3 +17,9 @@ uav_flight_recorder:
     storage_preset: {{ flight_recorder_storage_preset | to_json }}
     max_cache_size: {{ flight_recorder_max_cache_size | int }}
     stall_sec: {{ flight_recorder_stall_sec | float }}
+    postflight_enabled: {{ flight_recorder_postflight_enabled | bool | lower }}
+    postflight_required_topics: {{ flight_recorder_postflight_required_topics | to_json }}
+    postflight_gap_topics: {{ flight_recorder_postflight_gap_topics | to_json }}
+    postflight_max_gap_ms: {{ flight_recorder_postflight_max_gap_ms | float }}
+    postflight_map_service: {{ flight_recorder_postflight_map_service | to_json }}
+    postflight_timeout_sec: {{ flight_recorder_postflight_timeout_sec | float }}

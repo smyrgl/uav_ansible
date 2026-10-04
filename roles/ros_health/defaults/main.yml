@@ -29,3 +29,17 @@ ros_health_ptp_status_path: /run/uav/time/ptp-status.json
 # Official release/1.17, matching the Pixhawk firmware's message generation.
 ros_health_px4_workspace: /opt/uav/px4_msgs
 ros_health_px4_msgs_revision: 86d8239e962f6939e05c3737784f60c02fa884db
+# PX4 input guard ("PX4 / Guard" row; autonomy roadmap Stage 0b). The /fmu/in
+# topics the flashed firmware may subscribe to (uav/v1.17.0-pps keeps only the
+# message-format request); the uORB topics whose px4_msgs definition is checked
+# against the FC's message hash; the MAVLink system ids that may send commands,
+# modes, parameters or setpoints (the ground station). Everything else that
+# writes is reported; the router forwards all traffic to the health node's
+# system id for this (mavlink_router_sniffer_sysid).
+ros_health_guard_expected_readers: ["/fmu/in/message_format_request"]
+ros_health_guard_hash_topics: [vehicle_status, vehicle_attitude, vehicle_local_position, vehicle_odometry,
+                               sensor_combined, timesync_status, sensor_gps, battery_status, pps_capture,
+                               vehicle_local_position_setpoint, trajectory_setpoint, offboard_control_mode,
+                               vehicle_command, obstacle_distance, message_format_request, message_format_response]
+ros_health_guard_mavlink_gcs_systems: [255]
+ros_health_guard_hash_timeout_sec: 120.0

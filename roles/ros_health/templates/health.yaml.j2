@@ -19,3 +19,7 @@ uav_sensor_health:
     gnss_broker_port: {{ ros_health_gnss_broker_port | int }}
     gnss_require_rtk_fixed: {{ ros_health_gnss_require_rtk_fixed | bool | lower }}
     ptp_status_path: {{ ros_health_ptp_status_path | to_json }}
+    guard_expected_readers: {{ ros_health_guard_expected_readers | to_json }}
+    guard_hash_topics: {{ ros_health_guard_hash_topics | to_json }}
+    guard_mavlink_gcs_systems: {{ ros_health_guard_mavlink_gcs_systems | to_json }}
+    guard_hash_timeout_sec: {{ ros_health_guard_hash_timeout_sec | float }}

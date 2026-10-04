@@ -28,3 +28,15 @@ flight_recorder_pymavlink_version: "2.4.49"   # same pin as ros_health
 flight_recorder_armed_topic: /px4/armed
 flight_recorder_safety_topic: /px4/safety_off
 flight_recorder_manual_topic: /flight_recorder/manual
+# Post-flight checks, run as a separate low-priority process when a bag closes
+# (postflight.py): required topics present, zero /fmu/in messages (the sign-off
+# rule), a gap scan of the key topics over the armed interval, the LIO map saved
+# beside the bag, flight.json + flight_card.md. The gap scan needs the mcap
+# library in the recorder's venv.
+flight_recorder_postflight_enabled: true
+flight_recorder_postflight_required_topics: [/fmu/out/vehicle_odometry, /avia/points, /e1r/points, /gnss/navsatfix]
+flight_recorder_postflight_gap_topics: [/fmu/out/vehicle_odometry, /avia/points, /e1r/points, /gnss/navsatfix, /fmu/out/trajectory_setpoint]
+flight_recorder_postflight_max_gap_ms: 100.0
+flight_recorder_postflight_map_service: /lio/map/save
+flight_recorder_postflight_timeout_sec: 1800.0
+flight_recorder_mcap_version: "1.5.0"

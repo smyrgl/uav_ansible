@@ -12,6 +12,9 @@
 # Any number of GCSs connect here (QGC: Comm Links -> TCP -> <jethawk>:{{ mavlink_router_tcp_port }}).
 TcpServerPort = {{ mavlink_router_tcp_port }}
 ReportStats = false
+# Forward every message to the endpoint announcing this system id: the health
+# node's PX4 input guard (group_vars, mavlink_router_sniffer_sysid).
+SnifferSysid = {{ mavlink_router_sniffer_sysid | int }}
 {% if mavlink_router_px4_link != 'serial' %}
 # While no GCS heartbeat reaches it, PX4 sends every message twice: unicast to
 # its latched partner (this router) and broadcast to .255 (its discovery

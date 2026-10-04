@@ -30,6 +30,7 @@ E1R's strict timestamp gates or certify data for flight/fusion.
 | PX4 / MAVLink | Heartbeats specifically from system 1/component 1 via the router; camera heartbeats do not count | Also folds the FC barometer (`SCALED_PRESSURE`, bay air temperature and static pressure) in as an informational section when PX4 streams it |
 | Jetson Companion | One summary of the `jetson_stats/*` rows published by the jetson_stats role (isaac_ros_jetson_stats on jtop): hottest thermal zone, VDD_IN draw, fan, CPU/GPU load, nvpmodel. Thermal zones drive the level; a zone past the upstream 100 °C mark is the one connected-device ERROR |
 | PX4 / DDS | Actual periodic uORB sample receipt, rates, timestamp progress and timesync evidence |
+| PX4 / Guard | Is there any way for this host to steer the FC: publishers on `/fmu/in`, the firmware's `/fmu/in` subscription set, px4_msgs definitions against the FC's message hashes, write-class MAVLink from companion sources. ERROR = a write path exists |
 | Hadron | Explicit not-integrated/unknown until a thermal health source is configured |
 
 H-FLOW's default association is PX4 flow instance 0 and downward (orientation 25)
@@ -46,8 +47,11 @@ The GNSS observer never opens the serial receiver. It reads the broker at
 PHC evidence must be current and from this boot. Monitoring uses monotonic receipt
 time; wall-clock proximity alone never proves sensor synchronization. Image and
 cloud payloads are not retained; geometric accuracy/image content are not certified.
-DDS still deserializes the input messages. Network and chrony probes run in bounded
-background workers, so they cannot block diagnostic publication.
+The two LiDAR cloud subscriptions are raw (`raw=True`): the stamp, frame, size
+and layout are read out of the serialized CDR buffer (`core.cloud_header`), so
+no 2.5 MB cloud is deserialized in Python; the other inputs are deserialized as
+usual. Network and chrony probes run in bounded background workers, so they
+cannot block diagnostic publication.
 
 Defaults: image timeout 2 s, minimum 15 Hz over 5 s, startup grace 10 s;
 LiDAR/driver/GNSS evidence 3 s, H-FLOW measurements 4 s. PPS bench tolerance 10 ms
@@ -115,6 +119,41 @@ partial delivery, frozen timestamps, low rates and timing faults are WARN.
 Event-only uORB topics are excluded from periodic health expectations.
 This observer publishes no PX4 command or control topics. DDS timesync
 residual/RTT limits are bench checks, not proof of sensor hardware sync.
+
+## PX4 / Guard: no write path to the FC
+
+Autonomy roadmap Stage 0b. The XRCE-DDS client republishes anything it receives
+on `/fmu/in` to uORB with no mode gate, so the only safe companion is one that
+provably has no input path. The row checks four things every second:
+
+- **Writers**: publishers on any `/fmu/in` topic (`get_publishers_info_by_topic`).
+  Any publisher is ERROR, naming topic and node. The node's own
+  message-format request publisher is the one exception, and it exists only
+  while a hash check runs.
+- **Firmware inputs**: the `/fmu/in` topics that have a subscriber, i.e. the
+  flashed firmware's input set, against `ros_health_guard_expected_readers`
+  (`uav/v1.17.0-pps` keeps only `message_format_request`). Extra topics are a
+  WARN ("old firmware?"), not an ERROR: they are a hazard only with a writer.
+- **Message hashes**: once the FC's client is talking, a `MessageFormatRequest`
+  per topic in `ros_health_guard_hash_topics`; the FC answers with the 32-bit
+  FNV-1a hash its build computed over the field list (`ORB_DEFINE`'s fourth
+  argument). The same hash is computed here from the px4_msgs `.msg` files
+  (`guard.py` is a port of PX4's `get_message_fields_str_for_message_hash`,
+  nested types expanded in place, constants skipped; the unit test checks six
+  topics, including a nested array, against the numbers in the FC build). The
+  section reads "unknown" until the FC answers, retries every 2 s, and gives up
+  after `ros_health_guard_hash_timeout_sec`.
+- **MAVLink writes**: COMMAND_LONG/INT (except the read-only request commands),
+  SET_MODE, PARAM_SET, setpoint, mission and override messages whose source is
+  neither the FC nor a ground station in `ros_health_guard_mavlink_gcs_systems`.
+  This is complete only because the router forwards all traffic to this node's
+  system id (`mavlink_router_sniffer_sysid` = `SnifferSysid`); a process that
+  spoofs the GCS id is out of scope.
+
+The row's "connection" is the absence of a write path: a publisher on
+`/fmu/in` or a companion MAVLink write is the one ERROR; stale hashes and an
+over-permissive firmware are WARN. Every bag is additionally checked for zero
+`/fmu/in` messages at sign-off (flight recorder).
 
 ## D555 streams are watched through CameraInfo, not Image
 

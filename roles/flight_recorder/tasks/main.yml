@@ -44,6 +44,14 @@
     virtualenv_site_packages: true
   notify: Restart flight recorder
 
+- name: Install the recorder's pinned MCAP reader (post-flight gap scan)
+  ansible.builtin.pip:
+    name: "mcap=={{ flight_recorder_mcap_version }}"
+    virtualenv: "{{ flight_recorder_venv }}"
+    virtualenv_command: /usr/bin/python3 -m venv
+    virtualenv_site_packages: true
+  notify: Restart flight recorder
+
 - name: Run the recorder's tests on the target
   ansible.builtin.command:
     argv: ["{{ flight_recorder_venv }}/bin/python", -m, unittest, -q, test_policy, test_mavlink_arm]

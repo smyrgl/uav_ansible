@@ -16,6 +16,7 @@ import subprocess
 import threading
 import time
 
+from .guard import mavlink_write
 from .health import Sample, check, grouped
 
 
@@ -141,6 +142,11 @@ class Observers:
         self.transport = {"connected": False, "message": "Starting MAVLink observer"}
         self.gnss_transport = "Starting GNSS observer"
         self.timing = {}
+        # Write-class MAVLink seen from a companion-side source (the guard's
+        # second channel). Complete only when the router forwards all traffic
+        # to this node's system id (mavlink_router SnifferSysid).
+        self.writes = {"count": 0, "last": None, "last_mono": None}
+        self.gcs_systems = set(int(x) for x in (params.get("guard_mavlink_gcs_systems") or [255]))
         self.threads = [threading.Thread(target=fn, daemon=True) for fn in (self._mavlink, self._gnss, self._time)]
         for thread in self.threads:
             thread.start()
@@ -152,7 +158,7 @@ class Observers:
 
     def snapshot(self):
         with self.lock:
-            return copy.deepcopy((self.samples, self.transport, self.gnss_transport, self.timing))
+            return copy.deepcopy((self.samples, self.transport, self.gnss_transport, self.timing, self.writes))
 
     def _record(self, key, values, stamp=None):
         with self.lock:
@@ -187,9 +193,16 @@ class Observers:
                         messages = []
                     now = time.monotonic()
                     for msg in messages:
-                        if (msg.get_srcSystem(), msg.get_srcComponent()) != (1, 1):
-                            continue
                         kind = msg.get_type()
+                        source = (msg.get_srcSystem(), msg.get_srcComponent())
+                        if mavlink_write(kind, source[0], source[1], getattr(msg, "command", None), self.gcs_systems):
+                            with self.lock:
+                                self.writes["count"] += 1
+                                self.writes["last"] = {"type": kind, "command": getattr(msg, "command", None),
+                                                       "system": source[0], "component": source[1]}
+                                self.writes["last_mono"] = now
+                        if source != (1, 1):
+                            continue
                         if kind == "HEARTBEAT":
                             last_hb = now
                         if kind in wanted:

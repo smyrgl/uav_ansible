@@ -2,7 +2,7 @@ import binascii
 import struct
 import unittest
 
-from uav_sensor_health.core import Assessment, ERROR, OK, WARN
+from uav_sensor_health.core import Assessment, ERROR, OK, WARN, cloud_header
 from uav_sensor_health.health import Sample, check, d555_timing, grouped, lidar_health, px4_health, hflow_health, jetson_health, jetson_identity
 from uav_sensor_health.observers import (sbf_blocks, chrony_assessment, ptp_assessment, gnss_health, parse_pvt_geodetic,
                                          parse_receiver_time, parse_receiver_status)
@@ -394,3 +394,29 @@ class GnssTimeTests(unittest.TestCase):
         self.assertEqual(bad.values["Receiver status/message"], "Receiver error flags: RxError ANTENNA, ExtError none")
         self.assertIn("Receiver status: Receiver error flags", bad.values["Attention"])
         self.assertNotIn("Receiver status/status", self.health(0x07).values)
+
+
+class CloudHeaderTests(unittest.TestCase):
+    def test_parses_a_hand_built_cdr_cloud(self):
+        import struct
+        def string(text):
+            raw = text.encode() + b"\0"
+            return struct.pack("<I", len(raw)) + raw
+        def pad(buf):
+            return buf + b"\0" * ((4 - (len(buf) - 4) % 4) % 4)
+        buf = b"\x00\x01\x00\x00"                         # CDR_LE encapsulation
+        buf += struct.pack("<iI", 1791136442, 157368411)       # stamp
+        buf = pad(buf + string("avia_frame"))
+        buf += struct.pack("<II", 1, 3)                        # height, width
+        buf += struct.pack("<I", 2)                            # 2 fields
+        for name, offset, datatype, count in (("x", 0, 7, 1), ("intensity", 4, 7, 1)):
+            buf = pad(buf + string(name))
+            buf += struct.pack("<I", offset) + struct.pack("<B", datatype)
+            buf = pad(buf) + struct.pack("<I", count)
+        buf += struct.pack("<B", 0)                            # is_bigendian
+        buf = pad(buf) + struct.pack("<II", 8, 24)             # point_step, row_step
+        buf += struct.pack("<I", 24) + b"\0" * 24                # data
+        buf += struct.pack("<B", 1)                            # is_dense
+        stamp, frame, height, width, point_step, row_step, nbytes = cloud_header(buf)
+        self.assertEqual(stamp, 1791136442157368411)
+        self.assertEqual((frame, height, width, point_step, row_step, nbytes), ("avia_frame", 1, 3, 8, 24, 24))
