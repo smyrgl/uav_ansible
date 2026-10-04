@@ -136,6 +136,8 @@ def main(argv=None):
     ap.add_argument("--voxel", type=float, default=0.05)
     ap.add_argument("--out", default="")
     ap.add_argument("--recall-min", type=float, default=0.0, help="gate on recall instead of Jaccard when > 0")
+    ap.add_argument("--ulog-summary", default="", help="ulog2mcap summary JSON: adds the ulog-to-bag alignment gate")
+    ap.add_argument("--ulog-align-median-ms", type=float, default=2.0)
     args = ap.parse_args(argv)
     live = read_odometry(args.live, args.odometry_topic)
     replay = read_odometry(args.replay, args.odometry_topic)
@@ -162,6 +164,18 @@ def main(argv=None):
                 result["reasons"].append("map recall %.3f under %.2f at %.2f m voxels" % (fine["recall"] or 0, args.recall_min, args.voxel))
         elif (fine["jaccard"] or 0) < args.jaccard_min:
             result["reasons"].append("map Jaccard %.3f under %.2f at %.2f m voxels" % (fine["jaccard"] or 0, args.jaccard_min, args.voxel))
+    if args.ulog_summary and os.path.isfile(args.ulog_summary):
+        with open(args.ulog_summary) as f:
+            ulog = json.load(f)
+        pps = (ulog.get("cross_checks") or {}).get("pps_capture") or {}
+        result["ulog"] = {"offset_source": ulog.get("offset_source"), "pps": pps,
+                          "gps": {k: v for k, v in (ulog.get("cross_checks") or {}).items() if k.startswith("vehicle_gps")}}
+        if not ulog.get("offset_samples"):
+            result["reasons"].append("ulog has no timesync offset: no UTC alignment")
+        elif not pps.get("count"):
+            result["reasons"].append("ulog has no PPS captures to check the alignment")
+        elif pps["median_us"] > args.ulog_align_median_ms * 1000:
+            result["reasons"].append("ulog-to-bag alignment %.2f ms median over %.1f ms" % (pps["median_us"] / 1000, args.ulog_align_median_ms))
     result["pass"] = not result["reasons"]
     if args.out:
         with open(args.out, "w") as f:
@@ -173,6 +187,9 @@ def main(argv=None):
     for m in result["maps"]:
         print("map at %.2f m voxels: Jaccard %s, recall %s (live %d / replay %d voxels)" % (
             m["voxel_m"], m["jaccard"], m["recall"], m["live_voxels"], m["replay_voxels"]))
+    if "ulog" in result:
+        pps = result["ulog"]["pps"]
+        print("ulog alignment: %s; PPS residual median %s us over %s edges" % (result["ulog"]["offset_source"], pps.get("median_us"), pps.get("count")))
     print("REPLAY " + ("PASS" if result["pass"] else "FAIL: " + "; ".join(result["reasons"])))
     return 0 if result["pass"] else 3
 

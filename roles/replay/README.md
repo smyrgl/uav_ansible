@@ -86,3 +86,11 @@ installs a root-only credentials file, a systemd mount/automount at
 to the share one way every `replay_archive_interval` (replay outputs and
 offload stamps excluded, nothing deleted on either side). Without the vault
 entry those steps are skipped and reported.
+
+## The FC's ulog
+
+When a bag carries `fc.ulg` (fetched by the aircraft, flight_recorder role),
+`uav-replay` converts it with `tools/ulog2mcap.py` (installed here; UTC from
+the XRCE timesync offset) to `fc_ulog.mcap` beside the replay and the scorer
+adds the Stage 0b alignment gate: the median residual of the PPS captures
+against the converted time under `replay_ulog_align_median_ms` (2 ms).

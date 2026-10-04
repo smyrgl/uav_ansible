@@ -133,6 +133,12 @@ class FlightRecorder(Node):
         bag early, and an absent transmitter holds its last request."""
         snap = self.mav.snapshot()
         armed = snap["armed"]
+        # The mission item the FC is on (MISSION_CURRENT): a timeline per bag,
+        # so a scripted mission marks its own manoeuvres in flight.json.
+        seq = snap.get("mission_seq")
+        if self.bag is not None and seq is not None and seq != self.bag.get("mission_seq"):
+            self.bag["mission_seq"] = seq
+            self.bag.setdefault("mission", []).append({"seq": int(seq), "utc": datetime.now(timezone.utc).isoformat()})
         if self.p["arm_source"] == "mavlink" and armed is not None and armed != self._mav_armed:
             self._mav_armed = armed
             self.get_logger().info("autopilot %s (HEARTBEAT)" % ("armed" if armed else "disarmed"))
@@ -247,7 +253,7 @@ class FlightRecorder(Node):
         size = dir_bytes(bag["path"])
         duration = round(time.monotonic() - bag["started_mono"], 1)
         meta = {"bag": bag["path"], "started_at": bag["started_at"], "armed_at": bag["armed_at"],
-                "disarmed_at": bag.get("disarmed_at"),
+                "disarmed_at": bag.get("disarmed_at"), "mission": bag.get("mission", []),
                 "stopped_at": datetime.now(timezone.utc).isoformat(), "duration_sec": duration,
                 "bytes": size, "start_reason": bag["reason"], "stop_reason": reason,
                 "recorder_exit_code": proc.returncode}

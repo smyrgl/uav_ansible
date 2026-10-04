@@ -85,14 +85,17 @@ def to_utc_us(series, hrt_us):
 
 
 def residual_stats(residuals_us):
-    """count, median, p95 and worst |residual| in microseconds."""
-    values = sorted(abs(float(r)) for r in residuals_us)
+    """count, median, p95 and worst |residual| in microseconds, plus the signed
+    median (positive: the converted time runs ahead of the reference)."""
+    signed = sorted(float(r) for r in residuals_us)
+    values = sorted(abs(r) for r in signed)
     if not values:
-        return {"count": 0, "median_us": None, "p95_us": None, "max_us": None}
+        return {"count": 0, "median_us": None, "p95_us": None, "max_us": None, "signed_median_us": None}
     def pct(p):
         k = min(len(values) - 1, max(0, int(math.ceil(p * len(values)) - 1)))
         return values[k]
-    return {"count": len(values), "median_us": pct(0.5), "p95_us": pct(0.95), "max_us": values[-1]}
+    return {"count": len(values), "median_us": pct(0.5), "p95_us": pct(0.95), "max_us": values[-1],
+            "signed_median_us": signed[len(signed) // 2]}
 
 
 def cross_check(series, stamps, reference_utc_us, valid=None):

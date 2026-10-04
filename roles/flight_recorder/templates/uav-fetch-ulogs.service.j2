@@ -1,0 +1,13 @@
+[Unit]
+Description=Fetch the FC's ulogs over MAVLink FTP (disarmed only)
+After=uav-mavlink-router.service
+Wants=uav-mavlink-router.service
+
+[Service]
+Type=oneshot
+User={{ target_user }}
+Group={{ target_user }}
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ flight_recorder_workspace }}/install/local_setup.bash; exec {{ flight_recorder_venv }}/bin/python -m uav_flight_recorder.fetch_ulogs --endpoint {{ flight_recorder_mavlink_endpoint }} --flights {{ flight_recorder_dir }} --days {{ flight_recorder_fetch_ulogs_days | int }} --tolerance-s {{ flight_recorder_fetch_ulogs_tolerance_s | float }}'
+Nice=10
+IOSchedulingClass=idle

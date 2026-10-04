@@ -13,6 +13,7 @@ disarm, and stops it after a post-roll:
 | manual request withdrawn, never armed | stop immediately |
 | free space under `flight_recorder_min_free_gb` (50 GB) | refuse to start; stop a running bag |
 | the bag grows nothing for `flight_recorder_stall_sec` (120 s) | finish it and start a new bag: rosbag2 on Jazzy can stop writing without exiting (ros2/rosbag2#2463); keep this above `max_cache_size` divided by the data rate |
+| the FC changes mission item (MISSION_CURRENT) | append `{seq, utc}` to the bag's `mission` list in flight.json: a scripted QGC mission marks its own manoeuvres |
 | a bag starts | request `/lio/map/reset` (`flight_recorder_reset_map_on_start`), so the map saved at the end covers exactly the bag and a replay (replay role) can be compared with it |
 
 ## Post-flight checks
@@ -57,6 +58,21 @@ dataset, so this key can write bags there and nothing else). A pushed bag gets
 a `.offloaded` stamp and is never pushed or deleted again; `offload.log` beside
 the bags records every attempt. In the field the host is unreachable and the
 timer just fails quietly until the aircraft is back on the bench network.
+
+## The FC's ulogs
+
+`uav-fetch-ulogs.timer` (every `flight_recorder_fetch_ulogs_interval`, as the
+owner) fetches the FC's logs over MAVLink FTP through the router, only while
+the FC is disarmed (the TELEM2 serial link is the pilot's telemetry): it lists
+`/fs/microsd/log/<day>` for the last `flight_recorder_fetch_ulogs_days`,
+downloads every .ulg it has not fetched at that size (`ulogs/fetched.json`)
+into `<bags>/ulogs/<day>_<name>`, and hard-links each into the bag whose
+`armed_at` is within `flight_recorder_fetch_ulogs_tolerance_s` of the log's
+start time (PX4 names logs by the UTC time logging started) as `fc.ulg`. The
+offload pushes the ulogs directory with the bags; the replay host converts
+`fc.ulg` to MCAP and checks the ulog-to-bag alignment as part of the score.
+Measured 2026-10-04: about 32 kB/s end to end over TELEM2 (an hour's log in
+30 to 90 minutes); the FC's Ethernet MAVLink instance would make it minutes.
 
 ## Armed state
 

@@ -123,9 +123,17 @@
     name:
       - "evo=={{ replay_evo_version }}"
       - "mcap=={{ replay_mcap_version }}"
+      - "pyulog=={{ replay_pyulog_version }}"
+      - zstandard
     virtualenv: "{{ replay_venv }}"
     virtualenv_command: /usr/bin/python3 -m venv
     virtualenv_site_packages: true
+
+- name: Install the ulog converter (tools/ulog2mcap.py)
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/tools/ulog2mcap.py"
+    dest: /usr/local/lib/uav/ulog2mcap.py
+    mode: "0755"
 
 - name: Install the replay scorer
   ansible.builtin.copy:

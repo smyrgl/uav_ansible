@@ -53,6 +53,8 @@ class AutopilotParser:
                 events.append(("rc", tuple(getattr(msg, "chan%d_raw" % i) for i in range(1, 19))))
             elif kind == "SYS_STATUS":
                 events.append(("rc_present", bool(msg.onboard_control_sensors_present & MAV_SYS_STATUS_SENSOR_RC_RECEIVER)))
+            elif kind == "MISSION_CURRENT":
+                events.append(("mission", int(msg.seq)))
         return events
 
 
@@ -115,6 +117,7 @@ class AutopilotLink:
         self.rc = RcSwitch(rc_channel) if int(rc_channel) else None
         self._lock = threading.Lock()
         self._armed = None
+        self._mission_seq = None
         self._last_heartbeat = None
         self._heartbeats = 0
         self._connected = False
@@ -134,7 +137,7 @@ class AutopilotLink:
         with self._lock:
             age = None if self._last_heartbeat is None else now - self._last_heartbeat
             snap = {"armed": self._armed, "heartbeat_age_s": age, "heartbeats": self._heartbeats,
-                    "connected": self._connected, "error": self._error}
+                    "connected": self._connected, "error": self._error, "mission_seq": self._mission_seq}
             if self.rc:
                 snap.update(rc_level=self.rc.level, rc_presses=self.rc.presses, rc_present=self.rc.present)
             return snap
@@ -146,6 +149,8 @@ class AutopilotLink:
                 if kind == "armed":
                     self._armed, self._last_heartbeat = value, now
                     self._heartbeats += 1
+                elif kind == "mission":
+                    self._mission_seq = value
                 elif self.rc and kind == "rc_present":
                     self.rc.set_present(value)
                 elif self.rc and kind == "rc":

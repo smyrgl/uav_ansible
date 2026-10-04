@@ -15,6 +15,9 @@ replay_zfs_dataset: rpool/flights          # "" to skip dataset management
 replay_venv: /opt/uav/replay-venv          # evo + mcap + numpy, system ROS visible
 replay_evo_version: "1.31.1"
 replay_mcap_version: "1.5.0"
+replay_pyulog_version: "1.2.4"
+# ulog-to-bag alignment gate (autonomy roadmap Stage 0b): pps_capture residual median
+replay_ulog_align_median_ms: 2.0
 replay_lio_build_jobs: 12                  # 24 threads, 62 GB: the IKFoM templates fit
 # Scoring gates (autonomy roadmap Stage 0b): APE of the replayed /lio/odometry
 # against the live one, and the voxel maps' Jaccard at the fine voxel.

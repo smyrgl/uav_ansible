@@ -1,0 +1,10 @@
+[Unit]
+Description=Fetch the FC's ulogs every {{ flight_recorder_fetch_ulogs_interval }}
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec={{ flight_recorder_fetch_ulogs_interval }}
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

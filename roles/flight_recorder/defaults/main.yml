@@ -54,3 +54,11 @@ flight_recorder_offload_user: john
 flight_recorder_offload_key: "/home/{{ target_user }}/.ssh/uav-offload"
 flight_recorder_offload_interval: 15min
 flight_recorder_offload_bandwidth_kbps: 0      # 0 = unlimited
+# The FC's ulogs, fetched over MAVLink FTP through the router while disarmed
+# (about 32 kB/s over TELEM2; minutes per flight hour once the FC's Ethernet
+# MAVLink instance is enabled), filed in <bag dir>/ulogs and linked into the
+# bag whose armed time is within the tolerance as fc.ulg.
+flight_recorder_fetch_ulogs_enabled: true
+flight_recorder_fetch_ulogs_interval: 15min
+flight_recorder_fetch_ulogs_days: 3
+flight_recorder_fetch_ulogs_tolerance_s: 300.0

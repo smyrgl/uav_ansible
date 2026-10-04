@@ -138,3 +138,10 @@ class Reader(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_mission_current_is_folded_into_the_snapshot():
+    from uav_flight_recorder.mavlink_arm import AutopilotLink
+    link = AutopilotLink("tcp:127.0.0.1:1", 0)
+    link.apply([("mission", 7), ("armed", True)], 10.0)
+    assert link.snapshot(10.0)["mission_seq"] == 7

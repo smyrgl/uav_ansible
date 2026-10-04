@@ -71,8 +71,14 @@ sleep 2
 timeout 30 ros2 service call /lio/map/save std_srvs/srv/Trigger "{}" >"$OUT/log/map_save.log" 2>&1 || echo "map save failed or timed out (see $OUT/log/map_save.log)"
 cleanup; PIDS=()
 echo "replay recorded in $OUT/replay"
+ULOG_ARGS=""
+if [ -f "$BAG/fc.ulg" ]; then
+  echo "converting the FC ulog"
+  {{ replay_venv }}/bin/python /usr/local/lib/uav/ulog2mcap.py "$BAG/fc.ulg" -o "$OUT/fc_ulog.mcap" --summary "$OUT/fc_ulog.json" >"$OUT/log/ulog2mcap.log" 2>&1 || echo "ulog conversion exited $? (see $OUT/log/ulog2mcap.log)"
+  [ -f "$OUT/fc_ulog.json" ] && ULOG_ARGS="--ulog-summary $OUT/fc_ulog.json --ulog-align-median-ms {{ replay_ulog_align_median_ms }}"
+fi
 if [ "$SCORE" = 1 ]; then
-  {{ replay_venv }}/bin/python /usr/local/lib/uav/replay_score.py --live "$BAG" --replay "$OUT/replay" \
+  {{ replay_venv }}/bin/python /usr/local/lib/uav/replay_score.py --live "$BAG" --replay "$OUT/replay" $ULOG_ARGS \
     --live-map "$BAG/lio_map.pcd" --replay-map "$(ls -t "$OUT"/lio_map_*.pcd 2>/dev/null | head -1)" \
     --odometry-topic {{ lio_odometry_topic }} --window-ms {{ replay_match_window_ms }} \
     --ape-median-m {{ replay_ape_median_m }} --jaccard-min {{ replay_map_jaccard_min }} \

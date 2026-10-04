@@ -40,3 +40,19 @@
     enabled: "{{ flight_recorder_offload_enabled | bool }}"
     state: "{{ 'started' if flight_recorder_offload_enabled | bool else 'stopped' }}"
     daemon_reload: true
+
+- name: Install the ulog fetch service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop:
+    - uav-fetch-ulogs.service
+    - uav-fetch-ulogs.timer
+
+- name: Run the ulog fetch timer (or stop it when disabled)
+  ansible.builtin.systemd_service:
+    name: uav-fetch-ulogs.timer
+    enabled: "{{ flight_recorder_fetch_ulogs_enabled | bool }}"
+    state: "{{ 'started' if flight_recorder_fetch_ulogs_enabled | bool else 'stopped' }}"
+    daemon_reload: true

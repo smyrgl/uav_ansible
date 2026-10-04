@@ -24,5 +24,10 @@ for dir in "$BAGS"/flight_*/; do
     status=$?; failed=$((failed+1)); echo "$(date -u +%FT%TZ) FAILED $name (rsync exit $status)" >> "$BAGS/offload.log"
   fi
 done
+# The fetched ulogs travel too (cheap when nothing changed); a bag's fc.ulg is a
+# hard link to one of them and goes with the bag.
+if [ -d "$BAGS/ulogs" ]; then
+  rsync -a --partial --timeout=60 $LIMIT --exclude '.lock' -e "$SSH" "$BAGS/ulogs" "$HOST:./" 2>>"$BAGS/offload.log" || echo "$(date -u +%FT%TZ) FAILED ulogs" >> "$BAGS/offload.log"
+fi
 echo "offload: $pushed pushed, $failed failed, $skipped without sign-off"
 [ "$failed" = 0 ]
