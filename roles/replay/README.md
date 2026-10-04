@@ -71,6 +71,14 @@ has no extent, so the alignment's rotation is unobservable. Replay-against-
 replay of the same bag (a common origin) is the determinism check; a flight bag
 is the fidelity check.
 
+## Automatic replay
+
+`uav-replay-new.timer` (every `replay_auto_interval`) replays and scores every
+signed-off bag in the dataset that has no replay yet, one at a time, writing
+`<bag>.replay.log` and a `.replayed` stamp (delete the stamp to retry). Bench
+bags from before the live map reset score FAIL on the map and are still
+useful for the trajectory numbers.
+
 ## Offload and archive
 
 The aircraft pushes signed-off bags here itself (flight_recorder role,

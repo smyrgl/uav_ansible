@@ -1,0 +1,9 @@
+[Unit]
+Description=Replay and score newly offloaded flight bags
+
+[Service]
+Type=oneshot
+User={{ replay_user }}
+Group={{ replay_group }}
+ExecStart=/usr/local/bin/uav-replay-new
+Nice=5

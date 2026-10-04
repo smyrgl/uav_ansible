@@ -147,5 +147,27 @@
     dest: /usr/local/bin/uav-replay
     mode: "0755"
 
+- name: Install the automatic replay of new bags
+  ansible.builtin.template:
+    src: uav-replay-new.j2
+    dest: /usr/local/bin/uav-replay-new
+    mode: "0755"
+
+- name: Install the automatic replay service and timer
+  ansible.builtin.template:
+    src: "{{ item }}.j2"
+    dest: "/etc/systemd/system/{{ item }}"
+    mode: "0644"
+  loop:
+    - uav-replay-new.service
+    - uav-replay-new.timer
+
+- name: Run the automatic replay timer (or stop it when disabled)
+  ansible.builtin.systemd_service:
+    name: uav-replay-new.timer
+    enabled: "{{ replay_auto_enabled | bool }}"
+    state: "{{ 'started' if replay_auto_enabled | bool else 'stopped' }}"
+    daemon_reload: true
+
 - name: Offload key and archive tier
   ansible.builtin.include_tasks: offload.yml

@@ -40,3 +40,6 @@ replay_archive_dir: /srv/archive
 replay_archive_unit: srv-archive              # systemd needs the unit named after the path
 replay_archive_credentials: /etc/uav/truenas.cred
 replay_archive_interval: 1h
+# Replay and score every newly offloaded, signed-off bag on a timer.
+replay_auto_enabled: true
+replay_auto_interval: 10min

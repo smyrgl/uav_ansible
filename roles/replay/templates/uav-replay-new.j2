@@ -1,0 +1,20 @@
+#!/bin/bash
+# Managed by uav_ansible (replay). Replay and score every signed-off bag in the
+# flights dataset that has no replay yet (one at a time; a run marks the bag
+# with .replayed so a failed score is not retried forever: delete the stamp to
+# retry).
+set -eo pipefail
+FLIGHTS={{ replay_flights_dir }}
+for dir in "$FLIGHTS"/flight_*/; do
+  dir="${dir%/}"; name=$(basename "$dir")
+  case "$name" in *_replay_*) continue ;; esac
+  [ -f "$dir/flight.json" ] && grep -q '"signoff"' "$dir/flight.json" || continue
+  [ -f "$dir/.replayed" ] && continue
+  echo "$(date -u +%FT%TZ) replaying $name"
+  if /usr/local/bin/uav-replay "$dir" --out "${dir}_replay_$(date -u +%Y%m%dT%H%M%SZ)" > "$dir.replay.log" 2>&1; then
+    echo "$(date -u +%FT%TZ) $name: $(grep -E '^REPLAY ' "$dir.replay.log" | tail -1)"
+  else
+    echo "$(date -u +%FT%TZ) $name: replay exited $? ($(grep -E '^REPLAY ' "$dir.replay.log" | tail -1))"
+  fi
+  date -u +%FT%TZ > "$dir/.replayed"
+done
