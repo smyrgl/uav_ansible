@@ -36,9 +36,22 @@ base_packages:
   - openssl                     # Priority: important on Ubuntu already; the
                                 # station's enrollment bootstrap uses it
 
-# Power / performance
-nvpmodel_mode: 0                # 0 = max on most Orin NX profiles. TODO confirm: nvpmodel -q
-jetson_clocks_enabled: true
+# Power / performance. nvpmodel modes of this image (JetPack 7.2, Orin NX 16 GB;
+# /etc/nvpmodel.conf): 0 = MAXN, uncapped (8 cores to 1984 MHz, GPU 918 MHz, EMC
+# 3199 MHz); 2 = 15W runs cores 0-3 only, capped at 1.42 GHz, GPU 612 MHz (1 = 10W:
+# fewer cores still, 1.19 GHz); 3 = 25W keeps 8 cores at 1.5 GHz but caps the GPU
+# at 408 MHz. The image's own default is 2. On 12S power the limit is thermal, so
+# the mode is MAXN and the limit is set explicitly at the fan (jetson_fan_profile).
+# nvfancontrol is closed-loop on the profile's rpm column: `max` holds the fan at
+# its rated 6000 rpm (measured 2026-10-03: PWM 237, 6038 rpm), not at a raw 255.
+nvpmodel_mode: 0
+jetson_clocks_enabled: true     # pins every clock at the mode's maximum (no DVFS)
+# nvfancontrol profile: quiet (JetPack's default: 187/255 from 74 C, full speed
+# only from 95 C), cool (full speed from 70 C), or max (255/255 at every
+# temperature; the base role defines it). Noise is irrelevant on the aircraft,
+# cooling margin on a hot-day ground hold without prop wash is not. Airflow brings
+# dust and ash through the fins: the heatsink is a post-flight inspection item.
+jetson_fan_profile: max
 
 # Swap (sized for colcon builds)
 swap_enabled: true

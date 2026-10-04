@@ -125,6 +125,38 @@
     daemon_reload: true
   when: jetson_clocks_enabled
 
+# --- Fan -----------------------------------------------------------------------
+# nvfancontrol maps the margin to the 105 C limit onto a PWM; JetPack ships
+# `quiet` as the default. The profile is an explicit setting here (group_vars,
+# jetson_fan_profile); `max` is a profile this role adds: 255/255 at every
+# margin, with the controller still watching the tach.
+- name: Check the fan profile setting
+  ansible.builtin.assert:
+    that: jetson_fan_profile in ['quiet', 'cool', 'max']
+    fail_msg: "jetson_fan_profile must be quiet, cool or max"
+  tags: [fan]
+
+- name: Define the max fan profile
+  ansible.builtin.blockinfile:
+    path: /etc/nvfancontrol.conf
+    marker: "# {mark} uav_ansible fan profile"
+    insertbefore: '^\s*FAN_DEFAULT_CONTROL\s'
+    block: |
+          FAN_PROFILE max {
+                  0       0       255     6000
+                  105     0       255     6000
+          }
+  notify: Restart nvfancontrol
+  tags: [fan]
+
+- name: Select the fan profile
+  ansible.builtin.lineinfile:
+    path: /etc/nvfancontrol.conf
+    regexp: '^\s*FAN_DEFAULT_PROFILE\s'
+    line: "\tFAN_DEFAULT_PROFILE {{ jetson_fan_profile }}"
+  notify: Restart nvfancontrol
+  tags: [fan]
+
 # --- Headless posture + user service autostart -------------------------------
 # Boot target: multi-user (headless) frees RAM/GPU for ROS/perception. Takes
 # effect on the NEXT reboot. Set gui_enabled=true to keep the GNOME desktop.

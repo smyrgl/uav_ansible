@@ -2,3 +2,12 @@
 - name: Reload systemd
   ansible.builtin.systemd:
     daemon_reload: true
+
+# nvfancontrol keeps the profile it last ran in /var/lib/nvfancontrol/status and
+# prefers that to the file's default, so the state goes between stop and start.
+- name: Restart nvfancontrol
+  ansible.builtin.shell: |
+    set -e
+    systemctl stop nvfancontrol.service
+    rm -f /var/lib/nvfancontrol/status
+    systemctl start nvfancontrol.service
