@@ -67,7 +67,14 @@ def main(argv=None):
     state = load_state(state_path)
     bags = bags_armed_at(args.flights)
     fetched = failed = 0
-    for day in recent_days(args.days):
+    ftp = fresh_ftp(master, pause=1.0)
+    ftp.cmd_list(["/fs/microsd/log"])
+    ftp.process_ftp_reply("ListDirectory", timeout=20)
+    present = set(e.name for e in (ftp.list_result or []) if e.is_dir)
+    window = set(recent_days(args.days))
+    days = sorted(present & window, reverse=True)
+    print("day folders on the card: %d, in the %d-day window: %d" % (len(present), args.days, len(days)))
+    for day in days:
         ftp = fresh_ftp(master, pause=1.0)
         ftp.cmd_list(["/fs/microsd/log/" + day])
         ftp.process_ftp_reply("ListDirectory", timeout=20)
