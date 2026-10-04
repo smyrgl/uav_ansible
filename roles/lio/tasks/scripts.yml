@@ -1,0 +1,32 @@
+---
+# The lio bridge, voxel map, E1R registration, health and watchdog scripts and
+# their tests, as used by the aircraft units and the replay launcher.
+- name: Install the lio bridge, the voxel map, the second-LiDAR registration and their tests
+  ansible.builtin.copy:
+    src: "{{ item }}"
+    dest: "/usr/local/lib/uav/{{ item }}"
+    mode: "0755"
+  loop:
+    - lio_bridge.py
+    - test_lio_bridge.py
+    - lio_map.py
+    - test_lio_map.py
+    - lio_register.py
+    - test_lio_register.py
+    - lio_health.py
+    - test_lio_health.py
+    - lio_watchdog.py
+  notify:
+    - Restart lio bridge
+    - Restart lio map
+    - Restart lio e1r
+    - Restart lio watchdog
+
+- name: Run the bridge, map and registration tests on the target
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, -m, unittest, -q, test_lio_bridge, test_lio_map, test_lio_register, test_lio_health]
+    chdir: /usr/local/lib/uav
+  environment:
+    PYTHONDONTWRITEBYTECODE: "1"
+  changed_when: false
+

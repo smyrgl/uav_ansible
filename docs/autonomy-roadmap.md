@@ -195,7 +195,15 @@ estimates.
   `vehicle_gps_position.time_utc_usec` and `pps_capture`. *Written 2026-10-04:
   `tools/ulog2mcap.py`; the UTC path waits for a log from this FC.*
 - Storage and offload plan: ~50 GB per flight hour; where bags go, which host
-  replays them (the Mac cannot run Jazzy rclcpp natively).
+  replays them (the Mac cannot run Jazzy rclcpp natively). *2026-10-04: the
+  replay host exists (roles/replay on `atomic`, inventory/replay.yml): the
+  aircraft's own builds, loopback DDS on domain 42, a ZFS flights dataset,
+  `uav-replay` and a scorer. Replay-against-replay of a bench bag is
+  bit-identical (APE 1e-16 m, map Jaccard 1.0): the harness is deterministic.
+  Fidelity against the live run needs a flight bag (a stationary bench bag has
+  no trajectory extent for the alignment); the recorder now resets the live map
+  when a bag starts so the saved map covers exactly the bag. Offload from the
+  Jetson and the TrueNAS tier are still to do.*
 - Compute recovery, measured: `rclpy.experimental.EventsExecutor` on every Python
   node with a jtop A/B per node; the camera node's 1.2 cores are a Python
   GStreamer buffer problem, not executor polling, and need a C++ or zero-copy
@@ -560,6 +568,10 @@ fusion for this campaign.
    `RTL_RETURN_ALT` for the campaign, or fit every pattern inside 50 × 30 m?
 2. **Is GNSS-denied flight a goal?** It decides `EKF2_EV_CTRL`, Air-IO, cuVSLAM's
    future and the frame-contract emphasis. If not, LIO stays a map pose only.
+   *Decided 2026-10-04: no.* `EKF2_EV_CTRL` stays 0, nothing from the Jetson
+   enters the FC's estimator, LIO is a map pose in `camera_init`, the
+   `camera_init → px4_local` monitor is what every planner output converts
+   through, and cuVSLAM/Air-IO drop to "evaluate only if cheap".
 3. **D555 in the bag** — *decided 2026-10-03: LiDAR-first for now.* A throttled
    IR pair or depth copy (a second unicast subscriber on the camera's link,
    measured against the encoder) stays optional; without it cuVSLAM and any
@@ -572,7 +584,10 @@ fusion for this campaign.
    gates need ~30–60 flights before an external mode; which gates to relax?
 7. **Storage and replay host:** NVMe capacity, how ~50 GB per flight hour reaches
    the Mac, where the archive lives, whether an x86 Linux (NVIDIA) host exists for
-   replaying the rclcpp stack.
+   replaying the rclcpp stack. *Decided 2026-10-04: the owner's "Atomic"
+   workstation (x86, NVIDIA, 4 TB NVMe, Isaac Sim installed) is both the archive
+   and the replay host; it becomes an Ansible target so the replay stack is the
+   same roles as the aircraft.*
 8. **Firmware:** which of the four commits on `uav/v1.17.0-pps` fly; how many
    flashes per campaign; maintain a bench variant with the registration topics?
 9. **RTK in the field:** correction source, expected fixed rate, antenna lever

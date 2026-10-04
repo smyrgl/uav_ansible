@@ -27,6 +27,7 @@ from rclpy.executors import ExternalShutdownException
 from rclpy.node import Node
 from rclpy.qos import DurabilityPolicy, HistoryPolicy, QoSProfile, ReliabilityPolicy
 from std_msgs.msg import Bool
+from std_srvs.srv import Trigger
 
 from .mavlink_arm import AutopilotLink
 from .policy import FlightPolicy, GrowthWatch, IDLE, RECORDING, POST_ROLL
@@ -47,6 +48,9 @@ DEFAULTS = {
     "postflight_gap_topics": ["/fmu/out/vehicle_odometry", "/avia/points", "/e1r/points", "/gnss/navsatfix",
                               "/fmu/out/trajectory_setpoint"],
     "postflight_max_gap_ms": 100.0, "postflight_map_service": "/lio/map/save", "postflight_timeout_sec": 1800.0,
+    # Reset the live voxel map when a bag starts, so the map postflight saves
+    # covers exactly the bag (what a replay of the bag can reproduce).
+    "reset_map_on_start": True, "map_reset_service": "/lio/map/reset",
     # Where the armed state comes from: "mavlink" (the autopilot's HEARTBEAT
     # through mavlink-router, i.e. over TELEM2) or "ros" (/px4/armed and
     # /px4/safety_off from the PX4 bridge, i.e. over the FC's Ethernet).
@@ -106,6 +110,7 @@ class FlightRecorder(Node):
         self.size_checked = 0.0
         self.growth = GrowthWatch(self.p["stall_sec"])
         self.posts = []             # running post-flight checks: dict(proc, bag, started, log)
+        self.map_reset = self.create_client(Trigger, str(self.p["map_reset_service"])) if self.p["reset_map_on_start"] else None
         self.last_postflight = None
         os.makedirs(self.p["bag_dir"], exist_ok=True)
         self.create_timer(1.0, self._tick)
@@ -209,6 +214,12 @@ class FlightRecorder(Node):
         self.last_size = 0
         self.growth.reset(self.bag["started_mono"])
         self.get_logger().info("recording %s (%s)" % (path, reason))
+        if self.map_reset is not None:
+            if self.map_reset.service_is_ready():
+                self.map_reset.call_async(Trigger.Request())      # fire and forget: the map node logs the reset
+                self.get_logger().info("live map reset requested (%s)" % self.p["map_reset_service"])
+            else:
+                self.get_logger().warning("live map not reset: %s unavailable" % self.p["map_reset_service"])
 
     def _finish(self, reason):
         proc, bag = self.proc, self.bag

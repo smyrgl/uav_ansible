@@ -1,0 +1,49 @@
+---
+# The Livox message package alone (CustomMsg for FAST-LIO and the bags), for a
+# host that never talks to an Avia: the replay workstation. main.yml builds the
+# same package together with the driver on the aircraft.
+- name: Install the Livox message build dependencies
+  ansible.builtin.apt:
+    name:
+      - build-essential
+      - cmake
+      - python3-colcon-common-extensions
+      - "ros-{{ ros_distro }}-ament-cmake"
+      - "ros-{{ ros_distro }}-rclcpp"
+      - "ros-{{ ros_distro }}-sensor-msgs"
+      - "ros-{{ ros_distro }}-rosidl-default-generators"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Prepare the workspace source directory
+  ansible.builtin.file:
+    path: "{{ avia_workspace }}/src"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Install the Livox message sources
+  ansible.builtin.copy:
+    src: livox_ros_driver2
+    dest: "{{ avia_workspace }}/src/"
+    owner: root
+    group: root
+    mode: preserve
+  register: avia_messages_source
+
+- name: Check for the built Livox messages
+  ansible.builtin.stat:
+    path: "{{ avia_workspace }}/install/share/livox_ros_driver2/package.xml"
+  register: avia_messages_installed
+
+- name: Build the Livox messages
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    colcon build --merge-install --packages-select livox_ros_driver2 --cmake-args -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=OFF
+  args:
+    executable: /bin/bash
+    chdir: "{{ avia_workspace }}"
+  when: avia_messages_source is changed or not avia_messages_installed.stat.exists

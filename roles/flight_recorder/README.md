@@ -13,6 +13,7 @@ disarm, and stops it after a post-roll:
 | manual request withdrawn, never armed | stop immediately |
 | free space under `flight_recorder_min_free_gb` (50 GB) | refuse to start; stop a running bag |
 | the bag grows nothing for `flight_recorder_stall_sec` (120 s) | finish it and start a new bag: rosbag2 on Jazzy can stop writing without exiting (ros2/rosbag2#2463); keep this above `max_cache_size` divided by the data rate |
+| a bag starts | request `/lio/map/reset` (`flight_recorder_reset_map_on_start`), so the map saved at the end covers exactly the bag and a replay (replay role) can be compared with it |
 
 ## Post-flight checks
 

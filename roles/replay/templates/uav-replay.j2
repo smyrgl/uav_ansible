@@ -1,0 +1,80 @@
+#!/bin/bash
+# Managed by uav_ansible (replay). Replay a flight bag through the aircraft's
+# LIO stack and score it against the live run recorded in the same bag.
+#
+#   uav-replay <bag_dir> [--rate R] [--out DIR] [--no-score] [--view]
+#
+# The bag plays with /clock (--clock-topics-all) and without any /fmu/in topic;
+# FAST-LIO, the lio bridge, the voxel map, the E1R registration and the PX4
+# bridge run with use_sim_time; their outputs are recorded beside the bag and
+# the scorer compares /lio/odometry and the saved map with the live ones.
+set -eo pipefail            # no -u: ROS setup scripts reference unset variables
+BAG=""; RATE=1.0; OUT=""; SCORE=1; VIEW=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --rate) RATE="$2"; shift 2 ;;
+    --out) OUT="$2"; shift 2 ;;
+    --no-score) SCORE=0; shift ;;
+    --view) VIEW=1; shift ;;
+    -h|--help) sed -n 2,11p "$0"; exit 0 ;;
+    *) BAG="${1%/}"; shift ;;
+  esac
+done
+[ -n "$BAG" ] && [ -f "$BAG/metadata.yaml" ] || { echo "usage: uav-replay <bag_dir> (a rosbag2 directory with metadata.yaml)" >&2; exit 2; }
+OUT="${OUT:-${BAG}_replay_$(date -u +%Y%m%dT%H%M%SZ)}"
+mkdir -p "$OUT"
+set -a; . {{ replay_environment_file }}; set +a
+export ROS_LOG_DIR="$OUT/log"; mkdir -p "$ROS_LOG_DIR"
+source /opt/ros/{{ ros_distro }}/setup.bash
+source {{ ros_health_px4_workspace }}/install/local_setup.bash
+source {{ lio_workspace }}/install/local_setup.bash
+SIM="--ros-args -p use_sim_time:=true"
+PIDS=(); FASTLIO_PID=""
+start() { "$@" >>"$OUT/log/$(basename "$1" | tr -c 'A-Za-z0-9\n' '_').log" 2>&1 & PIDS+=($!); }
+cleanup() {
+  # FAST-LIO's destructor closes a never-opened position log and segfaults on
+  # SIGINT; after the map save nothing of its state is needed: SIGTERM it.
+  [ -n "$FASTLIO_PID" ] && kill -TERM "$FASTLIO_PID" 2>/dev/null || true
+  for p in "${PIDS[@]}"; do kill -INT "$p" 2>/dev/null || true; done
+  for _ in $(seq 1 100); do kill -0 "${PIDS[@]}" 2>/dev/null || break; sleep 0.1; done   # 10 s for a clean close
+  for p in "${PIDS[@]}"; do kill -TERM "$p" 2>/dev/null || true; done
+  for p in "${PIDS[@]}"; do wait "$p" 2>/dev/null || true; done
+}
+# A previous replay that was killed may have left its nodes running on this
+# domain; two FAST-LIOs on one bag double every pose. This host runs nothing
+# else from the stack, so clear them.
+LEFTOVERS=$(pgrep -f 'fastlio_mapping|/usr/local/lib/uav/lio_|uav_px4_bridge/px4_bridge|ros2 bag record|foxglove_bridge' || true)
+if [ -n "$LEFTOVERS" ]; then echo "stopping leftover replay processes: $LEFTOVERS"; kill -TERM $LEFTOVERS 2>/dev/null || true; sleep 2; kill -KILL $LEFTOVERS 2>/dev/null || true; fi
+trap cleanup EXIT
+echo "replay of $BAG -> $OUT (rate $RATE, domain $ROS_DOMAIN_ID)"
+start {{ lio_workspace }}/install/lib/fast_lio/fastlio_mapping --ros-args --params-file {{ lio_config_path }} -p use_sim_time:=true
+FASTLIO_PID=${PIDS[0]}
+start /usr/bin/python3 /usr/local/lib/uav/lio_bridge.py --odometry-topic {{ lio_odometry_topic }} --imu-lever-arm {{ lio_imu_lever_arm | join(" ") }} --twist-stddev {{ lio_twist_stddev_mps }} $SIM
+start /usr/bin/python3 /usr/local/lib/uav/lio_map.py --scan-topics /cloud_registered{{ (' ' ~ lio_e1r_registered_topic) if lio_e1r_enabled else '' }} --voxel {{ lio_map_voxel_m }} --max-points {{ lio_map_max_points | int }} --update-period {{ lio_map_update_period_s }} --overview-voxel {{ lio_map_overview_voxel_m }} --overview-max-points {{ lio_map_overview_max_points | int }} --publish-period {{ lio_map_publish_period_s }} --map-dir "$OUT" --promote {{ lio_map_promote_voxels | int }} $SIM
+{% if lio_e1r_enabled %}
+start /usr/bin/python3 /usr/local/lib/uav/lio_register.py --name e1r --input-topic {{ lio_e1r_topic }} --time-field {{ lio_e1r_time_field }} --output-topic {{ lio_e1r_registered_topic }} --imu-lever-arm {{ lio_imu_lever_arm | join(" ") }} --min-range {{ lio_e1r_min_range_m }} --max-range {{ lio_e1r_max_range_m }} --max-pose-gap {{ lio_e1r_max_pose_gap_s }} --max-wait {{ lio_e1r_max_wait_s }} $SIM
+{% endif %}
+start {{ px4_bridge_workspace }}/install/lib/uav_px4_bridge/px4_bridge --ros-args --params-file {{ px4_bridge_config }} -p use_sim_time:=true
+start ros2 bag record -s mcap --use-sim-time -o "$OUT/replay" --topics {{ lio_odometry_topic }} /lio/map /lio/map/updates /lio/health {{ lio_e1r_registered_topic }} /px4/odometry /tf /tf_static
+if [ "$VIEW" = 1 ]; then start ros2 run foxglove_bridge foxglove_bridge $SIM; fi
+sleep 4
+# --clock-topics-all publishes /clock before every replayed message (it cannot
+# be combined with --clock). Only sensor inputs replay: nothing from /fmu/in,
+# and none of the live stack's own outputs (FAST-LIO's /Odometry and clouds, the
+# lio and PX4 bridge topics, dynamic /tf, diagnostics), which would otherwise be
+# echoed by the replayed nodes and score as a perfect match. /tf_static stays:
+# the URDF's static frames are an input the replay host does not produce.
+# rosbag2 full-matches this against each topic name (std::regex_match).
+EXCLUDE='^/(fmu/in/.*|Odometry|path|Laser_map.*|cloud_.*|lio/.*|px4/.*|tf|diagnostics|uav/health|clock)$'
+ros2 bag play "$BAG" --clock-topics-all --exclude-regex "$EXCLUDE" --rate "$RATE" --disable-keyboard-controls >"$OUT/log/play.log" 2>&1 || echo "bag play exited $?"
+sleep 2
+timeout 30 ros2 service call /lio/map/save std_srvs/srv/Trigger "{}" >"$OUT/log/map_save.log" 2>&1 || echo "map save failed or timed out (see $OUT/log/map_save.log)"
+cleanup; PIDS=()
+echo "replay recorded in $OUT/replay"
+if [ "$SCORE" = 1 ]; then
+  {{ replay_venv }}/bin/python /usr/local/lib/uav/replay_score.py --live "$BAG" --replay "$OUT/replay" \
+    --live-map "$BAG/lio_map.pcd" --replay-map "$(ls -t "$OUT"/lio_map_*.pcd 2>/dev/null | head -1)" \
+    --odometry-topic {{ lio_odometry_topic }} --window-ms {{ replay_match_window_ms }} \
+    --ape-median-m {{ replay_ape_median_m }} --jaccard-min {{ replay_map_jaccard_min }} \
+    --voxel {{ lio_map_voxel_m }} --recall-min {{ replay_map_recall_min }} --out "$OUT/score.json"
+fi

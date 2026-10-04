@@ -1,0 +1,50 @@
+---
+# The bridge package into the shared workspace: aircraft and replay host alike.
+- name: Install bridge dependencies
+  ansible.builtin.apt:
+    name:
+      - python3-colcon-common-extensions
+      - "ros-{{ ros_distro }}-rclpy"
+      - "ros-{{ ros_distro }}-sensor-msgs"
+      - "ros-{{ ros_distro }}-nav-msgs"
+      - "ros-{{ ros_distro }}-geographic-msgs"
+      - "ros-{{ ros_distro }}-diagnostic-msgs"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install the bridge package
+  ansible.builtin.copy:
+    src: uav_px4_bridge
+    dest: "{{ px4_bridge_workspace }}/src/"
+    owner: root
+    group: root
+    mode: preserve
+  register: px4_bridge_source
+  notify: Restart PX4 bridge
+
+- name: Run the bridge's pure conversion tests on the target
+  ansible.builtin.command:
+    argv: [/usr/bin/python3, -m, unittest, -q, test_convert]
+    chdir: "{{ px4_bridge_workspace }}/src/uav_px4_bridge/test"
+  environment:
+    PYTHONPATH: "{{ px4_bridge_workspace }}/src/uav_px4_bridge"
+  changed_when: false
+
+- name: Check the installed bridge executable
+  ansible.builtin.stat:
+    path: "{{ px4_bridge_workspace }}/install/lib/uav_px4_bridge/px4_bridge"
+  register: px4_bridge_executable
+
+# Shared merge-install workspace: never run two deployments of it at once.
+- name: Build the bridge package
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    /usr/bin/colcon build --packages-select uav_px4_bridge --merge-install
+  args:
+    executable: /bin/bash
+    chdir: "{{ px4_bridge_workspace }}"
+  when: px4_bridge_source is changed or not px4_bridge_executable.stat.exists
+  notify: Restart PX4 bridge
+

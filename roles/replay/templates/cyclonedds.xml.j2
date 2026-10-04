@@ -1,0 +1,12 @@
+<CycloneDDS xmlns="https://cdds.io/config">
+  <!-- Managed by uav_ansible (replay): loopback only. -->
+  <Domain Id="any">
+    <General>
+      <Interfaces><NetworkInterface name="lo"/></Interfaces>
+      <AllowMulticast>false</AllowMulticast>
+    </General>
+    <Internal>
+      <SocketReceiveBufferSize max="16MB"/>
+    </Internal>
+  </Domain>
+</CycloneDDS>

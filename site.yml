@@ -2,7 +2,7 @@
 # Master playbook. Roles run in dependency order. Each is tagged so it can be
 # run/re-run in isolation (e.g. --tags time_sync). Parked roles are opt-in.
 - name: Provision Jetson Orin NX UAV companion computer
-  hosts: all
+  hosts: all:!replay
   become: true
   gather_facts: true
 
@@ -104,3 +104,17 @@
         enabled: true
         daemon_reload: true
       tags: [ros_inspection]
+
+# The replay and archive host: the same source builds as the aircraft (FAST-LIO,
+# the Livox messages, px4_msgs, the lio nodes, the PX4 bridge) on its own DDS
+# domain over loopback, a flights dataset, the replay launcher and the scorer.
+- name: Provision the replay and archive host
+  hosts: replay
+  become: true
+  vars:
+    lio_manage_services: false
+    px4_bridge_manage_services: false
+    ros_health_manage_services: false
+  roles:
+    - role: replay
+      tags: ['replay']

@@ -1,0 +1,9 @@
+# Managed by uav_ansible (replay). The replay host's ROS environment: its own
+# domain, Cyclone DDS on loopback only, so a replay can never join the
+# aircraft's graph (domain {{ uav_ros_domain | default(0) }} on the drone LAN).
+ROS_DISTRO={{ ros_distro }}
+ROS_DOMAIN_ID={{ replay_domain_id }}
+RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+CYCLONEDDS_URI=file://{{ replay_cyclone_config }}
+ROS_AUTOMATIC_DISCOVERY_RANGE=LOCALHOST
+PYTHONUNBUFFERED=1

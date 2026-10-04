@@ -4,29 +4,32 @@
     name: uav-lio.service
     state: restarted
     daemon_reload: true
+  when: lio_manage_services | default(true) | bool
 
 - name: Restart lio map
   ansible.builtin.systemd_service:
     name: uav-lio-map.service
     state: restarted
     daemon_reload: true
+  when: lio_manage_services | default(true) | bool
 
 - name: Restart lio e1r
   ansible.builtin.systemd_service:
     name: uav-lio-e1r.service
     state: restarted
     daemon_reload: true
-  when: lio_e1r_enabled
+  when: (lio_manage_services | default(true) | bool) and lio_e1r_enabled
 
 - name: Restart lio bridge
   ansible.builtin.systemd_service:
     name: uav-lio-bridge.service
     state: restarted
     daemon_reload: true
+  when: lio_manage_services | default(true) | bool
 
 - name: Restart lio watchdog
   ansible.builtin.systemd_service:
     name: uav-lio-watchdog.service
     state: restarted
     daemon_reload: true
-  when: lio_watchdog_enabled | bool
+  when: (lio_manage_services | default(true) | bool) and (lio_watchdog_enabled | bool)

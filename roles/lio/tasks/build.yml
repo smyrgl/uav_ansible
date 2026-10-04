@@ -1,0 +1,78 @@
+---
+# FAST-LIO from the pinned source into the shared workspace: the aircraft (main.yml)
+# and the replay host (roles/replay) run exactly this.
+- name: Install FAST-LIO build dependencies
+  ansible.builtin.apt:
+    name:
+      - git
+      - libeigen3-dev
+      - libpcl-dev
+      - python3-dev                 # FAST-LIO includes Python.h (matplotlibcpp)
+      - python3-numpy
+      - "ros-{{ ros_distro }}-pcl-ros"
+      - "ros-{{ ros_distro }}-pcl-conversions"
+      - "ros-{{ ros_distro }}-rclcpp-components"
+      - "ros-{{ ros_distro }}-std-srvs"
+      - "ros-{{ ros_distro }}-visualization-msgs"
+      - "ros-{{ ros_distro }}-nav-msgs"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Check that the Livox messages are built (avia role)
+  ansible.builtin.stat:
+    path: "{{ lio_workspace }}/install/share/livox_ros_driver2/package.xml"
+  register: lio_livox_messages
+
+- name: Refuse to build FAST-LIO without the Livox messages
+  ansible.builtin.assert:
+    that: lio_livox_messages.stat.exists
+    fail_msg: Run the avia role first (it builds livox_ros_driver2 and publishes /avia/custom).
+    quiet: true
+
+- name: Fetch the pinned FAST-LIO source
+  ansible.builtin.git:
+    repo: "{{ lio_repository }}"
+    dest: "{{ lio_checkout_dir }}"
+    version: "{{ lio_revision }}"
+    recursive: true
+  register: lio_checkout
+
+- name: Check for the prepared FAST-LIO build tree
+  ansible.builtin.stat:
+    path: "{{ lio_source_dir }}/CMakeLists.txt"
+  register: lio_tree
+
+# FAST-LIO's CMakeLists forces C++14; Jazzy's rclcpp headers need C++17
+# (std::is_convertible_v, ...). The pinned checkout stays pristine; the copy
+# colcon builds gets the standard switched.
+- name: Prepare the FAST-LIO build tree (C++17)
+  ansible.builtin.shell: |
+    set -e
+    rm -rf {{ lio_source_dir }}
+    cp -a {{ lio_checkout_dir }} {{ lio_source_dir }}
+    rm -rf {{ lio_source_dir }}/.git
+    sed -i -e 's/c++14/c++17/g' -e 's/CMAKE_CXX_STANDARD 14/CMAKE_CXX_STANDARD 17/' {{ lio_source_dir }}/CMakeLists.txt
+    grep -q 'CMAKE_CXX_STANDARD 17' {{ lio_source_dir }}/CMakeLists.txt
+  args:
+    executable: /bin/bash
+  when: lio_checkout is changed or not lio_tree.stat.exists
+  register: lio_source
+
+- name: Check for the FAST-LIO executable
+  ansible.builtin.stat:
+    path: "{{ lio_workspace }}/install/lib/fast_lio/fastlio_mapping"
+  register: lio_executable
+
+- name: Build FAST-LIO
+  ansible.builtin.shell: |
+    set -e
+    source /opt/ros/{{ ros_distro }}/setup.bash
+    source {{ lio_workspace }}/install/local_setup.bash
+    MAKEFLAGS=-j{{ lio_build_jobs }} colcon build --merge-install --packages-select fast_lio --cmake-args -DCMAKE_BUILD_TYPE=Release
+  args:
+    executable: /bin/bash
+    chdir: "{{ lio_workspace }}"
+  when: lio_source is changed or not lio_executable.stat.exists
+  notify: Restart lio
+

@@ -40,3 +40,7 @@ flight_recorder_postflight_max_gap_ms: 100.0
 flight_recorder_postflight_map_service: /lio/map/save
 flight_recorder_postflight_timeout_sec: 1800.0
 flight_recorder_mcap_version: "1.5.0"
+# Reset the live voxel map (lio_map /lio/map/reset) when a bag starts, so the
+# PCD postflight saves covers exactly the bag and a replay can be compared to it.
+flight_recorder_reset_map_on_start: true
+flight_recorder_map_reset_service: /lio/map/reset

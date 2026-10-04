@@ -1,0 +1,8 @@
+---
+# The replay and archive host (autonomy roadmap §7.7): the owner's workstation.
+# ansible-playbook -i inventory/replay.yml site.yml --tags replay
+replay:
+  hosts:
+    atomic:
+      ansible_host: atomic
+      ansible_user: john

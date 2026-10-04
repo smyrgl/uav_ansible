@@ -29,3 +29,6 @@ x950_description/*_backup_*.blend
 
 # pytest
 .pytest_cache/
+
+# Bag offload: the aircraft's public key fetched for the replay host
+.offload-keys/

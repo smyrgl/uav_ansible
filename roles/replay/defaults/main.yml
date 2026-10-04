@@ -1,0 +1,28 @@
+---
+# The replay and archive host (autonomy roadmap §7.7, Stage 0b/1): the owner's
+# x86 NVIDIA workstation. It runs the aircraft's own source builds (FAST-LIO,
+# the Livox messages, px4_msgs, the lio nodes, the PX4 bridge) against recorded
+# bags, on its own DDS domain over loopback, and scores the replay against the
+# live run recorded in the same bag.
+replay_user: john
+replay_group: john
+replay_domain_id: 42                      # never the aircraft's 0
+replay_environment_file: /etc/uav/ros/environment
+replay_cyclone_config: /etc/uav/ros/cyclonedds.xml
+# Where bags live: a ZFS dataset of its own (snapshots, quota), mounted here.
+replay_flights_dir: /srv/flights
+replay_zfs_dataset: rpool/flights          # "" to skip dataset management
+replay_venv: /opt/uav/replay-venv          # evo + mcap + numpy, system ROS visible
+replay_evo_version: "1.31.1"
+replay_mcap_version: "1.5.0"
+replay_lio_build_jobs: 12                  # 24 threads, 62 GB: the IKFoM templates fit
+# Scoring gates (autonomy roadmap Stage 0b): APE of the replayed /lio/odometry
+# against the live one, and the voxel maps' Jaccard at the fine voxel.
+replay_ape_median_m: 0.02
+replay_map_jaccard_min: 0.98
+# Until every bag starts with a live map reset (flight_recorder
+# reset_map_on_start), the live map is older and larger than the replayed one:
+# gate on recall (replayed voxels the live map also holds) instead of Jaccard.
+# Set 0 to gate on Jaccard.
+replay_map_recall_min: 0.98
+replay_match_window_ms: 20.0

@@ -4,3 +4,4 @@
     name: uav-ros-health.service
     daemon_reload: true
     state: restarted
+  when: ros_health_manage_services | default(true) | bool

@@ -1,0 +1,140 @@
+---
+# Variables of the roles whose build steps run here (their defaults are not in
+# scope otherwise); overrides come after as facts, which outrank include_vars.
+- name: Load the aircraft roles' defaults
+  ansible.builtin.include_vars:
+    file: "{{ role_path }}/../{{ item }}/defaults/main.yml"
+  loop: [ros_health, avia, lio, px4_bridge]
+
+- name: Size the FAST-LIO build for this host
+  ansible.builtin.set_fact:
+    lio_build_jobs: "{{ replay_lio_build_jobs }}"
+
+- name: Install the replay host's packages
+  ansible.builtin.apt:
+    name:
+      - "ros-{{ ros_distro }}-rmw-cyclonedds-cpp"
+      - "ros-{{ ros_distro }}-pcl-ros"
+      - "ros-{{ ros_distro }}-foxglove-bridge"
+      - "ros-{{ ros_distro }}-rosbag2-storage-mcap"
+      - "ros-{{ ros_distro }}-nav-msgs"
+      - "ros-{{ ros_distro }}-std-srvs"
+      - python3-venv
+      - python3-numpy
+      - python3-yaml
+      - python3-colcon-common-extensions
+      - rsync
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Check for the flights dataset
+  ansible.builtin.command: zfs list -H -o name {{ replay_zfs_dataset }}
+  register: replay_dataset
+  changed_when: false
+  failed_when: false
+  when: replay_zfs_dataset | length > 0
+
+- name: Create the flights dataset
+  ansible.builtin.command: zfs create -o mountpoint={{ replay_flights_dir }} {{ replay_zfs_dataset }}
+  when: replay_zfs_dataset | length > 0 and replay_dataset.rc != 0
+
+- name: Own the flights directory
+  ansible.builtin.file:
+    path: "{{ replay_flights_dir }}"
+    state: directory
+    owner: "{{ replay_user }}"
+    group: "{{ replay_group }}"
+    mode: "0755"
+
+- name: Create the shared directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  loop:
+    - /opt/uav
+    - /opt/uav/vendor
+    - /etc/uav/ros
+    - /usr/local/lib/uav
+
+- name: Install the replay ROS environment (own domain, loopback only)
+  ansible.builtin.template:
+    src: environment.j2
+    dest: "{{ replay_environment_file }}"
+    mode: "0644"
+
+- name: Bind Cyclone DDS to loopback
+  ansible.builtin.template:
+    src: cyclonedds.xml.j2
+    dest: "{{ replay_cyclone_config }}"
+    mode: "0644"
+
+- name: Build the firmware-matched PX4 messages
+  ansible.builtin.include_role:
+    name: ros_health
+    tasks_from: px4_messages.yml
+
+- name: Build the Livox messages
+  ansible.builtin.include_role:
+    name: avia
+    tasks_from: messages.yml
+
+- name: Build FAST-LIO
+  ansible.builtin.include_role:
+    name: lio
+    tasks_from: build.yml
+
+- name: Install the lio nodes
+  ansible.builtin.include_role:
+    name: lio
+    tasks_from: scripts.yml
+
+- name: Build the PX4 bridge
+  ansible.builtin.include_role:
+    name: px4_bridge
+    tasks_from: build.yml
+
+- name: Give FAST-LIO its log and PCD directories (it opens a position log there at start)
+  ansible.builtin.file:
+    path: "{{ lio_source_dir }}/{{ item }}"
+    state: directory
+    owner: "{{ replay_user }}"
+    group: "{{ replay_group }}"
+    mode: "0755"
+  loop: [Log, PCD]
+
+- name: Configure FAST-LIO as on the aircraft
+  ansible.builtin.template:
+    src: "{{ role_path }}/../lio/templates/fast_lio.yaml.j2"
+    dest: "{{ lio_config_path }}"
+    mode: "0644"
+
+- name: Configure the PX4 bridge as on the aircraft
+  ansible.builtin.template:
+    src: "{{ role_path }}/../px4_bridge/templates/px4_bridge.yaml.j2"
+    dest: "{{ px4_bridge_config }}"
+    mode: "0644"
+
+- name: Install the scoring environment
+  ansible.builtin.pip:
+    name:
+      - "evo=={{ replay_evo_version }}"
+      - "mcap=={{ replay_mcap_version }}"
+    virtualenv: "{{ replay_venv }}"
+    virtualenv_command: /usr/bin/python3 -m venv
+    virtualenv_site_packages: true
+
+- name: Install the replay scorer
+  ansible.builtin.copy:
+    src: replay_score.py
+    dest: /usr/local/lib/uav/replay_score.py
+    mode: "0755"
+
+- name: Install the replay launcher
+  ansible.builtin.template:
+    src: uav-replay.j2
+    dest: /usr/local/bin/uav-replay
+    mode: "0755"

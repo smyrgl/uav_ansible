@@ -4,80 +4,8 @@
 - name: Install and run FAST-LIO
   when: lio_state == 'present'
   block:
-    - name: Install FAST-LIO build dependencies
-      ansible.builtin.apt:
-        name:
-          - git
-          - libeigen3-dev
-          - libpcl-dev
-          - python3-dev                 # FAST-LIO includes Python.h (matplotlibcpp)
-          - python3-numpy
-          - "ros-{{ ros_distro }}-pcl-ros"
-          - "ros-{{ ros_distro }}-pcl-conversions"
-          - "ros-{{ ros_distro }}-rclcpp-components"
-          - "ros-{{ ros_distro }}-std-srvs"
-          - "ros-{{ ros_distro }}-visualization-msgs"
-          - "ros-{{ ros_distro }}-nav-msgs"
-        state: present
-        update_cache: true
-        cache_valid_time: 3600
-
-    - name: Check that the Livox messages are built (avia role)
-      ansible.builtin.stat:
-        path: "{{ lio_workspace }}/install/share/livox_ros_driver2/package.xml"
-      register: lio_livox_messages
-
-    - name: Refuse to build FAST-LIO without the Livox messages
-      ansible.builtin.assert:
-        that: lio_livox_messages.stat.exists
-        fail_msg: Run the avia role first (it builds livox_ros_driver2 and publishes /avia/custom).
-        quiet: true
-
-    - name: Fetch the pinned FAST-LIO source
-      ansible.builtin.git:
-        repo: "{{ lio_repository }}"
-        dest: "{{ lio_checkout_dir }}"
-        version: "{{ lio_revision }}"
-        recursive: true
-      register: lio_checkout
-
-    - name: Check for the prepared FAST-LIO build tree
-      ansible.builtin.stat:
-        path: "{{ lio_source_dir }}/CMakeLists.txt"
-      register: lio_tree
-
-    # FAST-LIO's CMakeLists forces C++14; Jazzy's rclcpp headers need C++17
-    # (std::is_convertible_v, ...). The pinned checkout stays pristine; the copy
-    # colcon builds gets the standard switched.
-    - name: Prepare the FAST-LIO build tree (C++17)
-      ansible.builtin.shell: |
-        set -e
-        rm -rf {{ lio_source_dir }}
-        cp -a {{ lio_checkout_dir }} {{ lio_source_dir }}
-        rm -rf {{ lio_source_dir }}/.git
-        sed -i -e 's/c++14/c++17/g' -e 's/CMAKE_CXX_STANDARD 14/CMAKE_CXX_STANDARD 17/' {{ lio_source_dir }}/CMakeLists.txt
-        grep -q 'CMAKE_CXX_STANDARD 17' {{ lio_source_dir }}/CMakeLists.txt
-      args:
-        executable: /bin/bash
-      when: lio_checkout is changed or not lio_tree.stat.exists
-      register: lio_source
-
-    - name: Check for the FAST-LIO executable
-      ansible.builtin.stat:
-        path: "{{ lio_workspace }}/install/lib/fast_lio/fastlio_mapping"
-      register: lio_executable
-
-    - name: Build FAST-LIO
-      ansible.builtin.shell: |
-        set -e
-        source /opt/ros/{{ ros_distro }}/setup.bash
-        source {{ lio_workspace }}/install/local_setup.bash
-        MAKEFLAGS=-j{{ lio_build_jobs }} colcon build --merge-install --packages-select fast_lio --cmake-args -DCMAKE_BUILD_TYPE=Release
-      args:
-        executable: /bin/bash
-        chdir: "{{ lio_workspace }}"
-      when: lio_source is changed or not lio_executable.stat.exists
-      notify: Restart lio
+    - name: Build FAST-LIO (shared with the replay host)
+      ansible.builtin.include_tasks: build.yml
 
     - name: Let the service write FAST-LIO's log and map directories
       ansible.builtin.file:
@@ -90,34 +18,8 @@
         - Log
         - PCD
 
-    - name: Install the lio bridge, the voxel map, the second-LiDAR registration and their tests
-      ansible.builtin.copy:
-        src: "{{ item }}"
-        dest: "/usr/local/lib/uav/{{ item }}"
-        mode: "0755"
-      loop:
-        - lio_bridge.py
-        - test_lio_bridge.py
-        - lio_map.py
-        - test_lio_map.py
-        - lio_register.py
-        - test_lio_register.py
-        - lio_health.py
-        - test_lio_health.py
-        - lio_watchdog.py
-      notify:
-        - Restart lio bridge
-        - Restart lio map
-        - Restart lio e1r
-        - Restart lio watchdog
-
-    - name: Run the bridge, map and registration tests on the target
-      ansible.builtin.command:
-        argv: [/usr/bin/python3, -m, unittest, -q, test_lio_bridge, test_lio_map, test_lio_register, test_lio_health]
-        chdir: /usr/local/lib/uav
-      environment:
-        PYTHONDONTWRITEBYTECODE: "1"
-      changed_when: false
+    - name: Install the lio nodes (shared with the replay host)
+      ansible.builtin.include_tasks: scripts.yml
 
     - name: Install the lio bridge unit
       ansible.builtin.template:
