@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build ArduRemoteID (pinned tag) for the ESP32C3_DEV target with the heartbeat-state patch,
+# Build ArduRemoteID (pinned tag) for the ESP32C3_DEV target with the px4-arming patch,
 # in a work directory under this folder. Needs: git, curl, python3 with `uv` (or edit the pip
 # line), ~1 GB of disk, and on Apple silicon Rosetta (the pinned esp32 2.0.3 core ships
 # x86_64 macOS toolchains). Output: .work/ArduRemoteID/RemoteIDModule/ArduRemoteID-ESP32C3_DEV.bin
