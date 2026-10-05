@@ -1,0 +1,9 @@
+# Camera topic config for isaac_mapping_ros rosbag_to_mapping_data: the D555's hardware-synchronised,
+# rectified IR pair as recorded by the d555_relay (identical stamps, UTC). Monochrome: the stereo workflow
+# asks for RGB, this is the shakedown of whether it accepts mono8.
+stereo_cameras:
+  - name: d555_ir
+    left: /d555/infra1/image
+    left_camera_info: /d555/infra1/camera_info
+    right: /d555/infra2/image
+    right_camera_info: /d555/infra2/camera_info
