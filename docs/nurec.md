@@ -46,13 +46,21 @@ the end records what came out. Everything runs on `atomic` (RTX 5090, 32 GB).
    `tools/nurec/run_3dgut.sh` runs `apps/colmap_3dgut_mcmc.yaml` with the venv's
    `bin` on PATH (the Slang compiler lives there and the launcher does not add it),
    exporting the NuRec USDZ and a PLY. Every 8th image is held out as the test split.
-5. **Pose refinement, the mono workflow's way**: `tools/nurec/run_colmap_sfm.sh`
-   runs COLMAP SfM (CPU build from apt is enough) on the same frames with the
-   calibrated intrinsics held fixed and the masks applied, sequential matching with
-   vocabulary-tree loop detection; `tools/nurec/align_colmap_to_metric.sh` fits the
-   result onto the PX4 camera positions with `colmap model_aligner` so the second
-   training run is metric too, and reports the residual, which is also a measure of
-   the odometry's accuracy against the photogrammetric solution.
+5. **Pose refinement from the odometry**: `tools/nurec/run_colmap_sfm.sh` extracts
+   SIFT features and matches them (CPU COLMAP from apt, calibrated intrinsics held
+   fixed, masks applied, sequential matching with vocabulary-tree loop detection);
+   `tools/nurec/refine_poses_ba.sh` then triangulates those matches with the PX4
+   poses as the start (`colmap_model_from_db.py` writes the start model with the
+   database's image ids), bundle-adjusts with the intrinsics fixed, and puts the
+   result back onto the odometry camera centres with a sim(3) fit
+   (`align_model_sim3.py`), so the adjustment's gauge freedom cannot move or scale
+   the scene. The free alternative, COLMAP's incremental mapper on the same matches
+   (`--map`), reconstructed all 470 images at 0.91 px but with its scale drifting by
+   a factor of two along the flight and one 70 m jump: on long-range, horizon-heavy
+   aerial frames both it and cuSFM drift, and a sim(3) cannot repair that. With good
+   odometry the refinement has to start from it, not replace it. (COLMAP 3.9's
+   `model_aligner --alignment_type custom` also returned an unaligned model here,
+   hence the own sim(3) tool.)
 
 Working directory on atomic: `/srv/flights/nurec/<bag>/{frames,colmap}` and
 `/srv/flights/nurec/runs/<experiment>/`; outputs are private (the flight was over
@@ -92,11 +100,11 @@ as pointless.
 ## Scripted: `uav-reconstruct`
 
 The `nurec` role installs everything above on the replay host and one driver,
-`uav-reconstruct <bag> [--every N] [--min-height M] [--sfm]`
+`uav-reconstruct <bag> [--every N] [--min-height M] [--refine]`
 (`tools/nurec/reconstruct_flight.sh`): frames and poses, the COLMAP-format dataset
 with the LIO map or, for a bag without one, seed points sampled in the camera view
 volumes, the propeller masks, the 3DGUT run with its exports and held-out metrics,
-and with `--sfm` the COLMAP refinement and a second run. Every step skips what
+and with `--refine` the feature-based pose refinement and a second run. Every step skips what
 already exists. First end-to-end run: the recovered mission bag
 (24.6 s, 207 frames, no LIO map), as the smoke test of the driver itself.
 

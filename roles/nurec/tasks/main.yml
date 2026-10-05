@@ -69,6 +69,9 @@
     - nurec/run_3dgut.sh
     - nurec/run_colmap_sfm.sh
     - nurec/align_colmap_to_metric.sh
+    - nurec/align_model_sim3.py
+    - nurec/colmap_model_from_db.py
+    - nurec/refine_poses_ba.sh
     - nurec/prop_mask.py
     - nurec/d555_ir_stereo.yaml
     - nurec/run_rosbag_to_mapping.sh

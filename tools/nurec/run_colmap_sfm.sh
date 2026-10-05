@@ -3,9 +3,12 @@
 # FULL_OPENCV intrinsics are held fixed, the propeller masks beside the images are applied, matching is
 # sequential with vocabulary-tree loop detection. Output: <dataset>/sfm/sparse/0 in COLMAP's own frame;
 # scale and orientation come from a later alignment to the metric PX4 poses (colmap model_aligner).
-# Usage: run_colmap_sfm.sh <dataset dir>
+# Usage: run_colmap_sfm.sh <dataset dir> [--map]   (--map also runs the incremental mapper: on the 2026-10-05
+# aerial sequence it drifted in scale by a factor of two along the flight; refine_poses_ba.sh needs only the
+# features and matches this script always produces)
 set -eo pipefail
-DS=$1; OUT=$DS/sfm; mkdir -p "$OUT/masks" "$OUT/sparse"
+DS=$1; MAP=0; [ "${2:-}" = "--map" ] && MAP=1
+OUT=$DS/sfm; mkdir -p "$OUT/masks" "$OUT/sparse"
 PARAMS=$(python3 - "$DS/export.json" <<'PY'
 import json, sys
 print(",".join("%.6f" % v for v in json.load(open(sys.argv[1]))["params"]))
@@ -29,6 +32,7 @@ colmap sequential_matcher --database_path "$OUT/database.db" --SiftMatching.use_
   --SequentialMatching.overlap 20 --SequentialMatching.quadratic_overlap 1 \
   --SequentialMatching.loop_detection $LOOP --SequentialMatching.vocab_tree_path "$VOCAB" \
   --SequentialMatching.loop_detection_num_images 30 > "$OUT/matching.log" 2>&1
+[ "$MAP" = 1 ] || { echo "$(date -u +%T) done (features and matches in $OUT/database.db)"; exit 0; }
 echo "$(date -u +%T) mapping"
 colmap mapper --database_path "$OUT/database.db" --image_path "$DS/images" --output_path "$OUT/sparse" \
   --Mapper.ba_refine_focal_length 0 --Mapper.ba_refine_principal_point 0 --Mapper.ba_refine_extra_params 0 \

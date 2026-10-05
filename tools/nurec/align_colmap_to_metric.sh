@@ -32,8 +32,8 @@ with open(out, "w") as f:
         f.write("%s %.6f %.6f %.6f\n" % (name, c[0], c[1], c[2]))
 print("%d reference camera positions" % len(centres))
 PY
-colmap model_aligner --input_path "$MODEL" --output_path "$OUT/sparse/0" --ref_images_path "$OUT/ref_positions.txt" \
-  --ref_is_gps 0 --alignment_type custom --alignment_max_error 1.0 --min_common_images 3 2>&1 | grep -v "^$" | tail -5
+# colmap model_aligner (3.9, custom alignment) returned an unaligned model on 2026-10-05; the sim(3) fit is done here
+python3 "$(dirname "$0")/align_model_sim3.py" "$MODEL" "$OUT/ref_positions.txt" "$OUT/sparse/0"
 ln -sfn ../images "$OUT/images"
 colmap model_analyzer --path "$OUT/sparse/0" 2>&1 | grep -E "Registered|Points|Mean reprojection"
 # residual of the alignment: SfM centres after alignment vs the PX4 centres

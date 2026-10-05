@@ -7,7 +7,7 @@ apt for the mono-workflow pose refinement, the repo's reconstruction tools under
 
 ```sh
 uav-reconstruct /srv/flights/flight_<UTC>            # frames, dataset, masks, 3DGUT, NuRec USDZ + PLY
-uav-reconstruct /srv/flights/flight_<UTC> --sfm      # plus COLMAP SfM, metric alignment, a second run
+uav-reconstruct /srv/flights/flight_<UTC> --refine   # plus feature-based pose refinement and a second run
 ```
 
 Outputs under `/srv/flights/nurec/<bag>/` and `/srv/flights/nurec/runs/<bag>_3dgut_mcmc/`
