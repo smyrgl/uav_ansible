@@ -122,8 +122,8 @@ def main(argv=None):
         T_cw = np.linalg.inv(T_wc)
         name = "%s.png" % e["index"]
         src = os.path.abspath(os.path.join(args.frames_dir, e["files"][args.camera])); dst = os.path.join(args.out, "images", name)
-        if not os.path.exists(dst):
-            os.symlink(src, dst)
+        if not os.path.lexists(dst):     # relative, so the dataset survives a bind mount into a container
+            os.symlink(os.path.relpath(src, os.path.dirname(os.path.abspath(dst))), dst)
         images[len(images) + 1] = (rot_to_qvec(T_cw[:3, :3]), T_cw[:3, 3].tolist(), 1, name)
         heights.append(T_wb[2, 3])
         look = T_wc[:3, 2]                                   # optical axis in the world (ENU)
