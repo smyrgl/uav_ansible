@@ -368,13 +368,20 @@ mavlink_camera_fps: 30
 # the camera replays stale width*height-byte buffers (measured 2026-09-30).
 mavlink_camera_video_topic: "/d555/color/video"
 mavlink_camera_video_frame_id: "camera_color_optical_frame"   # label only; the image is rotated by mavlink_camera_rotation_degrees
+# The bag's lossless colour record (2026-10-05): every frame the camera sends,
+# as sensor_msgs/Image (yuv422_yuy2, 1280x800, 30 Hz, ~61 MB/s, unrotated so it
+# matches /d555/color/camera_info), header mapped to UTC like the video. Published
+# by this node because the camera unicasts a copy per reader and this node is its
+# one colour reader. For neural reconstruction (NuRec), calibration, training.
+mavlink_camera_raw_topic: "/d555/color/image"
 # The D555 is a ROS 2 node; its stream profiles are ROS parameters
 # (`ros2 param describe /D555_<serial> RGB.Profile` lists the choices). The RGB
 # imager is 1280x800; the camera shipped streaming 896x504. A user-scope unit
 # (uav-d555-profile) sets these at boot so the camera state is declared here,
 # not left to whatever the camera remembers. Bandwidth: 1280x800 YUY2 at 30 Hz
-# is ~500 Mbit/s per subscriber, which is why the camera pipeline must be the
-# only image subscriber (health watches CameraInfo; nvblox is retired).
+# is ~500 Mbit/s per subscriber, which is why the camera pipeline is the colour
+# stream's only reader (health watches CameraInfo; nvblox is retired) and
+# republishes the raw frames itself for the bag (mavlink_camera_raw_topic).
 d555_serial: "261622302751"
 d555_rgb_profile: "yuv, 1280, 800, 30"
 d555_depth_profile: "z16, 896, 504, 30"
@@ -384,6 +391,14 @@ d555_depth_profile: "z16, 896, 504, 30"
 d555_ir_profile: "y8, 896, 504, 30"
 d555_emitter_mode: "Off"
 d555_profile_attempts: 30              # x 10 s: the camera may boot after the Jetson
+# The bag's copy of the stereo IR pair (roles/d555_relay, 2026-10-05). The camera
+# unicasts a copy per reader (the port measured 747 Mbit/s of its ~940 with one
+# reader per stream), so the relay is the one camera-side reader of Infrared_1/2
+# and republishes them under /d555/infra{1,2} (image + camera_info, UTC stamps
+# through /d555/clock, canonical frame ids) for the recorder and every offline
+# consumer: VSLAM replay, calibration, neural reconstruction. Lazy: the camera is
+# read only while an output has a reader, so between bags the pair costs nothing.
+d555_relay_lazy: true
 mavlink_camera_rtsp_port: 8554
 # Host part of the advertised stream URI (VIDEO_STREAM_INFORMATION). The server
 # binds every interface. Advertise the drone-LAN address: QGC on the Siyi GCS
@@ -477,15 +492,20 @@ foxglove_message_backlog_size: 128
 # Dashboard depth: the D555 has no compressed depth, so a topic_tools relay
 # republishes the single raw copy at this rate for Foxglove (colour uses the
 # camera's own H.264 stream).
-foxglove_depth_throttle_hz: 0.0   # off since 2026-10-02: the camera link carries the stereo IR pair for VSLAM instead
+foxglove_depth_throttle_hz: 0.0   # off since 2026-10-02: nothing consumes depth; the port's headroom carries the IR pair (bagged raw via d555_relay)
 # The airframe description (Blender + LinkForge authoring, exported ROS
 # package) lives in this repository: x950_description/ at the root.
 # Flight recorder: rosbag2 (mcap) of every flight on the NVMe root, armed -> safed.
-# Raw D555 streams excluded (per-subscriber unicast would starve the encoder).
+# The camera's own /realsense topics are excluded (a reader there is another
+# unicast copy on the port); the stereo IR pair and the colour stream ARE
+# recorded, raw, through their single-reader copies: /d555/infra*/image
+# (d555_relay) and /d555/color/image (the camera node). Since 2026-10-05.
 flight_recorder_dir: /data/flights
 flight_recorder_post_roll_sec: 30.0
 flight_recorder_min_free_gb: 50.0
-# Raw D555 streams (a second subscriber starves the camera link) and the
+# The camera's own topics (a second reader of a stream is a second unicast copy
+# on the port; the IR pair reaches the bag through the d555_relay's /d555/infra*
+# copy instead, colour as the encoder's /d555/color/video) and the
 # derived LiDAR clouds (~11 MB/s from FAST-LIO, ~4.4 MB/s of registered E1R;
 # re-created offline from /avia/custom, /avia/imu and /e1r/points, which are
 # recorded).
@@ -534,6 +554,11 @@ isaac_ros_key_fingerprints:
 isaac_ros_package_version: "4.6.0-0noble.20260818193828000"
 isaac_ros_packages:
   - "ros-{{ ros_distro }}-isaac-ros-visual-slam"
+# cuVSLAM off since 2026-10-05: nothing on the roadmap consumes it (nvblox is
+# LiDAR-only and takes its pose from the LIO transform tree; decision 2 made it
+# "evaluate only if cheap"). With the IR pair in the bag (d555_relay) it is
+# evaluated offline on the replay host instead. Its units stay installed.
+vslam_enabled: false
 
 # =============================================================================
 # nvblox  (Isaac ROS 3D reconstruction: D555 depth + colour and Avia LiDAR

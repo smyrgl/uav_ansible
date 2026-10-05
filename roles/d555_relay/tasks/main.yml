@@ -1,0 +1,61 @@
+---
+# The bag's copy of the D555 stereo IR pair: one camera-side reader, local
+# republish with UTC stamps and canonical frame ids (see README.md).
+- name: Install the D555 IR relay
+  when: d555_relay_state == 'present'
+  block:
+    - name: Install the relay and its tests
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "/usr/local/lib/uav/{{ item }}"
+        mode: "0755"
+      loop:
+        - d555_ir_relay.py
+        - test_d555_ir_relay.py
+      notify: Restart D555 IR relay
+
+    # Pure-Python CDR tests plus, with ROS sourced, a round trip through rclpy's
+    # own serializer: the header rewrite must deserialize back to the same image.
+    - name: Run the relay tests on the target
+      ansible.builtin.command:
+        argv:
+          - /bin/bash
+          - -c
+          - "source /opt/ros/{{ ros_distro }}/setup.bash && exec /usr/bin/python3 -m unittest -q test_d555_ir_relay"
+        chdir: /usr/local/lib/uav
+      environment:
+        PYTHONDONTWRITEBYTECODE: "1"
+      changed_when: false
+
+    - name: Install the relay unit
+      ansible.builtin.template:
+        src: uav-d555-ir-relay.service.j2
+        dest: /etc/systemd/system/uav-d555-ir-relay.service
+        mode: "0644"
+      notify: Restart D555 IR relay
+
+    - name: Enable the relay at boot
+      ansible.builtin.systemd_service:
+        name: uav-d555-ir-relay.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+- name: Remove the D555 IR relay
+  when: d555_relay_state == 'absent'
+  block:
+    - name: Stop and disable the relay
+      ansible.builtin.systemd_service:
+        name: uav-d555-ir-relay.service
+        enabled: false
+        state: stopped
+      failed_when: false
+
+    - name: Remove the relay unit and files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /etc/systemd/system/uav-d555-ir-relay.service
+        - /usr/local/lib/uav/d555_ir_relay.py
+        - /usr/local/lib/uav/test_d555_ir_relay.py

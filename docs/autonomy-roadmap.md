@@ -62,11 +62,24 @@ Each of these shapes the plan.
    after 5 s) and on this forward-only sensor suite `CP_GO_NO_DATA 1` is mandatory
    or Position mode cannot translate sideways. Build and bag the publisher in
    shadow; enable it as the first authority step.
-7. **The recorder cannot replay a vision stage.** Bags keep the D555 only as the
-   H.265 colour stream (raw IR/depth are excluded because the camera unicasts a
-   copy per subscriber), so cuVSLAM and any stereo or semantic network cannot be
-   re-run from flight data. The plan is LiDAR-first unless a throttled IR/depth
-   copy is added to the bag before the campaign.
+7. **The recorder could not replay a vision stage (resolved 2026-10-05).** Until
+   then bags kept the D555 only as the H.265 colour stream: the camera unicasts
+   a copy per subscriber, and a second reader of a raw stream would have
+   saturated the Jetson's one 1 GbE port, so cuVSLAM and any stereo or semantic
+   network could not be re-run from flight data and the plan was LiDAR-first.
+   **Every bag now holds the raw stereo IR pair and the raw colour stream**
+   through single-reader copies (roles/d555_relay, the camera node), so vision
+   stages, calibration and NuRec reconstruction run from flight data.
+   *2026-10-05: the raw IR pair is in the bag through a single-subscriber
+   relay (roles/d555_relay): the frames already reached the Jetson once, the
+   second copy was a DDS artefact. The port measured 747 of ~940 Mbit/s with
+   one reader per stream; the relay leaves it unchanged. cuVSLAM is off live
+   and evaluated from the bags on the replay host. The colour stream is bagged
+   raw as well, republished by the camera node, the camera's one colour reader
+   (61 MB/s). Bags run at 80–95 MB/s, ~340 GB per flight hour; the owner
+   offloads over GbE after flights. Measured cost: rosbag2 0.77 core, camera
+   node +0.06, IR relay 0.19, +80 MB, no GPU. Purpose: NuRec reconstruction
+   for Isaac Sim, VSLAM replay, calibration.*
 8. **Bookkeeping that would have bitten:** the FC *does* have GNSS (the mosaic-G5
    on GPS2; the Septentrio driver sets CLOCK_REALTIME and the ulog carries UTC
    anchors; `roles/px4_bridge/README.md` is stale); the firmware branch is four
@@ -213,6 +226,8 @@ estimates.
   zero-copy item is now about the remaining copies, not the conversion); the
   rest in docs/ros-bench.md "Executor A/B".*
 - Decision recorded: a throttled D555 IR/depth copy in the bag, or LiDAR-first.
+  *Superseded 2026-10-05: the full-rate raw IR pair is bagged via the
+  d555_relay (lossless, UTC-stamped, with camera_info); depth stays unread.*
 - Fix the stale README lines (FC GNSS; four-commit branch).
 - **Gate:** 3 bags with zero gaps > 100 ms on `/fmu/out/vehicle_odometry`,
   `/avia/*`, `/e1r/points`, `/gnss/*` while armed and `/fmu/out/trajectory_setpoint`
@@ -269,6 +284,12 @@ can be built on the bench, these numbers cannot.
   ESDF integrating in `odom` would otherwise misalign every existing block).
 - Replay harness and determinism fixture; offline scorer skeleton (pure Python
   over MCAP, no ROS graph).
+- Zero-copy camera path (the owner's framing, 2026-10-05): the raw colour
+  republish in the camera node and the IR relay are Python copies
+  (deserialise or CDR patch, then serialise; measured 0.06 + 0.19 core). The
+  C++ version passes `rclcpp::SerializedMessage` buffers from one camera reader
+  to the encoder and the bag, or NITROS where the GPU is involved, so the bag's
+  copies cost nothing beyond the DDS send.
 - Bench only: px4-ros2-interface-lib release/1.17 @ 4a3370f0 vendored and built
   against the pinned `px4_msgs`; a `SHADOW-NOFLY` mode registered against SIH on
   the bench firmware variant, own executor thread, `Restart=` and
@@ -457,7 +478,7 @@ GStreamer/NVENC pipeline).
 | Component | Cores | GPU % | RAM GB | When | Status |
 |---|---|---|---|---|---|
 | Baseline today | 5.2 | 5 (36 watched) | 4.1 | now | measured |
-| Flight recorder while armed (~14 MB/s zstd) | 0.5 | 0 | 0.3 | every flight | estimate, measure in 0b |
+| Flight recorder while armed: raw D555 IR pair + colour + everything (~95 MB/s zstd_fast) | 0.8 | 0 | 0.1 | every flight | measured 2026-10-05: rosbag2 0.77 core / 90 MB, camera node +0.06, IR relay 0.19 |
 | rclpy EventsExecutor on every Python node | −0.5…−1 | 0 | 0 | 0b | x86 figure, A/B here |
 | C++/composition of camera, health, px4_bridge, bridges | −0.5…−1 | 0 | −0.2 | 2 | estimate |
 | shadow_guard + tracker + frame monitor (rclcpp) | 0.1 | 0 | 0.1 | 2 | estimate |
@@ -572,10 +593,14 @@ fusion for this campaign.
    enters the FC's estimator, LIO is a map pose in `camera_init`, the
    `camera_init → px4_local` monitor is what every planner output converts
    through, and cuVSLAM/Air-IO drop to "evaluate only if cheap".
-3. **D555 in the bag** — *decided 2026-10-03: LiDAR-first for now.* A throttled
-   IR pair or depth copy (a second unicast subscriber on the camera's link,
-   measured against the encoder) stays optional; without it cuVSLAM and any
-   vision stage are evaluated only from live odometry, never from replay.
+3. **D555 in the bag** — *decided 2026-10-03: LiDAR-first for now; reversed
+   2026-10-05.* Every bag now carries the raw stereo IR pair and the raw colour
+   stream through single-reader copies at zero link cost (roles/d555_relay; the
+   camera node's `mavlink_camera_raw_topic`), for VSLAM replay, calibration and
+   neural reconstruction (NuRec on the replay host); cuVSLAM no longer runs live
+   (`vslam_enabled: false`). Depth remains unrecorded; the Stage 1 depth-validity
+   number needs a flight with a depth reader, which the port can carry only if
+   the colour profile is reduced.
 4. **QGC Survey missions** during the campaign (Mission is not on an RC slot) as the
    repeatable label?
 5. **RC allocation:** which of ch 12/13 is the marker and which the Offboard
@@ -604,7 +629,9 @@ fusion for this campaign.
 Decided 2026-10-03: standard Offboard mode, no custom mode until the end (§2,
 Stage 5); build-or-buy per component with ground-up implementation accepted where
 nothing maps exactly (§6); nav2's executive and lifecycle pieces pulled in;
-LiDAR-first; the Avia's time source is PPS + UTC, not a move to the PTP segment.
+LiDAR-first for the planning stack (its recording corollary, no vision in the
+bags, was reversed on 2026-10-05: the raw IR pair and colour are in every bag);
+the Avia's time source is PPS + UTC, not a move to the PTP segment.
 
 ## 8. Hardware futures (not for this programme)
 

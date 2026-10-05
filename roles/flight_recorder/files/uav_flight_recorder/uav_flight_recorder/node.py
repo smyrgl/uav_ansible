@@ -5,10 +5,12 @@ manual topic or a transmitter switch),
 keeps it rolling through disarm, and stops after a post-roll. The armed state
 comes from the autopilot's MAVLink HEARTBEAT through mavlink-router (default),
 or from the PX4 bridge's /px4/armed and /px4/safety_off, which can also stop
-the bag early once the vehicle is safed. The raw
-D555 streams are excluded by regex: the camera unicasts a copy per subscriber
-and a second copy would starve the encoder's link; the H.265 video topic and
-the throttled depth are recorded instead. A bag that stops growing while the
+the bag early once the vehicle is safed. The camera's own
+/realsense topics are excluded by regex: the D555 unicasts a copy per reader
+and a reader there is another copy on the Jetson's one port. The stereo IR pair
+and the colour stream are recorded raw through their single-reader copies
+(/d555/infra*/image from the d555_relay, /d555/color/image from the camera
+node), next to the H.265 video topic. A bag that stops growing while the
 recorder process lives (rosbag2 Jazzy issue #2463) is caught after `stall_sec`:
 the recorder is stopped and restarted into a new bag, and the stop reason says so.
 """

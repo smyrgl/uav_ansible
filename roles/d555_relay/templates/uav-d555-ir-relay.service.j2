@@ -1,0 +1,29 @@
+{% set streams = d555_relay_streams %}
+[Unit]
+Description=UAV D555 infrared relay (the bag's lossless copy of the stereo IR pair, UTC stamps)
+After=network-online.target uav-d555-frames.service
+Wants=network-online.target
+PartOf=uav-ros.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User={{ d555_relay_service_user }}
+Group={{ d555_relay_service_user }}
+EnvironmentFile={{ d555_relay_environment_file }}
+Environment=ROS_LOG_DIR=/var/log/uav-ros
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/d555_ir_relay.py --serial {{ d555_relay_serial }} --prefix {{ d555_relay_prefix }} --clock-topic {{ d555_relay_clock_topic }} --clock-max-age-s {{ d555_relay_clock_max_age_s }} --streams {% for s in streams %}{{ s.name }}:{{ s.source }}:{{ s.frame }}{{ "," if not loop.last else "" }}{% endfor %} --release-after-s {{ d555_relay_release_after_s | int }}{{ " --always" if not (d555_relay_lazy | bool) else "" }}'
+# always: the lazy relay exits 0 to release the camera (see README), and comes back idle
+Restart=always
+RestartSec=2
+KillSignal=SIGINT
+TimeoutStopSec=20
+StateDirectory=uav-ros
+LogsDirectory=uav-ros
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

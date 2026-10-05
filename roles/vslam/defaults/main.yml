@@ -2,16 +2,25 @@
 # Visual odometry from the D555's stereo IR: Isaac ROS cuVSLAM (isaac_ros role,
 # pinned 4.6 debs) plus a bridge that puts its output on the host UTC time base.
 vslam_state: present                      # present | absent
+# Installed but stopped when false: nothing on the roadmap consumes cuVSLAM live
+# and the IR pair it would read is bagged by the d555_relay for offline runs. To
+# run it live again, point its image/camera_info inputs at the relay's
+# /d555/infra{1,2} topics (a direct camera reader would be a second unicast
+# copy on the port) and drop the bridge's device-to-UTC stamp conversion, since
+# the relayed inputs already carry UTC stamps.
+vslam_enabled: true
 vslam_service_user: "{{ uav_ros_user | default('uav-ros') }}"
 vslam_environment_file: "{{ uav_ros_environment_file | default('/etc/uav/ros/environment') }}"
 vslam_launch_path: /etc/uav/ros/vslam.launch.py
 vslam_cuda_cache_path: /var/lib/uav-ros/.nv/ComputeCache
 vslam_cuda_cache_max_bytes: 1073741824
 
-# Inputs: the camera's own rectified IR pair (hardware-synchronised, identical
-# stamps) is read directly, so cuVSLAM is their only subscriber (the D555 sends
-# one unicast copy per reader). Their camera_info goes through the bridge, which
-# drops the occasional message the camera labels with another stream's frame.
+# Inputs as configured: the camera's own rectified IR pair (hardware-synchronised,
+# identical stamps), read directly. That was right while cuVSLAM was the pair's
+# one reader; since 2026-10-05 the d555_relay is that reader (the pair is bagged
+# raw), so a live cuVSLAM must read /d555/infra{1,2} instead (vslam_enabled above).
+# Their camera_info goes through the bridge, which drops the occasional message
+# the camera labels with another stream's frame.
 vslam_d555_serial: "261622302751"
 vslam_left_image_topic: "/realsense/D555_{{ vslam_d555_serial }}_Infrared_1"
 vslam_right_image_topic: "/realsense/D555_{{ vslam_d555_serial }}_Infrared_2"

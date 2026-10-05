@@ -252,7 +252,9 @@ discards anything written to it).
 | `px4_bridge` | PX4 uORB → ROS-native ENU/FLU topics (IMU, odometry for comparison, battery, status); no GNSS |
 | `gnss_ros` | Septentrio ROS 2 driver as a read-only client of the SBF fan-out: NavSatFix (full covariance), GPSFix, pose, twist, attitude |
 | `localization` | robot_localization REP-105 dual EKF (`ekf_odom`: odom→base_link, `ekf_map`: map→odom) + navsat_transform (utm→map, GNSS); PX4's own estimate stays in `px4_local`, informational |
-| `vslam` | Isaac ROS cuVSLAM on the D555 stereo IR → `/vslam/odometry` (UTC, base_link twist); shadow source, nothing fuses it yet |
+| `vslam` | Isaac ROS cuVSLAM on the D555 stereo IR → `/vslam/odometry`; installed but off since 2026-10-05 (`vslam_enabled: false`): evaluated offline from the bagged IR pair |
+| `d555_relay` | the bag's copy of the D555 stereo IR pair: one camera-side reader, local republish on `/d555/infra{1,2}` with UTC stamps; lazy, releases the camera by restarting |
+| `flight_recorder` | rosbag2 MCAP of every flight, armed → safed: everything including the raw IR pair and raw colour (`/d555/color/image`, from the camera node), sign-off, offload to the replay host |
 | `lio` | FAST-LIO2 on the Avia + its built-in IMU (GPL-2.0, fetched and built at a pinned commit) → `/lio/odometry`; shadow source, primary candidate; voxel map of the Avia and the E1R (registered with FAST-LIO's poses and the nominal extrinsic); a divergence watchdog (`/lio/health`) freezes and rolls back the map, stops the E1R registration and restarts FAST-LIO |
 | `lidar_view` | GPU (EGL) chase-camera render of the LIO map, the live Avia and E1R scans and the X950's URDF → NVENC RTSP `:8555/lidar`, the camera's stream 2 in QGC; rendered only while watched |
 | `hflow` | H-Flow over the FC's CAN2 bus, read listen-only on the Jetson's can0 → PX4-typed ROS 2 topics + Range |

@@ -12,6 +12,7 @@ uav_camera:
     rtsp_uri: "rtsp://{{ mavlink_camera_rtsp_host }}:{{ mavlink_camera_rtsp_port }}/rgb"
     video_topic: "{{ mavlink_camera_video_topic }}"
     video_frame_id: "{{ mavlink_camera_video_frame_id }}"
+    raw_topic: "{{ mavlink_camera_raw_topic | default('') }}"
     storage_dir: "{{ mavlink_camera_storage }}"
     mavlink_endpoint: "tcp:127.0.0.1:{{ mavlink_router_tcp_port }}"
     system_id: {{ mavlink_camera_system_id }}

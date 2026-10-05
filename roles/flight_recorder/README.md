@@ -131,14 +131,29 @@ also reports the link, the heartbeat count and its age, and goes WARN after
 `flight_recorder_mavlink_stale_sec` (3 s) without a heartbeat, since an
 arming would then go unseen.
 
-Everything is recorded except `^/realsense/`: the D555 unicasts a copy of every
-raw stream per subscriber, so a second subscriber on the raw colour or depth
-would starve the encoder's link. The bag takes `/d555/color/video` (H.265,
-about 0.7 MB/s) instead (the throttled depth is off since 2026-10-02). With both
-LiDARs that was roughly 14 MB/s, 50 GB per flight hour. Since 2026-10-02 bags
-also hold the odometry inputs and outputs: `/avia/custom` (about 20 bytes a
-point, ~3 MB/s), `/avia/imu`, `/Odometry`, `/lio/odometry` and
-`/vslam/odometry`, so FAST-LIO can be re-run offline from a bag. Its derived
+Everything is recorded except the camera's own topics (`^/realsense/`): the
+D555 unicasts a copy of every raw stream per subscriber over the Jetson's single
+1 GbE port (747 of ~940 Mbit/s with one reader per stream, measured 2026-10-05),
+so a second subscriber on a raw stream would push the port over its ceiling.
+Colour reaches the bag as the encoder's `/d555/color/video` (H.265, about
+0.7 MB/s). Since 2026-10-05 the stereo IR pair reaches it losslessly through the
+`d555_relay` role: `/d555/infra1/image`, `/d555/infra2/image` and their
+`camera_info` (896×504 Y8 at 29.3 Hz, UTC stamps, canonical frame ids), about
+26 MB/s before zstd; the relay is the camera's one reader and reads it only
+while something subscribes, which the bag does. The colour stream is recorded
+raw as well, `/d555/color/image` (`yuv422_yuy2` 1280×800 at 30 Hz, 61 MB/s,
+unrotated so it matches `/d555/color/camera_info`, UTC stamps), published by
+the camera node, the camera's one colour reader (`mavlink_camera_raw_topic`).
+Both are for offline VSLAM, calibration and neural reconstruction (NuRec).
+Depth is neither read nor recorded. Measured 2026-10-05 on the bench: the bag
+grows at 80–95 MB/s (about 340 GB per flight hour) and the cost is CPU, not
+disk: rosbag2 0.77 core and 90 MB (0.54 core with the IR pair alone), the camera
+node +0.06 core for the republish, the IR relay 0.19 core, +80 MB of system
+memory while recording, no GPU. Before the pair, both LiDARs and everything else
+were 7 MB/s, 26 GB per flight hour. Since 2026-10-02 bags also hold the odometry inputs and outputs:
+`/avia/custom` (about 20 bytes a point, ~3 MB/s), `/avia/imu`, `/Odometry` and
+`/lio/odometry`, so FAST-LIO can be re-run offline from a bag (`/vslam/odometry`
+only while cuVSLAM runs live; it is off since 2026-10-05). Its derived
 clouds (`/cloud_registered` at ~11 MB/s, the registered E1R at ~4.4 MB/s,
 `/lio/map` and the like) are excluded
 (`flight_recorder_exclude_regex` in `group_vars`). PX4's own ulog on the SD card remains the primary flight log; the

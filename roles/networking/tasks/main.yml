@@ -49,17 +49,23 @@
 # netplan's supplicant unit is pulled in when networkd starts at boot. A dongle
 # plugged in later (it comes out for flight) would sit idle until the next
 # netplan apply or reboot; start the supplicant whenever the device appears.
+# The match is the MAC-derived name udev computes (ID_NET_NAME_MAC), not KERNEL:
+# at the "add" event the interface is still wlan0 and is renamed to wlx<mac>
+# only after the rules have run, so a KERNEL match never fires (2026-10-05: the
+# hot-plugged dongle loaded its module and was renamed, the supplicant never ran).
 - name: Start the wifi supplicant when the dongle is plugged in
   ansible.builtin.copy:
     dest: /etc/udev/rules.d/90-uav-wifi-hotplug.rules
     content: |
       # Managed by uav_ansible: the uplink dongle comes and goes with the flight configuration.
-      ACTION=="add", SUBSYSTEM=="net", KERNEL=="{{ wifi_interface }}", TAG+="systemd", ENV{SYSTEMD_WANTS}+="netplan-wpa-{{ wifi_interface }}.service"
+      # ID_NET_NAME_MAC, not KERNEL: the interface is still wlan0 while the rules run.
+      ACTION=="add", SUBSYSTEM=="net", ENV{ID_NET_NAME_MAC}=="{{ wifi_interface }}", TAG+="systemd", ENV{SYSTEMD_WANTS}+="netplan-wpa-{{ wifi_interface }}.service"
     owner: root
     group: root
     mode: "0644"
   when: wifi_enabled
   notify: Reload udev rules
+  tags: [wifi_hotplug]
 
 - name: Remove the wifi hotplug rule when wifi is disabled
   ansible.builtin.file:
@@ -67,6 +73,7 @@
     state: absent
   when: not wifi_enabled
   notify: Reload udev rules
+  tags: [wifi_hotplug]
 
 - name: Check the uplink's supplicant
   ansible.builtin.command:

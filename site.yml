@@ -68,6 +68,8 @@
       tags: ['ros_health', 'ros_inspection']
     - role: foxglove
       tags: ['foxglove', 'ros_inspection']
+    - role: d555_relay           # the bag's copy of the D555 IR pair: one camera reader, local republish, UTC stamps
+      tags: ['d555_relay', 'ros_inspection']
     - role: jetson_stats         # jtop -> /diagnostics (vendored isaac_ros_jetson_stats)
       tags: ['jetson_stats', 'ros_inspection']
     - role: px4_bridge           # uORB -> ROS-native ENU/FLU (needs the px4_msgs overlay from ros_health)

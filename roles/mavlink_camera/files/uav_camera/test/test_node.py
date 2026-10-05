@@ -40,3 +40,22 @@ def test_raw_frame_passes_yuy2_through_and_trims_stride():
     assert fmt == "YUY2" and pixels == bytes(range(16)) + bytes(range(16, 32))
     tight = SimpleNamespace(encoding="rgb8", width=2, height=1, step=6, data=bytes(6))
     assert raw_frame(tight) == (bytes(6), "RGB")
+
+
+def test_restamped_image_keeps_the_pixels_and_carries_the_new_header():
+    from array import array
+    try:
+        from sensor_msgs.msg import Image
+    except ImportError:
+        pytest.skip('sensor_msgs not available')
+    from uav_camera.node import restamped_image
+    src = Image()
+    src.height, src.width, src.encoding, src.step = 2, 3, 'yuv422_yuy2', 6
+    src.data = array('B', range(12))
+    src.header.stamp.sec, src.header.frame_id = 7, 'camera_color_optical_frame\x00\x00'
+    out = restamped_image(src, 1_800_000_000_123_456_789, 'camera_color_optical_frame')
+    assert out.data == src.data and out.data.typecode == 'B'   # rclpy copies the array; equal pixels
+    assert (out.header.stamp.sec, out.header.stamp.nanosec) == (1_800_000_000, 123_456_789)
+    assert out.header.frame_id == 'camera_color_optical_frame'
+    assert (out.height, out.width, out.encoding, out.step) == (2, 3, 'yuv422_yuy2', 6)
+    assert (src.header.stamp.sec, src.header.frame_id) == (7, 'camera_color_optical_frame\x00\x00')

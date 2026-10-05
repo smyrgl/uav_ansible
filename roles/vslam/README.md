@@ -10,6 +10,14 @@ to FAST-LIO (the `lio` role), which suits a LiDAR mapping aircraft at altitude
 better (stereo depth error grows with the square of range: at f = 452 px and a
 95 mm baseline, disparity is ~43/Z px, 2.1 px at 20 m).
 
+**Status 2026-10-05: installed but not running** (`vslam_enabled: false`).
+Nothing on the roadmap consumes cuVSLAM live, and the IR pair it read is now in
+every bag through the `d555_relay` role, so it is evaluated offline on the
+replay host instead. Re-enabling it live means pointing its inputs at the
+relay's `/d555/infra{1,2}` topics (a direct camera reader would be a second
+unicast copy on the port) and dropping the bridge's device-to-UTC stamp
+conversion, since the relayed inputs already carry UTC stamps.
+
 ## What runs
 
 - `uav-vslam.service`: a `component_container_mt` with cuVSLAM loaded as a
@@ -40,7 +48,7 @@ better (stereo depth error grows with the square of range: at f = 452 px and a
 
 | Setting | Value | Why |
 | --- | --- | --- |
-| Inputs | `/realsense/D555_<sn>_Infrared_1/2` directly | rectified Y8 896×504 at 29.3 Hz, left/right stamps identical (hardware-synchronised); cuVSLAM is their only subscriber |
+| Inputs | `/realsense/D555_<sn>_Infrared_1/2` directly (as configured; stale since 2026-10-05, see Status) | rectified Y8 896×504 at 29.3 Hz, left/right stamps identical (hardware-synchronised); the pair's one reader is now the `d555_relay`, so a live cuVSLAM must read `/d555/infra{1,2}` |
 | `tracking_mode` | 0 (stereo VO) | VIO (1) needs the IMU noise model and frame; the D555 IMU runs at 100 Hz against NVIDIA's 200 Hz examples, and its DDS IMU has open upstream issues (axes, millimetre extrinsic). Evaluate later. |
 | SLAM | off (`enable_localization_n_mapping: false`) | loop closure and relocalisation can jump the pose |
 | TF | none; frames `vslam_odom`/`vslam_map` | robot_localization owns `odom→base_link` and `map→odom` |
@@ -50,7 +58,9 @@ better (stereo depth error grows with the square of range: at f = 452 px and a
 
 The camera link had to make room: the IR pair is 27 MB/s at 896×504/30 fps, on a
 1 GbE link already at ~93 MB/s. The Foxglove depth relay was dropped (27 MB/s),
-so with VSLAM the link is back to the same ~93 MB/s.
+so with VSLAM the link is back to the same ~93 MB/s. Since 2026-10-05 the pair
+flows to the `d555_relay` and from it, raw, into every flight bag, instead of to
+cuVSLAM; the port load is unchanged.
 
 ## The twist is computed by the bridge
 

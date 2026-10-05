@@ -54,11 +54,11 @@
         - Restart vslam bridge
         - Restart vslam
 
-    - name: Enable the vslam units at boot
+    - name: "{{ 'Enable the vslam units at boot' if vslam_enabled | bool else 'Keep the vslam units installed but stopped (vslam_enabled: false)' }}"
       ansible.builtin.systemd_service:
         name: "{{ item }}"
-        enabled: true
-        state: started
+        enabled: "{{ vslam_enabled | bool }}"
+        state: "{{ 'started' if vslam_enabled | bool else 'stopped' }}"
         daemon_reload: true
       loop:
         - uav-vslam-bridge.service

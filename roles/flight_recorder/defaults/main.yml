@@ -8,7 +8,7 @@ flight_recorder_dir: /data/flights
 flight_recorder_post_roll_sec: 30.0      # keep recording this long after disarm
 flight_recorder_safed_grace_sec: 5.0     # ...or this long after the safety switch is engaged post-disarm
 flight_recorder_min_free_gb: 50.0        # refuse to start, and stop, below this
-flight_recorder_exclude_regex: "^/realsense/"   # raw D555 streams: a second subscriber starves the encoder's link
+flight_recorder_exclude_regex: "^/realsense/"   # the camera's own topics (a reader there is another unicast copy on the port); the IR pair and colour are recorded raw via /d555/infra* and /d555/color/image
 flight_recorder_storage_preset: zstd_fast
 flight_recorder_max_cache_size: 268435456
 flight_recorder_stall_sec: 120.0         # restart the recorder if the bag grows nothing for this long (rosbag2 Jazzy #2463 silent stop); must exceed max_cache_size / data rate

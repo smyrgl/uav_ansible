@@ -255,3 +255,21 @@ but one subscriber on either throttles the colour imager to ~3.5 fps, which
 also starves this node's RTSP feed, and the camera replays stale
 width×height-byte buffers (see the Foxglove role README for the measurement).
 The Foxglove bridge hides both topics.
+
+## Raw colour record for the bag (`mavlink_camera_raw_topic`)
+
+Since 2026-10-05 the node republishes every colour frame it receives as
+`sensor_msgs/Image` on `/d555/color/image` (`yuv422_yuy2`, 1280×800, 30 Hz,
+2 MB a frame, 61 MB/s), header mapped to UTC through `/d555/clock` exactly like
+the video stamps, frame id `camera_color_optical_frame`, and **unrotated**: the
+180° flip happens in the encoder pipeline, so these frames match
+`/d555/color/camera_info` as published. The flight recorder records them; the
+operator stream is unchanged. The republish lives here because the D555
+unicasts a copy of the stream per reader over the Jetson's one 1 GbE port, and
+this node is the camera's one colour reader. It is published from the image
+callback before the frame goes to the encoder thread, so every frame the camera
+delivers is recorded whether or not the encoder keeps up. Cost, measured: +0.06
+core (one 2 MB copy by rclpy's setter plus the serialization) and no memory
+growth; the receiving rosbag2 pays 0.77 core for the pair and the colour
+together. `''` disables it. The zero-copy version of this path is a C++ node
+passing serialized buffers (or NITROS): the roadmap's Stage 2 compute item.

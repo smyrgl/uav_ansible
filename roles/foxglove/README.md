@@ -154,9 +154,10 @@ node's own NVENC output, H.265 by default at `mavlink_camera_bitrate`, decoded
 by Foxglove's Image panel). Depth used to come through `/d555/depth/throttled`,
 which the D555 adapter republishes at `foxglove_depth_throttle_hz` with UTC
 stamps from one raw (serialized) depth copy; since 2026-10-02 that rate is 0
-(`group_vars`), and the layout has no depth panel: the 27 MB/s went to the
-stereo IR pair for VSLAM. Set a rate again to bring depth back, minding the
-link budget. The D555 has no compressed depth stream.
+(`group_vars`), and the layout has no depth panel: nothing consumes depth, and
+the port's headroom carries the stereo IR pair instead (read by cuVSLAM until
+2026-10-05, since then by the `d555_relay`, which puts it raw into every flight
+bag). Set a rate again to bring depth back, minding the link budget. The D555 has no compressed depth stream.
 
 Do not use the camera's own `/realsense/<serial>_Color/compressed` (JPEG) or
 `/h264` topics, and the bridge hides them from Foxglove. Since 2026-10-01 it

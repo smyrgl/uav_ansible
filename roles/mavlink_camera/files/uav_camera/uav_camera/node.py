@@ -40,6 +40,11 @@ DEFAULTS = {
     # imager to ~3.5 fps and replay stale buffers).
     'video_topic': '/d555/color/video', 'video_frame_id': 'camera_color_optical_frame',
     'clock_topic': '/d555/clock',
+    # Every colour frame as the camera sent it, republished as sensor_msgs/Image
+    # with its header mapped to UTC and the canonical frame id ('' disables): the
+    # bag's lossless colour record. The camera unicasts a copy per reader, so the
+    # local copy has to come from this node, its one colour reader.
+    'raw_topic': '',
     # Transmitter buttons from the autopilot's RC_CHANNELS (channel 0 = off).
     # 'button' acts on a momentary press, 'toggle' on every flip of a latching one.
     'rc_photo_channel': 0, 'rc_video_channel': 0, 'rc_button_mode': 'button', 'rc_rate_hz': 20.0,
@@ -54,6 +59,21 @@ DEFAULTS = {
 # VIC (YUY2 is what the D555 sends: 2 bytes per pixel, no CPU colour conversion).
 NATIVE_FORMATS = {'yuv422_yuy2': (2, 'YUY2'), 'yuv422': (2, 'UYVY'), 'rgb8': (3, 'RGB'),
                   'rgba8': (4, 'RGBA'), 'bgra8': (4, 'BGRx'), 'mono8': (1, 'GRAY8'), 'bgr8': (3, 'BGR')}
+
+
+def restamped_image(msg, stamp_ns, frame_id):
+    """The same Image with a new header. rclpy's generated setter copies the
+    pixel array (Jazzy builds messages with check_fields off), so a republish
+    costs one 2 MB memcpy plus the serialization: measured as a few percent of a
+    core at 30 Hz. A zero-copy version of this path is a C++ node passing
+    serialized buffers, or NITROS: the roadmap's Stage 2 compute item."""
+    out = Image()
+    out.header.stamp.sec, out.header.stamp.nanosec = divmod(int(stamp_ns), 1000000000)
+    out.header.frame_id = frame_id
+    out.height, out.width, out.encoding = msg.height, msg.width, msg.encoding
+    out.is_bigendian, out.step = msg.is_bigendian, msg.step
+    out.data = msg.data
+    return out
 
 
 def raw_frame(msg):
@@ -124,6 +144,16 @@ class CameraNode(Node):
                                        reliability=ReliabilityPolicy.BEST_EFFORT,
                                        durability=DurabilityPolicy.VOLATILE)
                 self._video_pub = self.create_publisher(CompressedVideo, self.config['video_topic'], video_qos)
+        # The raw colour record for the bag: published from the image callback,
+        # before the frame is handed to the encoder thread, so every frame the
+        # camera delivers is republished whether or not the encoder keeps up.
+        self._raw_pub = None
+        self._raw_published = self._raw_capture_stamped = self._raw_receipt_stamped = 0
+        if self.config.get('raw_topic'):
+            raw_qos = QoSProfile(history=HistoryPolicy.KEEP_LAST, depth=5,
+                                 reliability=ReliabilityPolicy.BEST_EFFORT,
+                                 durability=DurabilityPolicy.VOLATILE)
+            self._raw_pub = self.create_publisher(Image, self.config['raw_topic'], raw_qos)
         # Encoded access units are queued by the GStreamer thread and published
         # from the executor, so DDS can never hold up the encoder.
         self._video_queue = collections.deque(maxlen=8)
@@ -164,18 +194,36 @@ class CameraNode(Node):
         self._worker = threading.Thread(target=self._convert, name='rgb-converter', daemon=True)
         self._worker.start()
         self.protocol.start()
-        self.log.info('Listening to %s; advertised video %s; video topic %s',
+        self.log.info('Listening to %s; advertised video %s; video topic %s; raw topic %s',
                       self.config['image_topic'], self.config['rtsp_uri'],
-                      self.config['video_topic'] if self._video_pub else 'disabled')
+                      self.config['video_topic'] if self._video_pub else 'disabled',
+                      self.config['raw_topic'] if self._raw_pub else 'disabled')
 
     def _image(self, msg):
+        received_ns = time.time_ns()
+        if self._raw_pub is not None:
+            self._publish_raw(msg, received_ns)
         with self._condition:
             self._received += 1
             self._last_arrival = time.monotonic()
             if self._pending is not None:
                 self._dropped += 1
-            self._pending = (msg, self._info, time.time_ns(), time.monotonic_ns())
+            self._pending = (msg, self._info, received_ns, time.monotonic_ns())
             self._condition.notify()
+
+    def _publish_raw(self, msg, received_ns):
+        """The frame as the camera sent it, header in UTC (the device stamp through
+        the /d555/clock model, receipt time while no model is valid) and the
+        canonical frame id."""
+        capture_ns = self.clock.to_utc_ns(msg.header.stamp.sec * 1000000000 + msg.header.stamp.nanosec)
+        if capture_ns is not None:
+            self._raw_capture_stamped += 1
+        else:
+            capture_ns = received_ns
+            self._raw_receipt_stamped += 1
+        frame_id = self.config['video_frame_id'] or msg.header.frame_id.rstrip('\x00')
+        self._raw_pub.publish(restamped_image(msg, capture_ns, frame_id))
+        self._raw_published += 1
 
     def _encoded(self, data, keyframe, meta):
         """Runs on the GStreamer streaming thread: queue only, never publish
@@ -267,6 +315,10 @@ class CameraNode(Node):
                       video_frames_published=self._video_published, video_frames_dropped=self._video_dropped,
                       video_stamped_capture_utc=self._video_capture_stamped,
                       video_stamped_receipt=self._video_receipt_stamped,
+                      raw_topic=self.config['raw_topic'] if self._raw_pub else '',
+                      raw_frames_published=self._raw_published,
+                      raw_stamped_capture_utc=self._raw_capture_stamped,
+                      raw_stamped_receipt=self._raw_receipt_stamped,
                       clock_model=self.clock.reason, rc_buttons=self.protocol.rc_status(),
                       source_timestamp_clock='camera_device_clock, mapped to UTC via /d555/clock')
         self._status_pub.publish(String(data=json.dumps(status, default=str)))
