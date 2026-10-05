@@ -58,6 +58,24 @@ Working directory on atomic: `/srv/flights/nurec/<bag>/{frames,colmap}` and
 `/srv/flights/nurec/runs/<experiment>/`; outputs are private (the flight was over
 the owner's neighbourhood) and are not in this repository.
 
+## The stereo workflow on the IR pair (in progress)
+
+The official chain was also started on the same bag, with `tools/nurec/`
+runners: `ros-jazzy-isaac-mapping-ros` (4.5.0, from the Isaac ROS apt repository
+atomic already carried) converts the bag with
+`tools/nurec/d555_ir_stereo.yaml`; it accepts the `mono8` IR images, pairs them
+within 50 µs (the relay stamps both with the same UTC, a few frames are
+single-sided), and selects keyframes from the PX4 odometry only when the same bag
+is also passed as `--pose_bag_file` (470 keyframes at 0.5 m / 5°, versus all 6 486
+pairs otherwise). pyCuSFM 0.1.3 installs into a venv (its host installer runs
+`pip install -e .` into the protected system Python on 24.04 and fails); its
+cuVSLAM front end tracked the full sequence (6 478 poses) and the ALIKED features,
+BoW index, pose graph and matching ran, but the bundle adjuster aborts with
+`Can't use SPARSE_NORMAL_CHOLESKY with CUDA_SPARSE`: the bundled Ceres cannot use
+the cuDSS solver here, so the configs' `use_cudss_solver: true` is flipped to the
+CPU sparse solver in a copied config directory. FoundationStereo's models need the
+EULA flag of `install_foundationstereo_models.sh`, left to the owner.
+
 ## Capture gotchas from the first flight
 
 - **Camera pitch.** Both cameras and the Avia were level: half of every frame was

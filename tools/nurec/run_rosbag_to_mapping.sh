@@ -3,7 +3,9 @@
 # (ros-jazzy-isaac-mapping-ros). Poses from PX4's ENU odometry (child frame base_link, the default the tool
 # expects), camera extrinsics through /tf_static. Usage: run_rosbag_to_mapping.sh <bag dir or .mcap> <out dir> [config yaml]
 set -eo pipefail
-BAG=$1; OUT=$2; CFG=${3:-$(dirname "$0")/d555_ir_stereo.yaml}
+BAG=$1; OUT=$2; shift 2
+CFG=$(dirname "$0")/d555_ir_stereo.yaml
+if [ $# -gt 0 ] && [ "${1#--}" = "$1" ]; then CFG=$1; shift; fi      # optional config path, then tool options
 [ -d "$BAG" ] && BAG=$(ls "$BAG"/*.mcap | head -1)
 source /opt/ros/jazzy/setup.bash
 mkdir -p "$OUT"
