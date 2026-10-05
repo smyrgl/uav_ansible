@@ -2,10 +2,12 @@
 # Bring cuSFM's COLMAP export into the metric odometry frame: colmap model_aligner from the SfM camera centres
 # onto the camera centres rosbag_to_mapping_data derived from the PX4 odometry (its frames_meta.json
 # camera_to_world, written when the bag is also given as --pose_bag_file). Output: <out>/sparse/0 plus an
-# images link, ready for 3DGRUT. Usage: align_cusfm_to_metric.sh <mapping dir> <cusfm colmap model dir> <out dir>
+# images link, ready for 3DGRUT. The reference may be a keyframe subset (a mapping dir converted with
+# --pose_bag_file) while the images come from the full conversion cuSFM ran on.
+# Usage: align_cusfm_to_metric.sh <reference mapping dir> <images mapping dir> <cusfm colmap model dir> <out dir>
 set -eo pipefail
-MAP=$1; MODEL=$2; OUT=$3; mkdir -p "$OUT/sparse/0"
-python3 - "$MAP/frames_meta.json" "$OUT/ref_positions.txt" <<'PY'
+REF=$1; MAP=$2; MODEL=$3; OUT=$4; mkdir -p "$OUT/sparse/0"
+python3 - "$REF/frames_meta.json" "$OUT/ref_positions.txt" <<'PY'
 import json, sys
 j = json.load(open(sys.argv[1]))
 n = 0

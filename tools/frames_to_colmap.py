@@ -105,6 +105,8 @@ def main(argv=None):
     ap.add_argument("--max-points", type=int, default=500_000)
     ap.add_argument("--lio-topic", default="/lio/odometry")
     ap.add_argument("--min-height-m", type=float, default=None, help="drop frames below this height in the odometry frame")
+    ap.add_argument("--seed-near-m", type=float, default=3.0, help="without a LIO map: seed depth range along the view rays")
+    ap.add_argument("--seed-far-m", type=float, default=80.0)
     args = ap.parse_args(argv)
     import numpy as np
     fr = json.load(open(os.path.join(args.frames_dir, "frames.json")))
@@ -149,8 +151,21 @@ def main(argv=None):
         write_points3d(os.path.join(args.out, "sparse", "0", "points3D.bin"), xyz, np.stack([grey] * 3, 1))
         print("points3D: %d LIO map points carried camera_init -> %s (fit over %d poses, residual %.3f m rms)" % (len(xyz), fr["meta"]["world_frame"], n, resid))
     else:
-        write_points3d(os.path.join(args.out, "sparse", "0", "points3D.bin"), np.zeros((0, 3)), np.zeros((0, 3), np.uint8))
-        print("no LIO map at %s: empty points3D (3DGRUT will seed randomly)" % pcd)
+        # no LIO map (a bag that never closed, a bench run): seed the view volumes instead, 3DGRUT needs a
+        # non-empty points3D and its MCMC moves the Gaussians where the images want them
+        rng = np.random.default_rng(0)
+        cams_w = [np.array(e["T_world_camera"][args.camera]) for e in fr["frames"]
+                  if args.min_height_m is None or e["T_world_base"][2][3] >= args.min_height_m]
+        n = min(args.max_points, 200_000); pts = []
+        for i in rng.integers(0, len(cams_w), n):
+            T = cams_w[i]
+            u, v = rng.uniform(0, cam["width"]), rng.uniform(0, cam["height"])
+            d = np.array([(u - k[2]) / k[0], (v - k[5]) / k[4], 1.0]); d /= np.linalg.norm(d)
+            r = rng.uniform(args.seed_near_m, args.seed_far_m)
+            pts.append(T[:3, 3] + T[:3, :3] @ d * r)
+        xyz = np.array(pts)
+        write_points3d(os.path.join(args.out, "sparse", "0", "points3D.bin"), xyz, np.full((len(xyz), 3), 128, np.uint8))
+        print("no LIO map at %s: %d seed points sampled in the camera view volumes (%.0f to %.0f m)" % (pcd, len(xyz), args.seed_near_m, args.seed_far_m))
     json.dump({"frames_dir": args.frames_dir, "camera": args.camera, "images": len(images), "camera_model": "FULL_OPENCV", "params": params},
               open(os.path.join(args.out, "export.json"), "w"), indent=1)
     return 0

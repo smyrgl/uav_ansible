@@ -76,6 +76,19 @@ the cuDSS solver here, so the configs' `use_cudss_solver: true` is flipped to th
 CPU sparse solver in a copied config directory. FoundationStereo's models need the
 EULA flag of `install_foundationstereo_models.sh`, left to the owner.
 
+Outcome on this flight: with the CPU solver cuSFM finished, but its map registered
+753 of its 5 457 keyframes with 2 631 points, and aligned to the odometry the
+camera centres sit 1.0 m off at the median and 15 m at the 95th percentile. That
+is the data, not the tool: a 95 mm stereo baseline at f = 452 px gives 0.9 px of
+disparity at 50 m, so from a level camera at 50 to 80 m the pair is effectively
+monocular and cuVSLAM's scale drifts. The stereo workflow is built for ground
+robots with structure within a few metres; for aerial capture the choice is the
+mono workflow (COLMAP or GLOMAP on the colour camera) or the odometry poses, and a
+stereo pair only pays off below about 15 m range (2.9 px at 15 m) with the camera
+pitched down. The colour carry-over (`cusfm_to_color_colmap.py`) works as glue
+and posed 91 frames inside the surviving trajectory; its training run was stopped
+as pointless.
+
 ## Capture gotchas from the first flight
 
 - **Camera pitch.** Both cameras and the Avia were level: half of every frame was
