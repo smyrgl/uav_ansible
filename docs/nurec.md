@@ -137,3 +137,13 @@ test viewpoints, slightly soft, consistent with 0.12 m of pose error at 20 to 80
 Outputs on atomic under `runs/flight1_3dgut_mcmc/colmap-0510_175946/`:
 `export_last_nurec.usdz` (118 MB, Isaac Sim), `export_last.ply` (248 MB, any
 splat viewer), `ours_30000/renders/` (the test renders).
+
+### Driver smoke test: the mission bag (2026-10-05)
+
+`uav-reconstruct /srv/flights/flight_20261005_155231Z --every 3` on the recovered
+24.6 s bag: 239 frames exported, 207 above the 1 m gate (the aircraft reached 3.4 m
+before the power loss), no LIO map so 200 000 view-volume seed points, masks, 3DGUT
+in 25 minutes: 17.3 dB / 0.627 SSIM on held-out views of a hover at 3 m with the
+horizon in frame. Useless as a scene, exactly what a driver test should be; it
+caught the container writing root-owned run directories (now handed back to the
+user after each run).
