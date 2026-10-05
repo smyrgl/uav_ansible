@@ -39,9 +39,9 @@ if [ ! -f "$OUT/colmap/sparse/0/images.bin" ]; then
   log "propeller masks"
   (cd "$OUT/colmap/images" && $PY "$HERE/prop_mask.py" . | tail -1)
 fi
-if [ "$TRAIN" = 1 ] && [ ! -f "$ROOT/runs/${NAME}_3dgut_mcmc/.done" ]; then
+if [ "$TRAIN" = 1 ] && [ ! -f "$OUT/.trained" ]; then
   log "3DGUT on the odometry poses"
-  "$HERE/run_3dgut.sh" "$NAME/colmap" "${NAME}_3dgut_mcmc" > "$OUT/train.log" 2>&1 && date -u +%FT%TZ > "$ROOT/runs/${NAME}_3dgut_mcmc/.done"
+  "$HERE/run_3dgut.sh" "$NAME/colmap" "${NAME}_3dgut_mcmc" > "$OUT/train.log" 2>&1 && date -u +%FT%TZ > "$OUT/.trained"
   ls -d "$ROOT/runs/${NAME}_3dgut_mcmc"/*/ | tail -1 | xargs -I{} sh -c 'echo "run: {}"; cat {}/metrics.json; echo'
 fi
 if [ "$SFM" = 1 ]; then
@@ -51,9 +51,9 @@ if [ "$SFM" = 1 ]; then
   if [ ! -f "$OUT/colmap/sfm_metric/sparse/0/images.bin" ]; then
     log "align the SfM model to the odometry"; "$HERE/align_colmap_to_metric.sh" "$OUT/colmap" | tee "$OUT/align.log"
   fi
-  if [ "$TRAIN" = 1 ] && [ ! -f "$ROOT/runs/${NAME}_3dgut_mcmc_sfm/.done" ]; then
+  if [ "$TRAIN" = 1 ] && [ ! -f "$OUT/.trained_sfm" ]; then
     log "3DGUT on the SfM poses"
-    "$HERE/run_3dgut.sh" "$NAME/colmap/sfm_metric" "${NAME}_3dgut_mcmc_sfm" > "$OUT/train_sfm.log" 2>&1 && date -u +%FT%TZ > "$ROOT/runs/${NAME}_3dgut_mcmc_sfm/.done"
+    "$HERE/run_3dgut.sh" "$NAME/colmap/sfm_metric" "${NAME}_3dgut_mcmc_sfm" > "$OUT/train_sfm.log" 2>&1 && date -u +%FT%TZ > "$OUT/.trained_sfm"
     ls -d "$ROOT/runs/${NAME}_3dgut_mcmc_sfm"/*/ | tail -1 | xargs -I{} sh -c 'echo "run: {}"; cat {}/metrics.json; echo'
   fi
 fi

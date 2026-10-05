@@ -17,6 +17,14 @@
     - "{{ nurec_root }}"
     - "{{ nurec_root }}/runs"
 
+- name: 3DGRUT checkout directory, owned by the reconstruction user
+  ansible.builtin.file:
+    path: "{{ nurec_3dgrut_dir }}"
+    state: directory
+    owner: "{{ nurec_user }}"
+    group: "{{ nurec_group }}"
+    mode: "0755"
+
 - name: 3DGRUT source at the pinned commit (with submodules)
   ansible.builtin.git:
     repo: "{{ nurec_3dgrut_repo }}"
@@ -39,6 +47,15 @@
     argv: [docker, build, --build-arg, "CUDA_VERSION={{ nurec_3dgrut_cuda_version }}", -t, "{{ nurec_3dgrut_image }}", .]
     chdir: "{{ nurec_3dgrut_dir }}"
   when: nurec_image.rc != 0
+
+- name: Tool directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    mode: "0755"
+  loop:
+    - "{{ nurec_tools_dir }}"
+    - "{{ nurec_tools_dir }}/nurec"
 
 - name: Install the reconstruction tools (same layout as tools/ in the repo)
   ansible.builtin.copy:
