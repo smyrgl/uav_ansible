@@ -83,4 +83,15 @@ the owner's neighbourhood) and are not in this repository.
 
 ## Results
 
-(filled in below as the runs finish)
+### Run 1: PX4 poses, LIO map seed (2026-10-05)
+
+470 airborne colour frames (every 10th message, 1 m height gate), 30 000 MCMC
+iterations of 3DGUT in about 35 minutes on the RTX 5090 (first run includes a
+three-minute kernel compile), about one million Gaussians. Held-out views (every
+8th image, 60 of them): PSNR 21.1 dB, SSIM 0.766, LPIPS 0.413. The number is pulled
+down by the masked sky half, which is unsupervised and renders as a smear; the
+scene half is a recognisable reconstruction of the houses, trees and roads at the
+test viewpoints, slightly soft, consistent with 0.12 m of pose error at 20 to 80 m.
+Outputs on atomic under `runs/flight1_3dgut_mcmc/colmap-0510_175946/`:
+`export_last_nurec.usdz` (118 MB, Isaac Sim), `export_last.ply` (248 MB, any
+splat viewer), `ours_30000/renders/` (the test renders).
