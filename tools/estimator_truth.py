@@ -14,13 +14,27 @@ arm before comparing (so the comparison is exact under any attitude). The
 reference heading is used as the receiver reports it: the owner configures the
 antenna-to-vehicle offset in the receiver, this tool applies none unless told.
 
-Alignment. The estimator worlds (FAST-LIO's camera_init, PX4's local origin)
-and local ENU are all gravity-aligned, so the frames differ by a yaw and a
-translation: a 4-DoF least-squares alignment, well conditioned even on a
-straight line, is the model (the full SE(3) Umeyama is reported alongside as a
-tilt check when the motion allows). APE is the position error after that
-alignment; RPE(1 s) compares 1 s displacement vectors; yaw is compared sample by
-sample after the alignment yaw (offset, spread, drift).
+Alignment. PX4's local origin and local ENU are gravity-aligned, so those frames
+differ by a yaw and a translation: a 4-DoF least-squares alignment, well
+conditioned even on a straight line, is the model and APE is the position error
+after it. FAST-LIO's camera_init is its first IMU pose and is only as level as
+the sensor was at start (5.4 deg off on 2026-10-05), so the full SE(3) Umeyama
+fit is reported alongside whenever the motion spans three directions: its tilt
+angle, and `ape_se3`, the error with that tilt removed. A large APE with a small
+`ape_se3` is a frame that is not gravity-aligned, not drift. RPE(1 s) compares
+1 s displacement vectors; yaw is compared sample by sample after the alignment
+yaw (offset, spread, drift).
+
+Heading. The receiver's AttEuler mode says how the auxiliary antenna was
+positioned: 2 and 4 with fixed ambiguities, 1 and 3 float (degrees of noise).
+Only fixed-ambiguity headings enter the yaw metrics unless --allow-float-heading.
+Convention: the gnss_ros role runs the Septentrio driver with
+use_ros_axis_orientation, so `/gnss/atteuler.heading` is already ENU yaw,
+counter-clockwise from east, with the owner's antenna offset applied in the
+receiver (--heading-convention enu-yaw, the default). A raw compass heading,
+clockwise from north, is --heading-convention compass (yaw = 90 deg - heading).
+Applying the compass conversion to an ENU yaw is a reflection, not a rotation:
+it agrees at one heading and is off by twice every yaw change (2026-10-05).
 
 Gates (autonomy roadmap, Stage 1): FAST-LIO APE RMS < 0.5 m, RPE(1 s) < 0.15 m
 and < 1 deg on RTK-fixed segments. Exit 0 pass, 3 fail, 2 when the bag holds no
@@ -109,9 +123,13 @@ def umeyama(src, dst):
     return r, mb - r @ ma
 
 
-def interpolate_reference(ref_t, ref_xyz, ref_yaw, t, max_gap_ns):
+def interpolate_reference(ref_t, ref_xyz, ref_yaw, t, max_gap_ns, max_yaw_gap_ns=None):
     """Reference position and yaw at stamps t (linear; yaw through the unwrapped
-    angle); samples farther than max_gap_ns from both neighbours are masked."""
+    angle); samples farther than max_gap_ns from both neighbours are masked.
+    ref_yaw is either an array on ref_t (NaN where unknown) or a (stamps, yaw)
+    pair on the heading's own stamps: a 10 Hz heading snapped onto the 50 Hz
+    position grid would be up to half a position interval early or late, which
+    at a 60 deg/s yaw is 3 deg of error per sample (seen 2026-10-05)."""
     import numpy as np
     idx = np.searchsorted(ref_t, t)
     lo = np.clip(idx - 1, 0, len(ref_t) - 1)
@@ -120,14 +138,19 @@ def interpolate_reference(ref_t, ref_xyz, ref_yaw, t, max_gap_ns):
     xyz = np.stack([np.interp(t, ref_t, ref_xyz[:, i]) for i in range(3)], -1)
     yaw = None
     if ref_yaw is not None:
-        valid = ~np.isnan(ref_yaw)
+        if isinstance(ref_yaw, tuple):
+            yaw_t, yaw_v = ref_yaw
+        else:
+            yaw_t, yaw_v = ref_t, ref_yaw
+        valid = ~np.isnan(yaw_v)
         if valid.sum() >= 2:
-            unwrapped = np.unwrap(ref_yaw[valid])
-            yaw = wrap(np.interp(t, ref_t[valid], unwrapped))
-            # no heading where the reference has none within the gap
-            vi = np.searchsorted(ref_t[valid], t)
-            vlo = np.clip(vi - 1, 0, valid.sum() - 1); vhi = np.clip(vi, 0, valid.sum() - 1)
-            yaw_ok = ok & ((ref_t[valid][vhi] - ref_t[valid][vlo]) <= max_gap_ns) & (t >= ref_t[valid][0]) & (t <= ref_t[valid][-1])
+            yt = yaw_t[valid]
+            # a lower-rate heading gets a wider gap: a little over its own interval
+            gap = max_yaw_gap_ns if max_yaw_gap_ns else max(max_gap_ns, int(1.5 * np.median(np.diff(yt))))
+            yaw = wrap(np.interp(t, yt, np.unwrap(yaw_v[valid])))
+            vi = np.searchsorted(yt, t)
+            vlo = np.clip(vi - 1, 0, len(yt) - 1); vhi = np.clip(vi, 0, len(yt) - 1)
+            yaw_ok = ok & ((yt[vhi] - yt[vlo]) <= gap) & (t >= yt[0]) & (t <= yt[-1])
             yaw = np.where(yaw_ok, yaw, np.nan)
     return xyz, yaw, ok
 
@@ -154,6 +177,35 @@ def relative_errors(t, est, ref, delta_ns, tol_ns):
     if len(i) == 0:
         return np.zeros(0), i, j[i]
     return np.linalg.norm((est[j[i]] - est[i]) - (ref[j[i]] - ref[i]), axis=1), i, j[i]
+
+
+def heading_lag(t, yaw_est, heading, max_gap_ns, span_s=1.0, step_s=0.01):
+    """The time shift of the reference heading that best explains the estimator's yaw: the
+    RMS of the sample-wise yaw error (median removed) over a grid of shifts. A positive
+    lag means the heading carries a stamp later than the instant it describes, as a
+    receiver-to-driver pipeline that stamps on receipt would produce. Returns
+    (lag_s, rms_deg_at_zero, rms_deg_at_lag)."""
+    import numpy as np
+    head_t, head_yaw = heading
+    best = None
+    for shift in np.arange(-span_s, span_s + step_s / 2, step_s):
+        _xyz, yaw_ref, _ok = interpolate_reference(head_t, np.zeros((len(head_t), 3)), (head_t, head_yaw),
+                                                   t + int(round(shift * NS)), max_gap_ns)
+        e = wrap(yaw_est - yaw_ref)
+        e = e[~np.isnan(e)]
+        if len(e) < 20:
+            continue
+        e = wrap(e - np.median(e))
+        rms = math.degrees(float(np.sqrt((e ** 2).mean())))
+        if best is None or rms < best[1]:
+            best = (float(shift), rms)
+        if abs(shift) < step_s / 2:
+            at_zero = rms
+    if best is None:
+        return None, None, None
+    if abs(best[0]) >= span_s - step_s / 2:
+        return None, round(at_zero, 3), None         # ran to the scan limit: not a constant lag
+    return round(best[0], 3), round(at_zero, 3), round(best[1], 3)
 
 
 def score_estimator(t, p, q, lever, ref_t, ref_xyz, ref_yaw, *, min_extent_m=2.0, max_gap_ns=100_000_000,
@@ -185,9 +237,12 @@ def score_estimator(t, p, q, lever, ref_t, ref_xyz, ref_yaw, *, min_extent_m=2.0
     out["alignment"] = {"yaw_deg": round(math.degrees(yaw_align), 3), "translation_m": [round(float(v), 3) for v in tr]}
     sv = np.linalg.svd(ref_at - ref_at.mean(0), compute_uv=False)
     if sv[1] > 0.5 and sv[2] > 0.25:                    # motion in three directions: the SE(3) fit is meaningful
-        r6, _t6 = umeyama(antenna, ref_at)
+        r6, t6 = umeyama(antenna, ref_at)
         tilt = math.degrees(math.acos(max(-1.0, min(1.0, float(r6[2, 2])))))
         out["alignment"]["se3_tilt_deg"] = round(tilt, 3)
+        err6 = antenna @ r6.T + t6 - ref_at                 # the same error with the frame's tilt removed
+        out["ape_se3"] = percentiles(np.linalg.norm(err6, axis=1))
+        out["ape_se3_horizontal"] = percentiles(np.linalg.norm(err6[:, :2], axis=1))
     out["ape"] = percentiles(np.linalg.norm(err, axis=1))
     out["ape_horizontal"] = percentiles(np.linalg.norm(err[:, :2], axis=1))
     out["ape_vertical"] = percentiles(np.abs(err[:, 2]))
@@ -207,6 +262,20 @@ def score_estimator(t, p, q, lever, ref_t, ref_xyz, ref_yaw, *, min_extent_m=2.0
             dy = wrap((yaw_est[j] - yaw_est[i]) - (ref_yaw_at[j] - ref_yaw_at[i]))
             dy = np.degrees(np.abs(dy[~np.isnan(dy)]))
             out["rpe_%gs" % rpe_delta_s]["yaw_deg"] = percentiles(dy)
+        if isinstance(ref_yaw, tuple):
+            # a stamp offset of the heading shows up as yaw error proportional to the yaw rate;
+            # fit it, report it, and give the yaw metrics with it taken out as well
+            lag, rms0, rms_lag = heading_lag(t, yaw_est + yaw_align, ref_yaw, max_gap_ns)
+            out["yaw"]["rms_deg_at_zero_lag"] = rms0
+            out["yaw"]["heading_lag_fit_s"] = lag          # None: no constant lag explains the error
+            if lag is not None:
+                out["yaw"]["rms_deg_at_fitted_lag"] = rms_lag
+                if abs(lag) >= 0.02 and len(i):
+                    _xyz, yaw_lag, _ok = interpolate_reference(ref_yaw[0], np.zeros((len(ref_yaw[0]), 3)), ref_yaw,
+                                                               t + int(round(lag * NS)), max_gap_ns)
+                    dy = wrap((yaw_est[j] - yaw_est[i]) - (yaw_lag[j] - yaw_lag[i]))
+                    dy = np.degrees(np.abs(dy[~np.isnan(dy)]))
+                    out["rpe_%gs" % rpe_delta_s]["yaw_deg_at_fitted_lag"] = percentiles(dy)
     return out
 
 
@@ -229,8 +298,16 @@ def stamp_ns(msg):
     return msg.header.stamp.sec * NS + msg.header.stamp.nanosec
 
 
-def reference_from_bag(bag, pvt_topic, att_topic, heading_offset_deg, allow_float):
-    """(t, enu xyz, yaw, info) of the main antenna in a local ENU frame from the receiver's own solution."""
+HEADING_FIXED_MODES = (2, 4)    # AttEuler mode: aux antenna positioned with fixed ambiguities (2 heading+pitch, 4 with roll)
+HEADING_FLOAT_MODES = (1, 3)    # the same with float ambiguities: degrees of heading noise
+
+
+def reference_from_bag(bag, pvt_topic, att_topic, heading_offset_deg, allow_float, allow_float_heading=False,
+                       att_cov_topic=None, heading_max_std_deg=None, heading_convention="enu-yaw"):
+    """(t, enu xyz, heading, info) of the main antenna in a local ENU frame from the receiver's own
+    solution; heading is (stamps, yaw) on the AttEuler stamps. With att_cov_topic and
+    heading_max_std_deg, headings whose reported standard deviation exceeds the limit are dropped
+    (the receiver's own doubt about a short-baseline fix)."""
     import numpy as np
     pvt = sorted(bag.get(pvt_topic, []), key=stamp_ns)
     info = {"pvt_samples": len(pvt), "modes": {}}
@@ -252,21 +329,39 @@ def reference_from_bag(bag, pvt_topic, att_topic, heading_offset_deg, allow_floa
     info["h_accuracy_m_median"] = round(float(np.median(acc)), 3) if acc else None
     info["duration_s"] = round(float((t[-1] - t[0]) / NS), 1)
     yaw = np.full(len(t), np.nan)
+    heading_series = None
     att = sorted(bag.get(att_topic, []), key=stamp_ns)
     if att:
         at = np.array([stamp_ns(m) for m in att], dtype=np.int64)
         heading = np.array([float(m.heading) for m in att])
-        valid = np.array([int(m.error) == 0 and int(m.mode) in (1, 2, 3) for m in att]) & (heading > DNU)
+        modes = np.array([int(m.mode) for m in att])
+        usable = np.array([int(m.error) == 0 for m in att]) & (heading > DNU)
+        if att_cov_topic and heading_max_std_deg:
+            cov = {stamp_ns(m): float(m.cov_headhead) for m in bag.get(att_cov_topic, [])}
+            std_ok = np.array([cov.get(stamp_ns(m), -1.0) >= 0 and math.sqrt(cov[stamp_ns(m)]) <= heading_max_std_deg
+                               for m in att])
+            info["heading_cov_samples"] = int(sum(1 for m in att if stamp_ns(m) in cov))
+            info["heading_dropped_by_cov_fraction"] = round(float((usable & ~std_ok).mean()), 3)
+            usable &= std_ok
+        fixed = usable & np.isin(modes, HEADING_FIXED_MODES)
+        floaty = usable & np.isin(modes, HEADING_FLOAT_MODES)
+        valid = (fixed | floaty) if allow_float_heading else fixed
         info["heading_samples"] = int(valid.sum())
-        info["heading_fixed_fraction"] = round(float(np.mean([int(m.mode) in (2, 3) for m in att])), 3)
+        info["heading_fixed_fraction"] = round(float(fixed.mean()), 3)
+        info["heading_float_fraction"] = round(float(floaty.mean()), 3)
         if valid.sum() >= 2:
-            yaw_valid = heading_to_yaw(heading[valid], heading_offset_deg)
-            # nearest heading sample within 60 ms of each reference sample
+            if heading_convention == "compass":
+                yaw_valid = heading_to_yaw(heading[valid], heading_offset_deg)
+            else:                                   # the driver already publishes ENU yaw
+                yaw_valid = wrap(np.radians(heading[valid] + heading_offset_deg))
+            # coverage: reference samples with a heading sample within 60 ms (diagnostic only)
             idx = np.clip(np.searchsorted(at[valid], t), 0, valid.sum() - 1)
             near = np.abs(at[valid][idx] - t) <= 60_000_000
             yaw[near] = yaw_valid[idx[near]]
+            info["heading_rate_hz"] = round(float(NS / np.median(np.diff(at[valid]))), 1) if valid.sum() > 2 else None
+            heading_series = (at[valid], yaw_valid)      # interpolated on its own stamps, never snapped to the grid
     info["heading_coverage"] = round(float((~np.isnan(yaw)).mean()), 3)
-    return t, xyz, yaw, info
+    return t, xyz, heading_series, info
 
 
 def odometry_arrays(msgs):
@@ -293,6 +388,14 @@ def main(argv=None):
     ap.add_argument("--heading-offset-deg", type=float, default=0.0,
                     help="added to the receiver's heading; 0: the receiver already reports vehicle heading")
     ap.add_argument("--allow-float", action="store_true", help="accept RTK-float reference samples too")
+    ap.add_argument("--allow-float-heading", action="store_true",
+                    help="let float-ambiguity headings (AttEuler modes 1, 3) into the yaw metrics")
+    ap.add_argument("--heading-cov-topic", default="/gnss/attcoveuler")
+    ap.add_argument("--heading-convention", choices=["enu-yaw", "compass"], default="enu-yaw",
+                    help="enu-yaw: the topic carries ENU yaw as the gnss_ros driver publishes it (default); "
+                         "compass: clockwise from north, yaw = 90 deg - heading")
+    ap.add_argument("--heading-max-std-deg", type=float, default=0.0,
+                    help="drop headings whose reported standard deviation (AttCovEuler) is above this; 0 = keep all")
     ap.add_argument("--min-extent-m", type=float, default=2.0)
     ap.add_argument("--ape-rms-max-m", type=float, default=0.5)
     ap.add_argument("--rpe-max-m", type=float, default=0.15)
@@ -303,11 +406,12 @@ def main(argv=None):
     if len(lever) != 3:
         ap.error("lever-arm needs x,y,z")
     estimators = [e for e in args.estimators.split(",") if e]
-    bag = read_bag(args.bag, estimators + [args.pvt_topic, args.heading_topic])
+    bag = read_bag(args.bag, estimators + [args.pvt_topic, args.heading_topic, args.heading_cov_topic])
     ref_t, ref_xyz, ref_yaw, info = reference_from_bag(bag, args.pvt_topic, args.heading_topic,
-                                                       args.heading_offset_deg, args.allow_float)
+                                                       args.heading_offset_deg, args.allow_float, allow_float_heading=args.allow_float_heading, att_cov_topic=args.heading_cov_topic, heading_max_std_deg=args.heading_max_std_deg or None,
+                                                       heading_convention=args.heading_convention)
     result = {"bag": args.bag, "reference": info, "lever_arm_m": list(lever), "heading_offset_deg": args.heading_offset_deg,
-              "estimators": {}, "gates": {}, "reasons": []}
+              "estimators": {}, "gates": {}, "reasons": [], "warnings": []}
     if ref_t is None:
         result["reasons"].append("no usable reference: %d RTK-fixed PVT samples" % info["reference_samples"])
         result["pass"] = None
@@ -329,30 +433,52 @@ def main(argv=None):
         result["pass"] = None
     else:
         rpe = gate.get("rpe_1s", {})
-        result["gates"] = {"ape_rms_m": [gate["ape"]["rms"], args.ape_rms_max_m],
+        # the roadmap gate is on the SE(3)-aligned error; the yaw-only alignment stands in when the
+        # motion cannot condition a tilt (its APE then includes any frame tilt, which is reported)
+        ape_key = "ape_se3" if "ape_se3" in gate else "ape"
+        result["gates"] = {"ape_rms_m": [gate[ape_key]["rms"], args.ape_rms_max_m, ape_key],
                            "rpe_1s_m": [rpe.get("rms"), args.rpe_max_m],
                            "rpe_1s_yaw_deg": [rpe.get("yaw_deg", {}).get("rms"), args.rpe_yaw_max_deg]}
-        if gate["ape"]["rms"] > args.ape_rms_max_m:
-            result["reasons"].append("APE RMS %.3f m over %.2f m" % (gate["ape"]["rms"], args.ape_rms_max_m))
+        if gate[ape_key]["rms"] > args.ape_rms_max_m:
+            result["reasons"].append("APE RMS %.3f m over %.2f m (%s)" % (gate[ape_key]["rms"], args.ape_rms_max_m, ape_key))
         if rpe.get("rms") is not None and rpe["rms"] > args.rpe_max_m:
             result["reasons"].append("RPE(1 s) RMS %.3f m over %.2f m" % (rpe["rms"], args.rpe_max_m))
         yaw_rms = rpe.get("yaw_deg", {}).get("rms")
+        lag = gate.get("yaw", {}).get("heading_lag_fit_s")
+        if lag is not None and abs(lag) >= 0.02:
+            result["warnings"].append("reference heading stamps fit a %+.0f ms lag against %s: fix the stamps at the source "
+                                      "(gnss_ros AttEuler); yaw gate uses the lag-compensated value" % (lag * 1000, args.gate_estimator))
+            yaw_rms = rpe.get("yaw_deg_at_fitted_lag", {}).get("rms", yaw_rms)
+            result["gates"]["rpe_1s_yaw_deg"] = [yaw_rms, args.rpe_yaw_max_deg, "at fitted heading lag %+.3f s" % lag]
         if yaw_rms is not None and yaw_rms > args.rpe_yaw_max_deg:
             result["reasons"].append("RPE(1 s) yaw RMS %.2f deg over %.1f deg" % (yaw_rms, args.rpe_yaw_max_deg))
         result["pass"] = not result["reasons"]
     _write(result, args.out)
-    print("reference: %d RTK samples over %s s, heading coverage %s, h-accuracy median %s m" % (
-        info["reference_samples"], info.get("duration_s"), info.get("heading_coverage"), info.get("h_accuracy_m_median")))
+    print("reference: %d RTK samples over %s s, heading %s Hz coverage %s (fixed-ambiguity %s of samples%s), h-accuracy median %s m" % (
+        info["reference_samples"], info.get("duration_s"), info.get("heading_rate_hz"), info.get("heading_coverage"),
+        info.get("heading_fixed_fraction"),
+        "" if "heading_dropped_by_cov_fraction" not in info else ", %s dropped by covariance" % info["heading_dropped_by_cov_fraction"],
+        info.get("h_accuracy_m_median")))
     for topic, s in result["estimators"].items():
         if "ape" in s:
             rpe = s.get("rpe_1s", {})
-            print("%-16s APE rms %.3f median %.3f max %.3f m | RPE(1 s) rms %s m, yaw rms %s deg | yaw offset %s deg, drift %s deg/5 min | align yaw %.2f deg%s" % (
-                topic, s["ape"]["rms"], s["ape"]["median"], s["ape"]["max"], rpe.get("rms"),
-                rpe.get("yaw_deg", {}).get("rms"), s.get("yaw", {}).get("offset_deg_median"),
-                s.get("yaw", {}).get("drift_deg_per_5min"), s["alignment"]["yaw_deg"],
-                "" if "se3_tilt_deg" not in s["alignment"] else ", tilt %.2f deg" % s["alignment"]["se3_tilt_deg"]))
+            yw = s.get("yaw", {})
+            lag_note = ""
+            if "heading_lag_fit_s" in yw:
+                lag_note = (" | heading lag fit %+.0f ms" % (yw["heading_lag_fit_s"] * 1000) if yw["heading_lag_fit_s"] is not None
+                            else " | no constant heading lag fits the yaw error")
+                if "yaw_deg_at_fitted_lag" in rpe:
+                    lag_note += ", yaw rms %.2f deg with it removed" % rpe["yaw_deg_at_fitted_lag"]["rms"]
+            print("%-16s APE rms %.3f median %.3f max %.3f m | RPE(1 s) rms %.3f m, yaw rms %s deg | yaw offset %s deg, drift %s deg/5 min | align yaw %.2f deg%s%s" % (
+                topic, s["ape"]["rms"], s["ape"]["median"], s["ape"]["max"], rpe.get("rms") or float("nan"),
+                None if "yaw_deg" not in rpe else round(rpe["yaw_deg"]["rms"], 2), yw.get("offset_deg_median"),
+                yw.get("drift_deg_per_5min"), s["alignment"]["yaw_deg"],
+                "" if "se3_tilt_deg" not in s["alignment"] else ", tilt %.2f deg, APE with tilt removed rms %.3f m" % (
+                    s["alignment"]["se3_tilt_deg"], s["ape_se3"]["rms"]), lag_note))
         else:
             print("%-16s %s" % (topic, s.get("skipped", "not scored")))
+    for w in result.get("warnings", []):
+        print("WARNING: " + w)
     if result["pass"] is None:
         print("TRUTH SKIPPED: " + "; ".join(result["reasons"]))
         return 2

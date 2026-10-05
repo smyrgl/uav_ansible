@@ -258,6 +258,14 @@ can be built on the bench, these numbers cannot.
 - Vehicle identification for the trajectory optimiser: hover thrust, drag, tilt
   from steady translations at 2/5/8 m/s. The X950 does not fit a 0.61 kg racer's
   defaults.
+- *First scored flight, 2026-10-05 (tuning flight, 86 s RTK-fixed, 52 m extent;
+  [flight-2026-10-05.md](flight-2026-10-05.md)): FAST-LIO 0.089 m APE rms after
+  SE(3) alignment, 0.132 m RPE(1 s), 0.55° yaw RPE, TRUTH PASS; PX4 0.12 m. The
+  LIO's `camera_init` was 5.4° off level (its first IMU pose), the only large
+  LIO error: a gravity-aligned `odom` out of the lio bridge is the open item.
+  Replay-vs-live FAST-LIO diverged 3.5 m median over the field (Avia alone, E1R
+  unpowered). The FC's UTC is GPS time, 18 s ahead: PX4's Septentrio driver
+  applies no leap seconds (fix in the FC branch).*
 - **Gate:** ≥ 5 scored flights, ≥ 20 min RTK-fixed; FAST-LIO APE < 0.5 m RMS and
   RPE(1 s) < 0.15 m / 1° on non-degenerate segments, every evo-visible jump > 2 m
   matched by a `/lio/health` event within 2 s; anchor drift < 0.3 m / < 1° per

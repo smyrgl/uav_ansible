@@ -93,6 +93,69 @@ class Scoring(unittest.TestCase):
         self.assertAlmostEqual(s["yaw"]["offset_deg_median"], 3.0, delta=0.3)
         self.assertLess(s["yaw"]["spread_deg_mad"], 0.5)
 
+    def test_tilted_estimator_frame_is_tilt_not_drift(self):
+        """FAST-LIO's camera_init is its first IMU pose: a 5 deg tilt gives a large 4-DoF APE while the
+        SE(3) fit removes it, and the tilt itself is reported."""
+        t, p, yaw = circle_flight()
+        lever = np.array(et.DEFAULT_LEVER_ARM)
+        ref_t, ref_xyz, ref_yaw = self.reference(t, p, yaw, lever)
+        a = math.radians(5.0)
+        tilt = np.array([[1.0, 0.0, 0.0], [0.0, math.cos(a), -math.sin(a)], [0.0, math.sin(a), math.cos(a)]])
+        est_p = p @ tilt.T                   # positions expressed in a frame rolled 5 deg about x
+        s = et.score_estimator(t, est_p, yaw_quat(yaw), lever, ref_t, ref_xyz, ref_yaw)
+        self.assertGreater(s["ape"]["rms"], 0.5)                       # 20 m radius x sin(5 deg) ~ 1.7 m peak
+        self.assertAlmostEqual(s["alignment"]["se3_tilt_deg"], 5.0, delta=0.15)   # the lever arm still turns with the body
+        self.assertLess(s["ape_se3"]["rms"], 0.2)                     # the antenna lever arm still rotates with the body
+
+    def test_only_fixed_ambiguity_headings_enter_the_yaw_reference(self):
+        from types import SimpleNamespace as NS
+        t0 = 1_791_200_000 * et.NS
+        def msg(i, **kw):
+            ns = t0 + i * et.NS // 50
+            return NS(header=NS(stamp=NS(sec=ns // et.NS, nanosec=ns % et.NS)), **kw)
+        pvt = [msg(i, mode=4, latitude=math.radians(40.0) + i * 1e-7, longitude=math.radians(-105.0), height=1600.0,
+                   h_accuracy=1) for i in range(100)]
+        att = [msg(i, error=0, mode=(2 if i < 50 else 1), heading=90.0) for i in range(100)]   # fixed, then float
+        bag = {"/pvt": pvt, "/att": att}
+        _t, _xyz, heading, info = et.reference_from_bag(bag, "/pvt", "/att", 0.0, False)
+        self.assertAlmostEqual(float(heading[1][0]), math.radians(90.0))        # ENU yaw as published: 90 stays 90
+        _t, _xyz, compass, _i = et.reference_from_bag(bag, "/pvt", "/att", 0.0, False, heading_convention="compass")
+        self.assertAlmostEqual(float(compass[1][0]), 0.0)                        # compass 90 = east = ENU yaw 0
+        self.assertAlmostEqual(info["heading_fixed_fraction"], 0.5)
+        self.assertEqual(len(heading[0]), 50)                                   # only the fixed half, on its own stamps
+        self.assertAlmostEqual(info["heading_coverage"], 0.53, delta=0.02)     # the 60 ms nearest-sample window carries 3 samples past the last fixed one
+        _t, _xyz, heading_all, info_all = et.reference_from_bag(bag, "/pvt", "/att", 0.0, False, allow_float_heading=True)
+        self.assertEqual(len(heading_all[0]), 100)
+        self.assertAlmostEqual(info_all["heading_coverage"], 1.0, delta=0.02)
+
+    def test_low_rate_heading_is_interpolated_on_its_own_stamps(self):
+        """A 10 Hz heading during a 60 deg/s yaw: snapping it to the 20 Hz pose grid would be 25 ms off
+        (1.5 deg per sample, 3 deg over a 1 s pair); interpolation on its own stamps is exact."""
+        t, p, yaw = circle_flight(n=1200, hz=20.0)
+        lever = np.array(et.DEFAULT_LEVER_ARM)
+        ref_t, ref_xyz, _ = self.reference(t, p, yaw, lever)
+        turn = np.linspace(0, math.radians(60.0) * (t[-1] - t[0]) / et.NS, len(t))   # 60 deg/s on top of the tangent
+        yaw_fast = et.wrap(yaw + turn)
+        head_t = t[::2] + 25_000_000                                            # 10 Hz, 25 ms off the pose stamps
+        head_yaw = et.wrap(np.interp(head_t, t, np.unwrap(yaw_fast)))
+        s = et.score_estimator(t, p, yaw_quat(yaw_fast), lever, ref_t, ref_xyz, (head_t, head_yaw))
+        self.assertLess(s["rpe_1s"]["yaw_deg"]["max"], 0.1)
+        self.assertLess(s["yaw"]["spread_deg_mad"], 0.1)
+
+    def test_heading_stamp_lag_is_fitted_and_removed(self):
+        """Headings stamped 80 ms late during a 60 deg/s yaw: the raw 1 s yaw RPE is several degrees,
+        the fit finds the lag and the compensated metric is clean."""
+        t, p, yaw = circle_flight(n=1200, hz=20.0)
+        lever = np.array(et.DEFAULT_LEVER_ARM)
+        ref_t, ref_xyz, _ = self.reference(t, p, yaw, lever)
+        rate = math.radians(60.0) * np.sin(np.linspace(0, 6 * math.pi, len(t)))      # yaw rate swinging +-60 deg/s
+        yaw_fast = et.wrap(yaw + np.cumsum(rate) * (t[1] - t[0]) / et.NS)
+        head_t = t + 80_000_000                                                      # stamped 80 ms late
+        s = et.score_estimator(t, p, yaw_quat(yaw_fast), lever, ref_t, ref_xyz, (head_t, yaw_fast))
+        self.assertGreater(s["rpe_1s"]["yaw_deg"]["rms"], 1.0)
+        self.assertAlmostEqual(s["yaw"]["heading_lag_fit_s"], 0.08, delta=0.011)
+        self.assertLess(s["rpe_1s"]["yaw_deg_at_fitted_lag"]["rms"], 0.3)
+
     def test_stationary_reference_is_reported_not_scored(self):
         t = (1_791_200_000 * et.NS + np.arange(200) * et.NS // 10).astype(np.int64)
         p = np.zeros((200, 3)); yaw = np.zeros(200)

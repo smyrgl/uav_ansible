@@ -12,16 +12,10 @@ for dir in "$FLIGHTS"/flight_*/; do
   [ -f "$dir/.pushed" ] || continue      # the offload writes this after the bag's data has landed
   [ -f "$dir/.replayed" ] && continue
   # Stage 1 truth first: it needs only the bag, so a failed replay never hides it.
-  if {{ replay_venv }}/bin/python /usr/local/lib/uav/estimator_truth.py "$dir" --out "$dir/truth.json" > "$dir.truth.log" 2>&1; then
-    echo "$(date -u +%FT%TZ) $name: $(grep -E '^TRUTH ' "$dir.truth.log" | tail -1)"
-  else
-    echo "$(date -u +%FT%TZ) $name: truth exited $? ($(grep -E '^TRUTH ' "$dir.truth.log" | tail -1))"
-  fi
+  rc=0; {{ replay_venv }}/bin/python /usr/local/lib/uav/estimator_truth.py "$dir" --out "$dir/truth.json" > "$dir.truth.log" 2>&1 || rc=$?
+  echo "$(date -u +%FT%TZ) $name: truth exited $rc ($(grep -E '^TRUTH ' "$dir.truth.log" | tail -1))"
   echo "$(date -u +%FT%TZ) replaying $name"
-  if /usr/local/bin/uav-replay "$dir" --out "${dir}_replay_$(date -u +%Y%m%dT%H%M%SZ)" > "$dir.replay.log" 2>&1; then
-    echo "$(date -u +%FT%TZ) $name: $(grep -E '^REPLAY ' "$dir.replay.log" | tail -1)"
-  else
-    echo "$(date -u +%FT%TZ) $name: replay exited $? ($(grep -E '^REPLAY ' "$dir.replay.log" | tail -1))"
-  fi
+  rc=0; /usr/local/bin/uav-replay "$dir" --out "${dir}_replay_$(date -u +%Y%m%dT%H%M%SZ)" > "$dir.replay.log" 2>&1 || rc=$?
+  echo "$(date -u +%FT%TZ) $name: replay exited $rc ($(grep -E '^REPLAY ' "$dir.replay.log" | tail -1 || tail -1 "$dir.replay.log"))"
   date -u +%FT%TZ > "$dir/.replayed"
 done

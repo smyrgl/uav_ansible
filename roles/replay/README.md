@@ -113,14 +113,21 @@ the replay, since it needs only the bag. It scores every odometry in the bag
 (`/lio/odometry`, `/px4/odometry`, `/vslam/odometry` when present) against the
 receiver's own solution recorded alongside: `/gnss/pvtgeodetic` (RTK position of
 the main antenna, RTK-fixed samples only unless `--allow-float`) and
-`/gnss/atteuler` (dual-antenna heading, used as the receiver reports it: the
-owner sets the antenna-to-vehicle offset in the receiver, the tool applies none).
-Each estimator pose is carried to the main antenna with the URDF lever arm, the
-frames are aligned by yaw and translation (gravity-aligned worlds; the full SE(3)
-fit is reported as a tilt check when the motion allows), then APE, RPE over 1 s
-(position and yaw), the yaw offset, spread and drift are written to
-`truth.json`. Gates (roadmap Stage 1, on `/lio/odometry`): APE RMS < 0.5 m,
-RPE(1 s) < 0.15 m and < 1 deg. Exit 0 pass, 3 fail, 2 skipped (no RTK-fixed
+`/gnss/atteuler` (dual-antenna heading; the gnss_ros driver publishes it as ENU
+yaw with the owner's antenna offset already applied in the receiver, and the tool
+takes it as such: `--heading-convention enu-yaw`; applying the compass conversion
+to it is a reflection and faked a 4.9° yaw error on 2026-10-05). Only
+fixed-ambiguity headings (AttEuler modes 2 and 4) enter the yaw metrics unless
+`--allow-float-heading`; `--heading-max-std-deg` drops headings by the receiver's
+own covariance; a heading stamp lag is fitted and reported. Each estimator pose
+is carried to the main antenna with the URDF lever arm, the frames are aligned by
+yaw and translation, and when the motion spans three directions also by the full
+SE(3) fit, which reports the frame's tilt and `ape_se3`, the error with the tilt
+removed (FAST-LIO's `camera_init` is its first IMU pose: 5.4° off level on
+2026-10-05, 1.3 m of yaw-only APE that was 0.089 m without the tilt). APE, RPE
+over 1 s (position and yaw), the yaw offset, spread and drift are written to
+`truth.json`. Gates (roadmap Stage 1, on `/lio/odometry`): APE RMS < 0.5 m on
+the SE(3)-aligned error when available, RPE(1 s) < 0.15 m and < 1 deg. Exit 0 pass, 3 fail, 2 skipped (no RTK-fixed
 reference or too little motion to align: a bench bag). Decoding uses
 `mcap-ros2-support` with the schemas the bag embeds, so no message package has to
 be installed here. Tests: `tools/test_estimator_truth.py` (synthetic circle
