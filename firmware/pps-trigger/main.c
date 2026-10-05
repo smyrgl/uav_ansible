@@ -5,7 +5,7 @@
  *   GPIO2  PPS in    rising edge, 3.3 V from the receiver's PPS fan-out (weak pull-down when unplugged)
  *   GPIO3  TRIG out  the 60 Hz train, 100 us high; 100 R in series to the r2 board's J3-1 (VSYNC_3V3), J3-2 GND
  *   GPIO4  EVT in    spare event input (chopper slot sensor), rising edge, reported as $EVT
- *   GPIO5  TEST out  1 Hz, 5 ms test pulse while "TEST 1"; jumper to GPIO2 for a self-test
+ *   GPIO5  TEST out  1 Hz, 5 ms test pulse while "TEST 1", high impedance otherwise; jumper to GPIO2 for a self-test
  *   GPIO16 WS2812    red: no PPS yet, amber: acquiring, green: locked, magenta: hold-over; blue blink per PPS edge
  *
  * Time bases. The train comes from a PIO state machine with intervals in system-clock
@@ -129,10 +129,13 @@ static bool test_on;
 static volatile uint32_t test_width_us = TEST_PULSE_US;
 static int64_t test_low(alarm_id_t id, void *user) { (void)id; (void)user; gpio_put(PIN_TEST, 0); return 0; }
 static bool test_high(repeating_timer_t *t) { (void)t; gpio_put(PIN_TEST, 1); test_pulses++; add_alarm_in_us(test_width_us, test_low, NULL, true); return true; }
+/* GPIO5 drives only while the self-test is on. Idle it is an input (high impedance):
+ * a bench unit may have GPIO5 soldered to GPIO2, and the flight unit's GPIO2 is on
+ * the receiver's passive PPS net, which nothing but the receiver may ever drive. */
 static void set_test(bool on) {
     if (on == test_on) return;
-    if (on) add_repeating_timer_us(-1000000, test_high, NULL, &test_timer);
-    else { cancel_repeating_timer(&test_timer); gpio_put(PIN_TEST, 0); }
+    if (on) { gpio_put(PIN_TEST, 0); gpio_set_dir(PIN_TEST, GPIO_OUT); add_repeating_timer_us(-1000000, test_high, NULL, &test_timer); }
+    else { cancel_repeating_timer(&test_timer); gpio_put(PIN_TEST, 0); gpio_set_dir(PIN_TEST, GPIO_IN); }
     test_on = on;
 }
 
@@ -168,7 +171,7 @@ int main(void) {
 
     gpio_init(PIN_PPS); gpio_set_dir(PIN_PPS, GPIO_IN); gpio_pull_down(PIN_PPS);
     gpio_init(PIN_EVT); gpio_set_dir(PIN_EVT, GPIO_IN); gpio_pull_down(PIN_EVT);
-    gpio_init(PIN_TEST); gpio_set_dir(PIN_TEST, GPIO_OUT); gpio_put(PIN_TEST, 0);
+    gpio_init(PIN_TEST); gpio_set_dir(PIN_TEST, GPIO_IN); gpio_disable_pulls(PIN_TEST);   /* high impedance until TEST 1 */
 
     uint off = pio_add_program(pio, &trigger_program);
     sm_trig = pio_claim_unused_sm(pio, true);

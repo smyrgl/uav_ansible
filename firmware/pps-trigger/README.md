@@ -15,7 +15,20 @@ expose, so the trigger comes from the one MCU left on the aircraft.
 | GPIO3 | TRIG out, 60 Hz, 100 µs high | 100 Ω in series to the r2 board's **J3 pin 1** (VSYNC_3V3); **J3 pin 2** is GND; pin 3 spare |
 | GPIO4 | EVT in, rising edge | spare: the chopper-wheel slot sensor for the bench verification |
 | GPIO5 | TEST out, 1 Hz 5 ms (only after `TEST 1`) | jumper to GPIO2 for a self-test |
-| USB-C | reports and commands | the Jetson (USB CDC) |
+| USB-C | power, reports and commands | the Jetson baseboard's **Orin USB 2.0 header**, JST-GH 5-pin (Holybro pinout: 1 VBUS 5 V out, 2 DM, 3 DP, 4 GND, 5 shield) |
+
+USB pigtail, USB-C plug at the Zero to JST-GH 5-pin at the baseboard, standard
+USB colours: pin 1 red (VBUS), pin 2 white (D−), pin 3 green (D+), pin 4 black
+(GND), pin 5 the cable's drain wire or empty. The header supplies VBUS
+unconditionally like any USB 2.0 host, so no USB-C CC handling is involved; the
+Zero draws about 50 mA. Everything is one ground domain: the Jetson's USB ground
+is the Zero's ground, the r2 board's (its USB) and the receiver's (its USB), so
+the PPS tap and the J3 lead need no isolation; the FC's isolated PPS leg stays
+separate and nothing here connects to the FMU. Put the 100 Ω in series at the
+Zero end of both signal leads and run PPS and TRIG as twisted pairs with their
+GND, kept short. GPIO5 is high-impedance unless `TEST 1` is active, so a bench
+unit's GPIO5–GPIO2 solder link never drives the receiver's PPS net while the
+self-test is off; remove it on the flight unit all the same.
 
 The r2 board shifts VSYNC_3V3 to the camera's 1.8 V (SN74AXC1T45) and feeds
 Hadron pin 43. Keep the harness short and shielded. The RP2040-Zero's crystal
