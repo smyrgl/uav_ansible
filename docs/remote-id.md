@@ -62,25 +62,46 @@ USB download mode and USB-JTAG permanently; the board could then only be updated
 with ArduPilot-signed OTA images. `LOCK_LEVEL` 0 (default) is fine: parameters
 stay writable and the web update accepts only signed official images.
 
-### The heartbeat patch (`firmware/remoteid/heartbeat-state.patch`)
+### The PX4 arming patch (`firmware/remoteid/px4-arming.patch`)
 
-PX4 1.15+ derives the Remote ID health that `COM_ARM_ODID` gates on from the
-module's HEARTBEAT `system_status`: STANDBY or ACTIVE means healthy. Stock
-ArduRemoteID sends 0 (UNINIT), so with the stock firmware `COM_ARM_ODID=2` can
-never arm and `COM_ARM_ODID=1` prints "Preflight Fail: Open Drone ID system not
-ready" at every health report even though the module works. PX4 does not read the
-module's OPEN_DRONE_ID_ARM_STATUS at all (no handler in 1.17). The patch reports
-ACTIVE only while a Location and a System message from the FC arrived within the
-last 5 s and the data encodes into valid F3411 messages, CRITICAL otherwise. So
-`COM_ARM_ODID=2` then means: no arming unless the module is alive and has a
-position and a take-off location to broadcast. PX4 sends System only with a 3D fix
-and a valid home, so indoors the module stays CRITICAL, which is the point.
+Three changes to upstream, all about what "ready to arm" means when the module hangs off
+PX4 rather than ArduPilot with Mission Planner:
+
+1. **Heartbeat state.** PX4 1.15+ derives the Remote ID health that `COM_ARM_ODID`
+   gates on from the module's HEARTBEAT `system_status` (STANDBY or ACTIVE = healthy)
+   and ignores OPEN_DRONE_ID_ARM_STATUS (no handler in 1.17). Stock ArduRemoteID sends
+   0 (UNINIT): `COM_ARM_ODID=2` could never arm and `=1` printed "Preflight Fail: Open
+   Drone ID system not ready" at every health report. Patched, the heartbeat carries
+   the module's own arming check: ACTIVE when it passes, CRITICAL otherwise.
+2. **No GCS dependency in the arming check.** Upstream's check (`transport.cpp`)
+   fails with `SELF_ID` / `OP_ID` unless a GCS has sent OPEN_DRONE_ID_SELF_ID and
+   OPEN_DRONE_ID_OPERATOR_ID within 22 s. PX4 never sends them; QGC does, but only
+   while its Remote ID settings enable them and only while it sees the module's arm
+   status. Both messages are optional in F3411 and not required of a Part 89
+   broadcast module, so they no longer gate arming. They are still broadcast when a
+   GCS supplies them. What remains: Location fresher than 3 s and non-zero, System
+   fresher than 3 s with a non-zero operator location, Basic ID stored, all encodable.
+3. **Only the autopilot's System message counts.** QGC "always tries to send System"
+   once it sees the module, addressed to component 0 so PX4 forwards it, and a GCS
+   without a fix of its own (a laptop) fills the operator location with 0/0. The
+   module keeps the last System it received, so the broadcast alternated between
+   PX4's take-off location and 0/0, the arm status flapped with reason `OP_LOC`, and
+   the QGC indicator went red/green at the beat of the two senders (observed 2026-10-05,
+   a pass every third second). System and System-Update are now accepted from the
+   autopilot component only, which is the Part 89 broadcast-module rule anyway.
+
+Observed arm-status reasons and their meaning: `OP_LOC` = last System had a 0/0
+operator location (a GCS without GPS); `OP_ID` / `SELF_ID` (stock only) = no GCS
+feeding those messages; `SYS` = no System in 3 s (PX4 sends it only with a 3D fix
+and a valid home, so this is normal indoors); `LOC` = no Location in 3 s or 0/0;
+`ID` = Basic ID not stored. With the patch, `COM_ARM_ODID=2` means: no arming unless
+the module is alive and has a position and a take-off location to broadcast.
 Nothing in PX4 1.17 acts on Remote ID health in flight; losing the module only
 produces the "Remote ID system lost" message.
 
 Build: `firmware/remoteid/build.sh` (arduino-cli 0.27.1, esp32 core 2.0.3 as pinned by
-upstream, everything under `firmware/remoteid/.work/`). Built on the Mac 2026-10-04
-in about five minutes; binaries in `.work/` (gitignored).
+upstream, everything under `firmware/remoteid/.work/`). About five minutes on the Mac
+for the first build, one minute after; binaries land in `.work/` (gitignored).
 
 ## Module configuration
 
@@ -149,11 +170,11 @@ the module restarts on the new baud).
 
 ## Bring-up checklist
 
-- [x] XIAO flashed with the patched v1.14 build (`erase-flash`, stock, then `write-flash 0x0` of `.work/*-hbstate.bin`), 2026-10-04. QGC auto-connects to the XIAO's USB port and blocks esptool; quit it before flashing.
+- [x] XIAO flashed with the patched v1.14 build (`erase-flash`, then `write-flash 0x0`), 2026-10-04; re-flash with the `*-px4arming.bin` build after the arming-check findings of 2026-10-05. QGC auto-connects to the XIAO's USB port and blocks esptool; quit it before flashing.
 - [x] FC: instance 0 confirmed free on TELEM3 (`mavlink status`: rx 0 B/s)
-- [ ] Fit the antenna, wire TELEM3 pins 1, 2, 3, 6 to 5V, D0, D1, GND
-- [ ] `fc-params --apply --reboot` (SER_TEL3_BAUD 57600, MAV_0_RATE 0, COM_ARM_ODID 2)
-- [ ] `set-id --uas-id <serial>` once the module heartbeat shows in `watch`
+- [x] Antenna fitted, TELEM3 pins 1, 2, 3, 6 wired to 5V, D0, D1, GND (2026-10-04)
+- [x] `fc-params --apply --reboot` (SER_TEL3_BAUD 57600, MAV_0_RATE 0, COM_ARM_ODID 2)
+- [x] `set-id --uas-id <serial>`: module heartbeat and arm status seen through the router, PX4 Location and System reaching it
 - [ ] Outside with a fix: `watch` shows ACTIVE, phone app shows the aircraft; then `set-param WEBSERVER_EN 0`
 
 Follow-ups: feed OPEN_DRONE_ID_OPERATOR_ID / SELF_ID from the Jetson (needs nothing

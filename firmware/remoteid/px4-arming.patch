@@ -1,0 +1,82 @@
+diff --git a/RemoteIDModule/mavlink.cpp b/RemoteIDModule/mavlink.cpp
+index 88086c0..8dd439e 100644
+--- a/RemoteIDModule/mavlink.cpp
++++ b/RemoteIDModule/mavlink.cpp
+@@ -82,13 +82,20 @@ void MAVLinkSerial::update_send(void)
+     uint32_t now_ms = millis();
+     if (now_ms - last_hb_ms >= 1000) {
+         last_hb_ms = now_ms;
++        /*
++          upstream sends system_status 0 (MAV_STATE_UNINIT). PX4 >= 1.15 derives the Remote ID
++          health that COM_ARM_ODID gates on from this field (STANDBY/ACTIVE = healthy), so report
++          our own arming check: ACTIVE while the data we broadcast is complete, fresh and valid,
++          CRITICAL otherwise.
++         */
++        const uint8_t system_status = (parse_fail == nullptr) ? MAV_STATE_ACTIVE : MAV_STATE_CRITICAL;
+         mavlink_msg_heartbeat_send(
+             chan,
+             MAV_TYPE_ODID,
+             MAV_AUTOPILOT_INVALID,
+             0,
+             0,
+-            0);
++            system_status);
+ 
+         // send arming status
+         arm_status_send();
+@@ -184,6 +191,14 @@ void MAVLinkSerial::process_packet(mavlink_status_t &status, mavlink_message_t &
+         break;
+     }
+     case MAVLINK_MSG_ID_OPEN_DRONE_ID_SYSTEM: {
++        if (msg.compid != MAV_COMP_ID_AUTOPILOT1) {
++            /*
++              the operator location we broadcast is the autopilot's take-off location (the Part 89
++              broadcast-module rule). A GCS "always tries to send System" and, without a fix of its
++              own, sends 0/0 every second, which would alternate with the valid location.
++             */
++            break;
++        }
+         mavlink_msg_open_drone_id_system_decode(&msg, &system);
+         if (g.options & OPTIONS_PRINT_RID_MAVLINK) {
+             Serial.printf("MAVLink: got System\n");
+@@ -196,6 +211,9 @@ void MAVLinkSerial::process_packet(mavlink_status_t &status, mavlink_message_t &
+         break;
+     }
+     case MAVLINK_MSG_ID_OPEN_DRONE_ID_SYSTEM_UPDATE: {
++        if (msg.compid != MAV_COMP_ID_AUTOPILOT1) {
++            break;      // see OPEN_DRONE_ID_SYSTEM
++        }
+         if (g.options & OPTIONS_PRINT_RID_MAVLINK) {
+             Serial.printf("MAVLink: got System update\n");
+         }
+diff --git a/RemoteIDModule/transport.cpp b/RemoteIDModule/transport.cpp
+index 98cac62..c7a698d 100644
+--- a/RemoteIDModule/transport.cpp
++++ b/RemoteIDModule/transport.cpp
+@@ -34,7 +34,6 @@ Transport::Transport()
+ uint8_t Transport::arm_status_check(const char *&reason)
+ {
+     const uint32_t max_age_location_ms = 3000;
+-    const uint32_t max_age_other_ms = 22000;
+     const uint32_t now_ms = millis();
+ 
+     uint8_t status = MAV_ODID_ARM_STATUS_PRE_ARM_FAIL_GENERIC;
+@@ -56,13 +55,11 @@ uint8_t Transport::arm_status_check(const char *&reason)
+         ret += "ID ";
+     }
+ 
+-    if (last_self_id_ms == 0  || now_ms - last_self_id_ms > max_age_other_ms) {
+-        ret += "SELF_ID ";
+-    }
+-
+-    if (last_operator_id_ms == 0 || now_ms - last_operator_id_ms > max_age_other_ms) {
+-        ret += "OP_ID ";
+-    }
++    /*
++      Self ID and Operator ID are optional F3411 messages that only a GCS sends (PX4 never
++      does) and that 14 CFR Part 89 does not ask of a broadcast module, so their absence is
++      not an arming failure here. They are still broadcast whenever a GCS supplies them.
++     */
+ 
+     if (last_system_ms == 0 || now_ms - last_system_ms > max_age_location_ms) {
+         // we use location age limit for system as the operator location needs to come in as fast

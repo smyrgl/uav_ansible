@@ -1,12 +1,17 @@
 # ArduRemoteID build for the interim Remote ID module
 
 ArduRemoteID tag v1.14, target `ESP32C3_DEV` (Seeed XIAO ESP32-C3: module RX GPIO2 = D0,
-TX GPIO3 = D1), plus one patch:
+TX GPIO3 = D1), plus one patch, `px4-arming.patch`:
 
-- `heartbeat-state.patch`: the module's HEARTBEAT `system_status` becomes ACTIVE while a
-  Location and a System message from the flight controller are fresher than 5 s and encode
-  into valid F3411 messages, CRITICAL otherwise. Upstream sends 0 (UNINIT), which PX4 1.15+
-  treats as "Open Drone ID system not ready", making `COM_ARM_ODID` useless with PX4.
+- the module's HEARTBEAT `system_status` carries its own arming check (ACTIVE / CRITICAL).
+  Upstream sends 0 (UNINIT), which PX4 1.15+ treats as "Open Drone ID system not ready",
+  making `COM_ARM_ODID` useless with PX4;
+- the arming check no longer demands Self ID and Operator ID messages from a GCS every
+  22 s (optional in F3411, not required of a Part 89 broadcast module; PX4 never sends them);
+- System / System-Update are accepted from the autopilot component only, so a GCS without a
+  GPS fix cannot overwrite the take-off location with 0/0 every second.
+
+Rationale and the observed symptoms are in `docs/remote-id.md`.
 
 `build.sh` reproduces the upstream Makefile build (arduino-cli 0.27.1, esp32 core 2.0.3, all
 under `.work/`, nothing in `~`), applies the patch and leaves

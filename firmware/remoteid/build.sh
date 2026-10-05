@@ -21,7 +21,7 @@ export PATH=$WORK/venv/bin:$PATH
 if [ ! -d "$WORK/ArduRemoteID" ]; then
   git clone -q --branch "$TAG" --depth 1 --recurse-submodules --shallow-submodules \
       https://github.com/ArduPilot/ArduRemoteID.git "$WORK/ArduRemoteID"
-  (cd "$WORK/ArduRemoteID" && git apply "$HERE/heartbeat-state.patch" && git diff --stat)
+  (cd "$WORK/ArduRemoteID" && git apply "$HERE/px4-arming.patch" && git diff --stat)
 fi
 cd "$WORK/ArduRemoteID"
 mkdir -p bin
