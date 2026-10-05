@@ -1,0 +1,30 @@
+; One pulse per two words from the TX FIFO: x = low cycles, y = high cycles.
+; Rising-to-rising interval = x + y + 7 cycles, high time = y + 2 cycles (see
+; the counts in main.c: pull 1, mov 1, loop n+1, pull 1, mov 1, set 1). A pull
+; on an empty FIFO stalls in the LOW phase, so an underrun can only ever make
+; a pulse late, never bring two pulses closer together.
+.program trigger
+.wrap_target
+    pull block
+    mov x, osr
+lowloop:
+    jmp x-- lowloop
+    pull block
+    mov y, osr
+    set pins, 1
+highloop:
+    jmp y-- highloop
+    set pins, 0
+.wrap
+
+% c-sdk {
+static inline void trigger_program_init(PIO pio, uint sm, uint offset, uint pin) {
+    pio_sm_config c = trigger_program_get_default_config(offset);
+    sm_config_set_set_pins(&c, pin, 1);
+    pio_gpio_init(pio, pin);
+    pio_sm_set_consecutive_pindirs(pio, sm, pin, 1, true);
+    sm_config_set_clkdiv(&c, 1.0f);
+    sm_config_set_fifo_join(&c, PIO_FIFO_JOIN_TX);     /* eight words: four pulses queued ahead */
+    pio_sm_init(pio, sm, offset, &c);
+}
+%}

@@ -36,3 +36,4 @@ x950_description/*_backup_*.blend
 # Mission plans and their item tables carry launch coordinates: never in a public repo
 docs/flight-cards/*.plan
 docs/flight-cards/*.items.md
+firmware/*/build/

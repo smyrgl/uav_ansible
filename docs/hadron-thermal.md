@@ -123,6 +123,12 @@ RP2040 gone (lights are DroneCAN), it is the only MCU on the aircraft.
   loss hold the last frequency and flag it (a ±30 ppm crystal reaches ~1 ms of
   phase error after minutes; **a 0.5 ppm TCXO on XIN is the one component worth
   specifying**). 3.3 V push-pull output, ~100 Ω series, short shielded harness.
+  *Implemented 2026-10-05: `firmware/pps-trigger` on the Waveshare RP2040-Zero
+  (PIO train, hardware-timer timestamps, dead-time-compensated phase loop,
+  `$TRG`/`$PPS`/`$EVT` over USB CDC). Loopback self-test: lock two seconds
+  after the first edge, offsets ±1 µs mean, 1–3 µs spread; hold-over and
+  re-acquire as designed. J3-1 is VSYNC_3V3, J3-2 GND. Still to do: a 3.3 V
+  PPS leg from the fan-out, the Jetson-side `$TRG` consumer, the chopper check.*
 - **Time report**: the MCU never needs UTC. `$TRG,<boot_id>,<seq>,<pps_count>,<k>,<offset_ns>,<status>*CS`
   over USB-CDC (~3 kB/s) says "pulse *k* of the second with PPS count *N*"; the
   Jetson already stamps the same PPS edge (tens of µs, software IRQ) and knows the
