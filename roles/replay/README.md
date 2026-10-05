@@ -74,7 +74,9 @@ is the fidelity check.
 ## Automatic replay
 
 `uav-replay-new.timer` (every `replay_auto_interval`) replays and scores every
-signed-off bag in the dataset that has no replay yet, one at a time, writing
+signed-off bag in the dataset that carries the offload's `.pushed` stamp (written
+after the data landed; a bag still arriving has `flight.json` but no stamp) and
+has no replay yet, one at a time, writing
 `<bag>.replay.log` and a `.replayed` stamp (delete the stamp to retry). Bench
 bags from before the live map reset score FAIL on the map and are still
 useful for the trajectory numbers.

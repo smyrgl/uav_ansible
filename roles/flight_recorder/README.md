@@ -54,9 +54,12 @@ owner) rsyncs every bag whose post-flight checks have signed it off
 dedicated ed25519 key (`flight_recorder_offload_key`, created by the role; its
 public half is fetched to the control machine's gitignored `.offload-keys/`
 and installed by the replay role restricted to `rrsync -wo` into the flights
-dataset, so this key can write bags there and nothing else). A pushed bag gets
-a `.offloaded` stamp and is never pushed or deleted again; `offload.log` beside
-the bags records every attempt. In the field the host is unreachable and the
+dataset, so this key can write bags there and nothing else). After the data has
+landed a second, tiny rsync puts a `.pushed` stamp into the remote bag directory:
+rsync copies in name order, so `flight.json` arrives minutes before a 16 GB MCAP,
+and without the stamp the replay host's timer started on half-copied bags
+(2026-10-05). A pushed bag gets a `.offloaded` stamp here and is never pushed or
+deleted again; `offload.log` beside the bags records every attempt. In the field the host is unreachable and the
 timer just fails quietly until the aircraft is back on the bench network.
 
 ## The FC's ulogs

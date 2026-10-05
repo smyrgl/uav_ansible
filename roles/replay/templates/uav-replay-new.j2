@@ -9,6 +9,7 @@ for dir in "$FLIGHTS"/flight_*/; do
   dir="${dir%/}"; name=$(basename "$dir")
   case "$name" in *_replay_*) continue ;; esac
   [ -f "$dir/flight.json" ] && grep -q '"signoff"' "$dir/flight.json" || continue
+  [ -f "$dir/.pushed" ] || continue      # the offload writes this after the bag's data has landed
   [ -f "$dir/.replayed" ] && continue
   # Stage 1 truth first: it needs only the bag, so a failed replay never hides it.
   if {{ replay_venv }}/bin/python /usr/local/lib/uav/estimator_truth.py "$dir" --out "$dir/truth.json" > "$dir.truth.log" 2>&1; then

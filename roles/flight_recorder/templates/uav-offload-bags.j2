@@ -17,7 +17,12 @@ for dir in "$BAGS"/flight_*/; do
   [ -f "$dir/.offloaded" ] && continue
   items=("$dir")
   for extra in "$dir.log" "$dir.postflight.log"; do [ -f "$extra" ] && items+=("$extra"); done   # older bags lack them
-  if rsync -a --partial --timeout=60 $LIMIT -e "$SSH" "${items[@]}" "$HOST:./" 2>>"$BAGS/offload.log"; then
+  # The replay host must not start on a half-copied bag: flight.json lands before the
+  # MCAP (alphabetical transfer order), so a .pushed stamp follows the data in a second
+  # rsync and uav-replay-new waits for it. A failed stamp leaves the bag for the next run.
+  if rsync -a --partial --timeout=60 $LIMIT -e "$SSH" "${items[@]}" "$HOST:./" 2>>"$BAGS/offload.log" \
+     && date -u +%FT%TZ > "$dir/.pushed" \
+     && rsync -a --timeout=60 -e "$SSH" "$dir/.pushed" "$HOST:./$name/" 2>>"$BAGS/offload.log"; then
     date -u +%FT%TZ > "$dir/.offloaded"; pushed=$((pushed+1))
     echo "$(date -u +%FT%TZ) pushed $name" >> "$BAGS/offload.log"
   else
