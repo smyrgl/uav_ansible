@@ -102,3 +102,24 @@ When a bag carries `fc.ulg` (fetched by the aircraft, flight_recorder role),
 the XRCE timesync offset) to `fc_ulog.mcap` beside the replay and the scorer
 adds the Stage 0b alignment gate: the median residual of the PPS captures
 against the converted time under `replay_ulog_align_median_ms` (2 ms).
+
+## Stage 1 estimator truth (`estimator_truth.py`)
+
+`uav-replay-new` also runs `/usr/local/lib/uav/estimator_truth.py <bag> --out
+<bag>/truth.json` on every new signed-off bag (log in `<bag>.truth.log`), before
+the replay, since it needs only the bag. It scores every odometry in the bag
+(`/lio/odometry`, `/px4/odometry`, `/vslam/odometry` when present) against the
+receiver's own solution recorded alongside: `/gnss/pvtgeodetic` (RTK position of
+the main antenna, RTK-fixed samples only unless `--allow-float`) and
+`/gnss/atteuler` (dual-antenna heading, used as the receiver reports it: the
+owner sets the antenna-to-vehicle offset in the receiver, the tool applies none).
+Each estimator pose is carried to the main antenna with the URDF lever arm, the
+frames are aligned by yaw and translation (gravity-aligned worlds; the full SE(3)
+fit is reported as a tilt check when the motion allows), then APE, RPE over 1 s
+(position and yaw), the yaw offset, spread and drift are written to
+`truth.json`. Gates (roadmap Stage 1, on `/lio/odometry`): APE RMS < 0.5 m,
+RPE(1 s) < 0.15 m and < 1 deg. Exit 0 pass, 3 fail, 2 skipped (no RTK-fixed
+reference or too little motion to align: a bench bag). Decoding uses
+`mcap-ros2-support` with the schemas the bag embeds, so no message package has to
+be installed here. Tests: `tools/test_estimator_truth.py` (synthetic circle
+flights), run on the host at deploy.

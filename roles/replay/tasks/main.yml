@@ -124,6 +124,7 @@
       - "evo=={{ replay_evo_version }}"
       - "mcap=={{ replay_mcap_version }}"
       - "pyulog=={{ replay_pyulog_version }}"
+      - "mcap-ros2-support=={{ replay_mcap_ros2_version }}"
       - zstandard
     virtualenv: "{{ replay_venv }}"
     virtualenv_command: /usr/bin/python3 -m venv
@@ -140,6 +141,25 @@
     src: replay_score.py
     dest: /usr/local/lib/uav/replay_score.py
     mode: "0755"
+
+# Stage 1 estimator truth (tools/estimator_truth.py): every odometry in a bag
+# against the RTK + heading reference recorded in the same bag.
+- name: Install the estimator-truth scorer and its tests
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/tools/{{ item }}"
+    dest: "/usr/local/lib/uav/{{ item }}"
+    mode: "0755"
+  loop:
+    - estimator_truth.py
+    - test_estimator_truth.py
+
+- name: Run the estimator-truth tests in the scoring environment
+  ansible.builtin.command:
+    argv: ["{{ replay_venv }}/bin/python", -m, unittest, -q, test_estimator_truth]
+    chdir: /usr/local/lib/uav
+  environment:
+    PYTHONDONTWRITEBYTECODE: "1"
+  changed_when: false
 
 - name: Install the replay launcher
   ansible.builtin.template:

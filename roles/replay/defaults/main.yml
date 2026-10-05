@@ -16,6 +16,7 @@ replay_venv: /opt/uav/replay-venv          # evo + mcap + numpy, system ROS visi
 replay_evo_version: "1.31.1"
 replay_mcap_version: "1.5.0"
 replay_pyulog_version: "1.2.4"
+replay_mcap_ros2_version: "0.5.7"       # mcap-ros2-support: decodes any topic from the schemas a bag embeds (the truth scorer)
 # ulog-to-bag alignment gate (autonomy roadmap Stage 0b): pps_capture residual median
 replay_ulog_align_median_ms: 2.0
 replay_lio_build_jobs: 12                  # 24 threads, 62 GB: the IKFoM templates fit
