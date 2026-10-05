@@ -28,7 +28,7 @@ os.environ.setdefault("MAVLINK20", "1")
 from pymavlink import mavutil  # noqa: E402
 
 RID_COMP = 236           # MAV_COMP_ID_ODID_TXRX_1, what ArduRemoteID answers as
-MAV_TYPE_ODID = 36
+MAV_TYPE_ODID = mavutil.mavlink.MAV_TYPE_ODID   # 34
 STATES = {0: "UNINIT (stock ArduRemoteID: PX4 calls this 'not ready')", 3: "STANDBY", 4: "ACTIVE (healthy for PX4)",
           5: "CRITICAL (module: data missing or invalid)"}
 ARM = {0: "GOOD_TO_ARM", 1: "PRE_ARM_FAIL_GENERIC"}

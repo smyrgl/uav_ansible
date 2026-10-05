@@ -57,6 +57,16 @@ esptool --port /dev/cu.usbmodem101 --chip esp32c3 --baud 921600 write-flash 0x0 
 `erase-flash` first: the parameter store is an NVS partition, and leftovers from
 another firmware make `nvs_flash_init` fail silently (parameters then never persist).
 
+The merged image is contiguous from 0x0 and its bytes over the NVS partition
+(0x9000 to 0xe000, see `partitions.csv`) are 0xFF, so **writing the full image at
+0x0 erases every stored parameter**, UAS_ID included (learned the hard way on
+2026-10-05: `set-id` had to be run again). For a firmware update on a configured
+module write only the application, which leaves NVS alone:
+
+```bash
+esptool --port /dev/cu.usbmodem1101 --chip esp32c3 --baud 921600 write-flash 0x10000 ArduRemoteID_ESP32C3_DEV_OTA.bin
+```
+
 Never set `LOCK_LEVEL` to 2. At that level the firmware burns eFuses that disable
 USB download mode and USB-JTAG permanently; the board could then only be updated
 with ArduPilot-signed OTA images. `LOCK_LEVEL` 0 (default) is fine: parameters
@@ -157,7 +167,7 @@ the module restarts on the new baud).
 
 ## Verification
 
-1. `tools/remoteid_setup.py watch`: the module's heartbeat (type 36, ODID) with
+1. `tools/remoteid_setup.py watch`: the module's heartbeat (MAV_TYPE_ODID, 34) with
    `system_status` 5 (CRITICAL, no FC data yet) indoors, 4 (ACTIVE) outside with a
    fix, and its arm status. "Remote ID system lost" from PX4 means the heartbeat
    stopped for 3 s.
@@ -175,6 +185,7 @@ the module restarts on the new baud).
 - [x] Antenna fitted, TELEM3 pins 1, 2, 3, 6 wired to 5V, D0, D1, GND (2026-10-04)
 - [x] `fc-params --apply --reboot` (SER_TEL3_BAUD 57600, MAV_0_RATE 0, COM_ARM_ODID 2)
 - [x] `set-id --uas-id <serial>`: module heartbeat and arm status seen through the router, PX4 Location and System reaching it
+- [ ] `set-id` again after the full-image reflash of 2026-10-05 (parameter store erased, see Firmware), then `set-param WEBSERVER_EN 0` again
 - [ ] Outside with a fix: `watch` shows ACTIVE, phone app shows the aircraft; then `set-param WEBSERVER_EN 0`
 
 Follow-ups: feed OPEN_DRONE_ID_OPERATOR_ID / SELF_ID from the Jetson (needs nothing
