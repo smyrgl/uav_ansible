@@ -120,3 +120,5 @@
   roles:
     - role: replay
       tags: ['replay']
+    - role: nurec            # 3DGRUT + COLMAP + the reconstruction tools: uav-reconstruct <bag> (docs/nurec.md)
+      tags: ['nurec']

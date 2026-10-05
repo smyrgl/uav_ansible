@@ -1,0 +1,14 @@
+---
+# NuRec reconstruction on the replay host: 3DGRUT in its own Docker image, COLMAP for the
+# mono-workflow pose refinement, and the repo's tools under one driver, `uav-reconstruct <bag>`.
+nurec_user: "{{ replay_user | default('john') }}"
+nurec_group: "{{ replay_group | default(nurec_user) }}"
+nurec_root: /srv/flights/nurec                 # frames, datasets and runs, one folder per bag
+nurec_tools_dir: /usr/local/lib/uav/nurec-tools
+# 3DGRUT (nv-tlabs/3dgrut) at a pinned commit, built as the project's own Docker image (CUDA 12.8 for Blackwell)
+nurec_3dgrut_repo: https://github.com/nv-tlabs/3dgrut.git
+nurec_3dgrut_version: e6f4552b408af020a96de09ab5757f9b57430aaa   # 2026-09-22, verified on the RTX 5090 2026-10-05
+nurec_3dgrut_dir: /opt/uav/3dgrut
+nurec_3dgrut_image: "3dgrut:cuda12"
+nurec_3dgrut_cuda_version: "12.8.1"
+nurec_colmap_enabled: true                      # apt colmap (CPU build): the --sfm pose refinement

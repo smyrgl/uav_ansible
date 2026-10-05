@@ -89,6 +89,17 @@ pitched down. The colour carry-over (`cusfm_to_color_colmap.py`) works as glue
 and posed 91 frames inside the surviving trajectory; its training run was stopped
 as pointless.
 
+## Scripted: `uav-reconstruct`
+
+The `nurec` role installs everything above on the replay host and one driver,
+`uav-reconstruct <bag> [--every N] [--min-height M] [--sfm]`
+(`tools/nurec/reconstruct_flight.sh`): frames and poses, the COLMAP-format dataset
+with the LIO map or, for a bag without one, seed points sampled in the camera view
+volumes, the propeller masks, the 3DGUT run with its exports and held-out metrics,
+and with `--sfm` the COLMAP refinement and a second run. Every step skips what
+already exists. First end-to-end run: the recovered mission bag
+(24.6 s, 207 frames, no LIO map), as the smoke test of the driver itself.
+
 ## Capture gotchas from the first flight
 
 - **Camera pitch.** Both cameras and the Avia were level: half of every frame was

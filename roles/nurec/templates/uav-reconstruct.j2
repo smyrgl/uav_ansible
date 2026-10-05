@@ -1,0 +1,7 @@
+#!/bin/bash
+# Managed by uav_ansible (nurec). One flight bag to a 3DGUT reconstruction and an Isaac Sim asset:
+#   uav-reconstruct /srv/flights/flight_<UTC> [--every N] [--min-height M] [--sfm] [--no-train]
+# Outputs under {{ nurec_root }}/<bag name>/ and {{ nurec_root }}/runs/. See docs/nurec.md in uav_ansible.
+export NUREC_ROOT={{ nurec_root }}
+export REPLAY_PY={{ replay_venv | default('/opt/uav/replay-venv') }}/bin/python
+exec {{ nurec_tools_dir }}/nurec/reconstruct_flight.sh "$@"

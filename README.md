@@ -307,3 +307,4 @@ Its bandwidth was the deciding cost: every D555 subscriber receives its own
 unicast copy of the images, and nvblox plus its colour adapter were two of the
 five copies that saturated the drone LAN. What was learned (JIT compile cache,
 LiDAR model maths, QoS, time bases) stays in [the nvblox role](roles/nvblox/README.md).
+| `nurec` | replay host: 3DGRUT image, COLMAP, the reconstruction tools and `uav-reconstruct <bag>` (docs/nurec.md) |

@@ -1,0 +1,66 @@
+---
+# NuRec on the replay host: see docs/nurec.md for what each piece is and why.
+- name: Install COLMAP (CPU build) for the mono-workflow pose refinement
+  ansible.builtin.apt:
+    name: colmap
+    state: present
+  when: nurec_colmap_enabled | bool
+
+- name: Working root for frames, datasets and runs
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ nurec_user }}"
+    group: "{{ nurec_group }}"
+    mode: "0775"
+  loop:
+    - "{{ nurec_root }}"
+    - "{{ nurec_root }}/runs"
+
+- name: 3DGRUT source at the pinned commit (with submodules)
+  ansible.builtin.git:
+    repo: "{{ nurec_3dgrut_repo }}"
+    dest: "{{ nurec_3dgrut_dir }}"
+    version: "{{ nurec_3dgrut_version }}"
+    recursive: true
+    force: false
+  become: true
+  become_user: "{{ nurec_user }}"
+
+- name: Is the 3DGRUT image already built?
+  ansible.builtin.command:
+    argv: [docker, image, inspect, "{{ nurec_3dgrut_image }}"]
+  register: nurec_image
+  changed_when: false
+  failed_when: false
+
+- name: Build the 3DGRUT image (CUDA {{ nurec_3dgrut_cuda_version }}; about 15 minutes, 15 GB)
+  ansible.builtin.command:
+    argv: [docker, build, --build-arg, "CUDA_VERSION={{ nurec_3dgrut_cuda_version }}", -t, "{{ nurec_3dgrut_image }}", .]
+    chdir: "{{ nurec_3dgrut_dir }}"
+  when: nurec_image.rc != 0
+
+- name: Install the reconstruction tools (same layout as tools/ in the repo)
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/tools/{{ item }}"
+    dest: "{{ nurec_tools_dir }}/{{ item }}"
+    mode: "0755"
+  loop:
+    - bag_to_frames.py
+    - frames_to_colmap.py
+    - nurec/reconstruct_flight.sh
+    - nurec/run_3dgut.sh
+    - nurec/run_colmap_sfm.sh
+    - nurec/align_colmap_to_metric.sh
+    - nurec/prop_mask.py
+    - nurec/d555_ir_stereo.yaml
+    - nurec/run_rosbag_to_mapping.sh
+    - nurec/run_cusfm.sh
+    - nurec/align_cusfm_to_metric.sh
+    - nurec/cusfm_to_color_colmap.py
+
+- name: The driver, uav-reconstruct
+  ansible.builtin.template:
+    src: uav-reconstruct.j2
+    dest: /usr/local/bin/uav-reconstruct
+    mode: "0755"
