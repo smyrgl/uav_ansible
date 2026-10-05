@@ -146,6 +146,19 @@ Outputs on atomic under `runs/flight1_3dgut_mcmc/colmap-0510_175946/`:
 `export_last_nurec.usdz` (118 MB, Isaac Sim), `export_last.ply` (248 MB, any
 splat viewer), `ours_30000/renders/` (the test renders).
 
+### Run 2: poses refined from the odometry (2026-10-05)
+
+Same 470 frames and masks, poses from `refine_poses_ba.sh`: 159 615 points
+triangulated from the COLMAP matches with the PX4 poses as the start (1.48 px mean
+reprojection error at that start), bundle adjustment with the intrinsics fixed
+(converged in 2.4 minutes), then a sim(3) back onto the odometry centres, which the
+adjustment had moved by 0.19 m at the median and 0.63 m at most with a 1.47 gauge
+scale drift. 3DGUT seeded with those points instead of the LIO map. Held-out views:
+**PSNR 27.0 dB, SSIM 0.890, LPIPS 0.299** against 21.1 / 0.766 / 0.413 for run 1.
+Pose accuracy was the limit; sub-pixel-consistent poses are worth 6 dB on this
+data, and the refinement has to start from the odometry rather than replace it.
+Outputs under `runs/flight1_3dgut_mcmc_refined/`.
+
 ### Driver smoke test: the mission bag (2026-10-05)
 
 `uav-reconstruct /srv/flights/flight_20261005_155231Z --every 3` on the recovered
