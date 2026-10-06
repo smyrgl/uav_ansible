@@ -16,6 +16,7 @@ PY
 )
 # COLMAP looks for <mask_path>/<image name>.png: for 000239.png that is 000239.png.png
 for m in "$DS"/images/*_mask.png; do
+  [ -e "$m" ] || continue                     # no masks (the default since the A-S+ mount)
   b=$(basename "$m" _mask.png); ln -sfn "$(realpath --relative-to="$OUT/masks" "$m")" "$OUT/masks/$b.png.png"
 done
 VOCAB=$(dirname "$DS")/../vocab_tree_flickr100K_words32K.bin

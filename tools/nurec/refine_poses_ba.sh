@@ -37,5 +37,5 @@ PY
 python3 "$HERE/align_model_sim3.py" "$OUT/adj" "$OUT/ref_positions.txt" "$OUT/sparse/0"
 ln -sfn ../images "$OUT/images"
 # masks beside the images for 3DGRUT
-for m in "$DS"/images/*_mask.png; do b=$(basename "$m"); ln -sfn "../../images/$b" "$OUT/images/$b" 2>/dev/null || true; done
+for m in "$DS"/images/*_mask.png; do [ -e "$m" ] || continue; b=$(basename "$m"); ln -sfn "../../images/$b" "$OUT/images/$b" 2>/dev/null || true; done
 echo "$(date -u +%T) done: $OUT/sparse/0"

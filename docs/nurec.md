@@ -36,10 +36,13 @@ the end records what came out. Everything runs on `atomic` (RTX 5090, 32 GB).
    odometry frame by an SE(3) fit of the two odometries (0.41 m rms on this flight,
    the LIO's own tilt and jump). It prints the capture's height, speed and pitch
    statistics.
-3. **Propeller mask**: `tools/nurec/prop_mask.py` writes one static `_mask.png`
-   beside every image (3DGRUT multiplies the loss by it). On these level frames the
-   derived mask ends up excluding the whole sky half, which is where the blades
-   sweep; fine for a ground reconstruction, and moot once the cameras pitch down.
+3. **Propeller mask** (`--prop-mask`, level-camera bags only): `tools/nurec/prop_mask.py`
+   writes one static `_mask.png` beside every image (3DGRUT multiplies the loss by it).
+   On these level frames the derived mask ends up excluding the whole sky half, which
+   is where the blades sweep. Since the A-S+ mount (D555 40 deg down, 2026-10-06) no
+   propeller is in any camera's view (integration report: 0 % at CAD radius and at
+   +20 mm with blade flex), so the step is off by default: with no sky in the frame
+   its dark-marks-against-sky search would mask ground texture.
 4. **3DGUT** in the project's Docker image (`docker build --build-arg
    CUDA_VERSION=12.8.1 -t 3dgrut:cuda12 .`, 14.6 GB, Blackwell through CUDA 12.8;
    the first run compiles the CUDA kernels for sm_120 in about three minutes).
@@ -115,8 +118,8 @@ already exists. First end-to-end run: the recovered mission bag
   up to 84 m. Brackets at 45° (Avia) and 40° (D555) are being made; the URDF mount
   transforms must follow, and the camera-to-LIO and E1R floor checks get redone.
 - **Props in the frame.** With a level camera the propeller tips cross the top of
-  the field of view in every frame; pitching the camera down clears them, a mask
-  handles the archive.
+  the field of view in every frame; the A-S+ mount (40 deg down) clears them
+  entirely, and `--prop-mask` handles the archive.
 - **Flight pattern.** A tuning flight hovers, yaws in place and flies legs; a
   reconstruction wants a double grid at 25 to 40 m with 70 % overlap and more than
   one heading, flown at the speeds the global shutter can take (5 m/s was blur-free
