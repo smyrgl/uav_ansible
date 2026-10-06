@@ -31,7 +31,7 @@ lio_filter_size_map_m: 0.5
 # extrinsic is read from TF (lio_imu_frame -> lio_lidar_frame, both published by
 # robot_description) into lio_extrinsic_file before every start; the bridge, the
 # E1R registration and the map view look up base_link -> lio_imu_frame.
-lio_imu_frame: avia_imu_frame
+lio_imu_frame: avia_imu
 lio_lidar_frame: avia_nominal_lidar_frame
 lio_extrinsic_file: /run/uav-lio/fast_lio_extrinsic.yaml
 # FAST-LIO (patched at build, files/patch_fast_lio.py) exits when lost, for

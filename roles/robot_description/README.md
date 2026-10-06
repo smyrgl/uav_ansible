@@ -20,7 +20,7 @@ deploying another publisher that owns the same native frame IDs.
 
 The launch also adds two Avia frames from `/etc/uav/ros/description.yaml`:
 `avia_nominal_lidar_frame` under `avia_link` (`avia_lidar_xyz/rpy`, the ranging
-origin) and `avia_imu_frame` under it (`avia_imu_xyz/rpy`, Livox's factory IMU
+origin) and `avia_imu` under it (`avia_imu_xyz/rpy`, Livox's factory IMU
 offset). Nothing else in the repository carries sensor geometry: FAST-LIO's
 IMU-to-LiDAR extrinsic, the lio bridge, the E1R registration, the LiDAR map view
 and the bag tools all look these frames up in TF (live) or in the bag's

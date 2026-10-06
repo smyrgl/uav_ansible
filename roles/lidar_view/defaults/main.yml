@@ -19,7 +19,7 @@ lidar_view_e1r_topic: "{{ lio_e1r_registered_topic | default('/lio/registered/e1
 lidar_view_odometry_topic: /Odometry       # FAST-LIO's IMU pose, moved to base_link here
 # Geometry: the model, FAST-LIO's IMU and both fields of view come from the
 # description robot_state_publisher serves (/robot_description), by frame name.
-lidar_view_imu_frame: "{{ lio_imu_frame | default('avia_imu_frame') }}"
+lidar_view_imu_frame: "{{ lio_imu_frame | default('avia_imu') }}"
 lidar_view_avia_frame: "{{ lio_lidar_frame | default('avia_nominal_lidar_frame') }}"
 lidar_view_e1r_frame: e1r_nominal_lidar_frame
 

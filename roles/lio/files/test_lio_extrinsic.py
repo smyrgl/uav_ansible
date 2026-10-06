@@ -21,7 +21,7 @@ class StaticTreeTest(unittest.TestCase):
         self.tree.add("base_link", "avia_mount_link", (0.14766, 0, 0.09325), (0, 0, 0, 1))
         self.tree.add("avia_mount_link", "avia_link", (0.035707, 0, -0.039474), quaternion_about_y(math.pi / 4))
         self.tree.add("avia_link", "avia_nominal_lidar_frame", (0.0525, 0, 0.0324), (0, 0, 0, 1))
-        self.tree.add("avia_nominal_lidar_frame", "avia_imu_frame", lx.LEGACY_IMU_IN_LIDAR, (0, 0, 0, 1))
+        self.tree.add("avia_nominal_lidar_frame", "avia_imu", lx.LEGACY_IMU_IN_LIDAR, (0, 0, 0, 1))
 
     def test_lookup_chains_and_inverts(self):
         t_base_lidar = self.tree.lookup("base_link", "avia_nominal_lidar_frame")
@@ -31,7 +31,7 @@ class StaticTreeTest(unittest.TestCase):
         self.assertIsNone(self.tree.lookup("base_link", "nowhere"))
 
     def test_fastlio_extrinsic_is_the_lidar_in_the_imu_frame(self):
-        t, r, legacy = lx.extrinsic(self.tree, "avia_imu_frame", "avia_nominal_lidar_frame")
+        t, r, legacy = lx.extrinsic(self.tree, "avia_imu", "avia_nominal_lidar_frame")
         self.assertFalse(legacy)
         np.testing.assert_allclose(t, [0.04165, 0.02326, -0.0284], atol=1e-12)    # FAST-LIO's avia.yaml
         np.testing.assert_allclose(r, np.eye(3).reshape(-1), atol=1e-12)
@@ -40,8 +40,8 @@ class StaticTreeTest(unittest.TestCase):
         old = lx.StaticTree()
         old.add("base_link", "avia_link", (0.2, 0, 0.1), (0, 0, 0, 1))
         old.add("avia_link", "avia_nominal_lidar_frame", (0.0525, 0, 0.0324), (0, 0, 0, 1))
-        self.assertIsNone(lx.extrinsic(old, "avia_imu_frame", "avia_nominal_lidar_frame"))
-        t, r, legacy = lx.extrinsic(old, "avia_imu_frame", "avia_nominal_lidar_frame", allow_legacy=True)
+        self.assertIsNone(lx.extrinsic(old, "avia_imu", "avia_nominal_lidar_frame"))
+        t, r, legacy = lx.extrinsic(old, "avia_imu", "avia_nominal_lidar_frame", allow_legacy=True)
         self.assertTrue(legacy)
         np.testing.assert_allclose(t, [0.04165, 0.02326, -0.0284], atol=1e-12)
 

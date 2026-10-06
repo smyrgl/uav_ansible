@@ -11,7 +11,7 @@ robot_description_native_d555_aliases: true
 robot_description_avia_lidar_xyz: [0.0525, 0.0, 0.0324]
 robot_description_avia_lidar_rpy: [0.0, 0.0, 0.0]
 # The Avia's built-in IMU in that LiDAR frame, axes aligned (Livox factory; the
-# inverse of FAST-LIO's avia.yaml extrinsic). Published as avia_imu_frame: FAST-LIO,
+# inverse of FAST-LIO's avia.yaml extrinsic). Published as avia_imu: FAST-LIO,
 # the lio bridge, the E1R registration and the map view all read it from TF.
 robot_description_avia_imu_xyz: [-0.04165, -0.02326, 0.0284]
 robot_description_avia_imu_rpy: [0.0, 0.0, 0.0]

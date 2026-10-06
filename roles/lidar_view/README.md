@@ -56,7 +56,7 @@ MAVLink camera's second stream.
 - **The X950**: about 390k triangles from the description robot_state_publisher
   serves (`/robot_description`), at FAST-LIO's pose. The pose is interpolated
   (see *Timing*) and moved from the IMU to `base_link` through the IMU's mount
-  in that description (`avia_imu_frame`, pitched 45 deg in the A-S+ cage), as
+  in that description (`avia_imu`, pitched 45 deg in the A-S+ cage), as
   the lio bridge does. The two fields of view hang on `avia_nominal_lidar_frame`
   and `e1r_nominal_lidar_frame` from the same description: no geometry is
   configured here, so a re-mount or a calibration shows up after a restart.

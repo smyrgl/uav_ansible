@@ -126,7 +126,7 @@ def slerp(q0, q1, u):
 
 def base_from_imu(position, q, mount):
     """base_link's pose for FAST-LIO's IMU pose, mount being the IMU's 4x4 pose in base_link
-    (the URDF's avia_imu_frame, as the lio bridge has it): T_w_base = T_w_imu mount^-1.
+    (the URDF's avia_imu, as the lio bridge has it): T_w_base = T_w_imu mount^-1.
     Returns (position (3,), quaternion (x, y, z, w))."""
     t = np.eye(4)
     t[:3, :3], t[:3, 3] = quat_matrix(*q), position
@@ -1793,7 +1793,7 @@ def main():
     parser.add_argument("--description-timeout", type=float, default=120.0, help="s to wait for it at start")
     parser.add_argument("--urdf", required=True, help="the model for --demo (and if the description never comes)")
     parser.add_argument("--package-dir", action="append", default=[], help="name=path for package:// URIs")
-    parser.add_argument("--imu-frame", default="avia_imu_frame", help="FAST-LIO's IMU (body) frame")
+    parser.add_argument("--imu-frame", default="avia_imu", help="FAST-LIO's IMU (body) frame")
     parser.add_argument("--avia-frame", default="avia_nominal_lidar_frame", help="the Avia's LiDAR frame (its FOV)")
     parser.add_argument("--e1r-frame", default="e1r_nominal_lidar_frame", help="the E1R's LiDAR frame (its FOV)")
     parser.add_argument("--width", type=int, default=1280)

@@ -59,11 +59,11 @@ class GeometryTest(unittest.TestCase):
         np.testing.assert_allclose(lv.quat_matrix(*q), world_base[:3, :3], atol=1e-12)
 
     def test_frames_come_from_the_description_text(self):
-        urdf = """<robot name="t"><link name="base_link"/><link name="avia_link"/><link name="avia_imu_frame"/>
+        urdf = """<robot name="t"><link name="base_link"/><link name="avia_link"/><link name="avia_imu"/>
           <joint name="a" type="fixed"><parent link="base_link"/><child link="avia_link"/><origin xyz="0.18 0 0.05" rpy="0 0.785398 0"/></joint>
-          <joint name="b" type="fixed"><parent link="avia_link"/><child link="avia_imu_frame"/><origin xyz="0 0 0.1" rpy="0 0 0"/></joint></robot>"""
+          <joint name="b" type="fixed"><parent link="avia_link"/><child link="avia_imu"/><origin xyz="0 0 0.1" rpy="0 0 0"/></joint></robot>"""
         frames = lv.urdf_frames(urdf)
-        np.testing.assert_allclose(frames["avia_imu_frame"][:3, 3], (0.18 + 0.1 * math.sin(0.785398), 0, 0.05 + 0.1 * math.cos(0.785398)), atol=1e-6)
+        np.testing.assert_allclose(frames["avia_imu"][:3, 3], (0.18 + 0.1 * math.sin(0.785398), 0, 0.05 + 0.1 * math.cos(0.785398)), atol=1e-6)
 
     def test_slerp_halfway(self):
         q = lv.slerp((0, 0, 0, 1), (0, 0, math.sin(0.5), math.cos(0.5)), 0.5)

@@ -6,7 +6,7 @@ start frame ("camera_init"), stamped in the Avia's PTP-locked UTC, with no
 twist. This republishes it as base_link odometry on /lio/odometry for
 robot_localization (and later PX4):
 - every pose is moved from the IMU to base_link through the IMU's mount,
-  base_link -> avia_imu_frame from /tf_static: the URDF (the Avia's mount, now
+  base_link -> avia_imu from /tf_static: the URDF (the Avia's mount, now
   45 deg nose-down) and robot_description's factory IMU offset. Position and
   attitude both: differencing base_link positions accounts for rotation about
   base_link, and the attitude is base_link's, not the pitched IMU's;
@@ -258,7 +258,7 @@ def main():
     parser.add_argument("--odom-frame", default="camera_init", help="FAST-LIO's own world frame (it is that frame)")
     parser.add_argument("--anchor-parent", default="odom", help="the TF frame FAST-LIO's frame is anchored under")
     parser.add_argument("--base-frame", default="base_link")
-    parser.add_argument("--imu-frame", default="avia_imu_frame", help="FAST-LIO's IMU (body) frame in the URDF")
+    parser.add_argument("--imu-frame", default="avia_imu", help="FAST-LIO's IMU (body) frame in the URDF")
     parser.add_argument("--mount-refresh", type=float, default=10.0, help="s between re-reads of the IMU's mount")
     parser.add_argument("--twist-stddev", type=float, default=0.05)
     parser.add_argument("--min-rate-hz", type=float, default=8.0)

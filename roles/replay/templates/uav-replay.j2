@@ -10,7 +10,7 @@
 # the scorer compares /lio/odometry and the saved map with the live ones.
 # Geometry comes from the bag's own /tf_static, as recorded: FAST-LIO's
 # IMU-to-LiDAR extrinsic is read from it before the play, and bags from before
-# avia_imu_frame existed get Livox's factory IMU offset as that frame. FAST-LIO
+# avia_imu existed get Livox's factory IMU offset as that frame. FAST-LIO
 # exits when lost and is restarted, as systemd does on the aircraft.
 set -eo pipefail            # no -u: ROS setup scripts reference unset variables
 BAG=""; RATE=1.0; OUT=""; SCORE=1; VIEW=0
@@ -66,7 +66,7 @@ echo "replay of $BAG -> $OUT (rate $RATE, domain $ROS_DOMAIN_ID)"
 EXTRINSIC=$({{ replay_venv }}/bin/python /usr/local/lib/uav/lio_extrinsic.py --bag "$BAG" --out "$OUT/fast_lio_extrinsic.yaml" --imu-frame {{ lio_imu_frame }} --lidar-frame {{ lio_lidar_frame }})
 echo "FAST-LIO $EXTRINSIC"
 if [ "${EXTRINSIC#legacy}" != "$EXTRINSIC" ]; then
-  # A bag from before avia_imu_frame: the factory offset stands in for it, for every node.
+  # A bag from before avia_imu: the factory offset stands in for it, for every node.
   start ros2 run tf2_ros static_transform_publisher $({{ replay_venv }}/bin/python /usr/local/lib/uav/lio_extrinsic.py --legacy-tf --imu-frame {{ lio_imu_frame }} --lidar-frame {{ lio_lidar_frame }})
 fi
 start fastlio

@@ -53,11 +53,12 @@ def add_nominal_avia_frame(robot, config):
     ET.SubElement(joint, "origin", **pose)
 
 
-def add_avia_imu_frame(robot, config):
+def add_avia_imu(robot, config):
     """The Avia's built-in IMU under its LiDAR frame: Livox's factory offset, axes aligned
     (FAST-LIO's avia.yaml gives the LiDAR in the IMU frame, (0.04165, 0.02326, -0.0284)).
-    FAST-LIO's IMU-to-LiDAR extrinsic and every consumer of its poses read this frame."""
-    parent, child = "avia_nominal_lidar_frame", "avia_imu_frame"
+    Named as the avia driver stamps /avia/imu (avia_imu_frame_id). FAST-LIO's IMU-to-LiDAR
+    extrinsic and every consumer of its poses read this frame."""
+    parent, child = "avia_nominal_lidar_frame", "avia_imu"
     links = {element.get("name") for element in robot.findall("link")}
     if parent not in links or child in links:
         raise ValueError(f"Cannot create Avia frame {parent} -> {child}")
@@ -95,7 +96,7 @@ def _launch_setup(context):
     if config.get("native_d555_aliases", True):
         add_nominal_d555_aliases(robot)
     add_nominal_avia_frame(robot, config)
-    add_avia_imu_frame(robot, config)
+    add_avia_imu(robot, config)
     return [Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",

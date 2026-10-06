@@ -4,7 +4,7 @@
 FAST-LIO wants the Avia LiDAR's pose in the Avia IMU's frame (mapping.extrinsic_T,
 and mapping.extrinsic_R row-major: p_imu = R p_lidar + T). Both frames are in the
 aircraft's TF tree: robot_description publishes avia_nominal_lidar_frame and its
-child avia_imu_frame (the Livox factory offset) from /etc/uav/ros/description.yaml,
+child avia_imu (the Livox factory offset) from /etc/uav/ros/description.yaml,
 so a calibration written there reaches FAST-LIO at its next start, as it reaches
 every other consumer of the geometry. uav-lio.service runs this before FAST-LIO;
 the replay launcher runs it on the bag.
@@ -12,7 +12,7 @@ the replay launcher runs it on the bag.
     lio_extrinsic.py --out FILE              # live: /tf_static from robot_state_publisher
     lio_extrinsic.py --bag BAG --out FILE    # a bag's recorded /tf_static
 
-Bags recorded before avia_imu_frame existed (2026-10-06) do not have it; with --bag
+Bags recorded before avia_imu existed (2026-10-06) do not have it; with --bag
 the Livox factory offset stands in for it (LEGACY_IMU_IN_LIDAR) and the output says
 so on stdout ("legacy"); --legacy-tf prints static_transform_publisher arguments for
 that frame, which the replay launcher then publishes for the nodes that look it up.
@@ -27,7 +27,7 @@ import numpy as np
 
 # The Avia's built-in IMU in its LiDAR frame, axes aligned: Livox's factory offset (FAST-LIO's
 # avia.yaml gives the LiDAR in the IMU frame, (0.04165, 0.02326, -0.0284)). Used only for bags
-# that predate avia_imu_frame; the live value is robot_description's avia_imu_xyz.
+# that predate avia_imu; the live value is robot_description's avia_imu_xyz.
 LEGACY_IMU_IN_LIDAR = (-0.04165, -0.02326, 0.0284)
 
 
@@ -148,7 +148,7 @@ def main():
     ap.add_argument("--legacy-tf", action="store_true",
                     help="print static_transform_publisher arguments for the factory IMU frame and exit")
     ap.add_argument("--bag", default="", help="read /tf_static from this bag (directory or .mcap) instead of ROS")
-    ap.add_argument("--imu-frame", default="avia_imu_frame")
+    ap.add_argument("--imu-frame", default="avia_imu")
     ap.add_argument("--lidar-frame", default="avia_nominal_lidar_frame")
     ap.add_argument("--timeout", type=float, default=60.0, help="live: seconds to wait for the frames")
     args = ap.parse_args()

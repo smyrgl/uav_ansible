@@ -69,7 +69,7 @@ and `PCD` are writable by the service user (`ReadWritePaths`).
 | --- | --- | --- |
 | `lidar_type`, `scan_line` | 1 (Livox), 6 | the Avia |
 | `blind` | 1.0 m | the Avia returns nothing closer than 1.00 m (minimum range over twelve bags), and in the A-S+ cage no part of the airframe is in its view (integration report: 0 %), so the blind radius is the sensor's own. On the skids, 45° nose-down, the Avia sees flat ground only out to 2.8 m: 1.5 m left a sliver of it (the top 6° of 77°), 1.0 m twice that |
-| `extrinsic_T`, `extrinsic_R` | from TF, `/run/uav-lio/fast_lio_extrinsic.yaml` | written before every start by `lio_extrinsic.py` from `avia_imu_frame → avia_nominal_lidar_frame` (robot_description; Livox's factory offset, (0.04165, 0.02326, −0.0284), identity) |
+| `extrinsic_T`, `extrinsic_R` | from TF, `/run/uav-lio/fast_lio_extrinsic.yaml` | written before every start by `lio_extrinsic.py` from `avia_imu → avia_nominal_lidar_frame` (robot_description; Livox's factory offset, (0.04165, 0.02326, −0.0284), identity) |
 | `point_filter_num`, filters | 3, 0.5 m, 0.5 m | FAST-LIO's Avia defaults |
 | Publishing | `/cloud_registered` (sparse), no path, no PCD | for the dashboard; map saving later |
 
@@ -87,16 +87,16 @@ the nominal lever arm.
 
 No sensor pose is configured in this role. robot_description publishes the
 Avia's ranging origin (`avia_nominal_lidar_frame`) and its built-in IMU
-(`avia_imu_frame`, Livox's factory offset) from `/etc/uav/ros/description.yaml`,
+(`avia_imu`, Livox's factory offset) from `/etc/uav/ros/description.yaml`,
 under the mount the URDF gives the Avia (45° nose-down in the A-S+ cage).
 FAST-LIO's IMU-to-LiDAR extrinsic is written from TF before every start
 (`lio_extrinsic.py`, `ExecStartPre`; the unit waits for `uav-description`),
 and the bridge, the E1R registration and the map view look up
-`base_link → avia_imu_frame` in `/tf_static`. A re-mount or a calibration is a
+`base_link → avia_imu` in `/tf_static`. A re-mount or a calibration is a
 change to the description; everything here follows at its next start. The
 replay host reads the same frames from each bag's own `/tf_static`, so old bags
 replay with the geometry they were flown with (bags from before
-`avia_imu_frame` get Livox's factory offset as that frame).
+`avia_imu` get Livox's factory offset as that frame).
 
 ## The bridge (`/usr/local/lib/uav/lio_bridge.py`)
 
@@ -199,7 +199,7 @@ FAST-LIO's trajectory and the E1R's mount instead. `uav-lio-e1r.service`
   it with the mount, once per slot: base_link → `e1r_nominal_lidar_frame` from
   `/tf_static` (the URDF: (−0.084, 0, −0.079) m, pitched +90° so the boresight
   points down and the sensor's "up" points forward), expressed in the IMU's
-  frame through `base_link → avia_imu_frame` from the same tree
+  frame through `base_link → avia_imu` from the same tree
   (`T_imu_s = T_base_imu^-1 T_base_s`). Only the static tree is read: following
   `/tf` (~70 Hz of small messages) cost about 9 % of a core in Python;
 - waits for the first pose after a frame's last point (median 19 ms; FAST-LIO

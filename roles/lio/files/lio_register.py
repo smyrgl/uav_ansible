@@ -10,7 +10,7 @@ attitude), through the sensor's mount in the IMU frame:
     p_ci = R_ci_body(t) (R_body_s p_s + t_body_s) + p_ci_body(t)
     T_body_s = T_base_imu^-1 T_base_s
 
-with base_link -> sensor and base_link -> the IMU (avia_imu_frame) both from
+with base_link -> sensor and base_link -> the IMU (avia_imu) both from
 /tf_static: the URDF, nominal until calibrated, re-read every few seconds (only
 the static tree is read, since following /tf at ~70 Hz cost more CPU than the
 registration). No geometry is configured here. The pose is
@@ -368,7 +368,7 @@ def main():
     parser.add_argument("--odometry-topic", default="/Odometry", help="FAST-LIO's IMU pose")
     parser.add_argument("--health-topic", default="/lio/health", help="the lio watchdog's verdict on FAST-LIO")
     parser.add_argument("--base-frame", default="base_link")
-    parser.add_argument("--imu-frame", default="avia_imu_frame", help="FAST-LIO's IMU (body) frame in the URDF")
+    parser.add_argument("--imu-frame", default="avia_imu", help="FAST-LIO's IMU (body) frame in the URDF")
     parser.add_argument("--min-range", type=float, default=0.1, help="m")
     parser.add_argument("--max-range", type=float, default=0.0, help="m; 0 = no limit")
     parser.add_argument("--max-pose-gap", type=float, default=0.25, help="s between bracketing poses")
