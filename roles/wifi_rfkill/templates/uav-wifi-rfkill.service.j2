@@ -1,0 +1,24 @@
+# Managed by uav_ansible — do not edit by hand.
+[Unit]
+Description=Block the Wi-Fi radio while the autopilot is armed (MAVLink HEARTBEAT)
+Documentation=file:///usr/local/lib/uav/uav-wifi-rfkill.py
+After=network.target uav-mavlink-router.service
+Wants=uav-mavlink-router.service
+
+[Service]
+Type=simple
+RuntimeDirectory=uav
+RuntimeDirectoryPreserve=yes
+ExecStart=/usr/bin/python3 /usr/local/lib/uav/uav-wifi-rfkill.py \
+    --endpoint {{ wifi_rfkill_mavlink_endpoint }} \
+    --type {{ wifi_rfkill_type }} \
+    --unblock-delay {{ wifi_rfkill_unblock_delay_s }} \
+    --stale {{ wifi_rfkill_stale_s }} \
+    --autopilot {{ wifi_rfkill_autopilot_system }}:{{ wifi_rfkill_autopilot_component }}
+# Stopping the service must never leave the radio dark.
+ExecStopPost=/usr/sbin/rfkill unblock {{ wifi_rfkill_type }}
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

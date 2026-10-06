@@ -1,0 +1,18 @@
+---
+# Wi-Fi radio off while armed: the uplink dongle stays on the airframe and the
+# UniRC 7 Pro link (RC + MAVLink) shares 2.4/5.8 GHz with it. See README.md.
+wifi_rfkill_enabled: true
+# Where the autopilot's HEARTBEAT is read from (mavlink-router's TCP server,
+# read-only, same source as the flight recorder).
+wifi_rfkill_mavlink_endpoint: "tcp:127.0.0.1:{{ mavlink_router_tcp_port | default(5760) }}"
+# rfkill device type to block: every Wi-Fi radio on the box.
+wifi_rfkill_type: "wlan"
+# Disarmed this long before the radio comes back (a quick re-arm keeps it off).
+wifi_rfkill_unblock_delay_s: 5
+# No autopilot HEARTBEAT for this long (FC off, router down) -> unblock: nothing
+# that happens on the bench may strand the Jetson behind a dark radio.
+wifi_rfkill_stale_s: 10
+# Only this system:component's HEARTBEAT counts (the autopilot, never the
+# camera component's own heartbeat).
+wifi_rfkill_autopilot_system: 1
+wifi_rfkill_autopilot_component: 1

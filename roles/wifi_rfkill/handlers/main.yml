@@ -1,0 +1,7 @@
+---
+- name: Restart uav-wifi-rfkill
+  ansible.builtin.systemd:
+    name: uav-wifi-rfkill.service
+    state: restarted
+    daemon_reload: true
+  when: wifi_rfkill_enabled

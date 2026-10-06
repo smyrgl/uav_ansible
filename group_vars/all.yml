@@ -99,22 +99,24 @@ lan_gateway: ""                 # leave empty — default route is via wifi
 ptp_interface: "enP1p1s0"       # Intel i226 (igc) — confirmed via ip -br link
 ptp_address: "192.168.145.1/30"
 
-# Uplink: USB 802.11ax dongle (Realtek), the Jetson's internet egress (NTRIP,
-# apt, Tailscale) on the bench. Credentials are secrets -> vault.yml.
+# Uplink: USB 802.11ac dongle (Cudy AC650 = Realtek RTL8811CU, rtl8821cu DKMS
+# driver from kernel_modules), the Jetson's internet egress (NTRIP, apt,
+# Tailscale). Credentials are secrets -> vault.yml.
 # CAUTION: the home wifi subnet must NOT overlap 192.168.144.0/24 or .145.0/30.
-# Depends on the dongle's DKMS driver (kernel_modules) being loaded first.
-# The dongle comes out for flight (sealed airframe) and goes back in on the
-# bench, so its config stays installed either way: without the dongle the
-# interface doesn't exist and the config is inert, and a converge skips the
-# bring-up. The egress then falls back to the Siyi GCS (gcs_gateway role, its
+# Since 2026-10-05 the dongle is a permanent fixture: the wifi_rfkill role
+# soft-blocks the radio while the autopilot is armed (the UniRC link shares
+# 2.4/5.8 GHz) and the egress falls back to the Siyi GCS (gcs_gateway role, its
 # default route at gcs_gateway_route_metric); wifi's route has the lower metric,
-# so the bench prefers it whenever both are up. wifi_enabled: false is for a
-# Jetson that should never join (it removes the uplink file, credentials and all).
+# so the Jetson prefers it whenever both are up. Without the dongle the
+# interface doesn't exist, the config is inert and a converge skips the
+# bring-up. wifi_enabled: false is for a Jetson that should never join (it
+# removes the uplink file, credentials and all).
 wifi_enabled: true
 wifi_route_metric: 50                  # below gcs_gateway_route_metric (100)
-wifi_interface: "wlx7419f815e6a9"  # rtl8852cu dongle — confirmed via ip -br link
-# Address: DHCP with a fixed lease on the UniFi gateway (74:19:f8:15:e6:a9 ->
-# 192.168.1.42), so the name `jethawk` stays in the gateway DNS and the address
+wifi_interface: "wlxd40dab451572"  # Cudy AC650 (d4:0d:ab:45:15:72) — confirmed via ip -br link
+# Address: DHCP with a fixed lease on the UniFi gateway (d4:0d:ab:45:15:72 ->
+# 192.168.1.42, moved from the old BrosTrend stick 74:19:f8:15:e6:a9 on
+# 2026-10-05), so the name `jethawk` stays in the gateway DNS and the address
 # never moves; a netplan static here would race the DHCP pool instead.
 wifi_ssid: "{{ vault_wifi_ssid | default('TODO') }}"
 wifi_password: "{{ vault_wifi_password | default('CHANGEME') }}"
@@ -158,6 +160,15 @@ kernel_dkms_drivers:
     version: "6.8.12"
     module: "ch341"
     tarball: "ch341-6.8.12.tar.gz"
+  # Wi-Fi 802.11ac dongle (Cudy WU650 / AC650 = Realtek RTL8811CU, USB
+  # 0bda:c811) -- the permanent uplink stick (2026-10-05). morrownr/8821cu-20210916
+  # at bda65aac150d2cde0df9603206eec23a6f3b77c4 (2026-08-21), kernels 5.12-6.17,
+  # firmware embedded (the tegra kernel cannot load .zst firmware). docs/ dropped
+  # from the vendored copy; see UPSTREAM.txt inside the tarball.
+  - name: "rtl8821cu"
+    version: "5.12.0.4"
+    module: "8821cu"
+    tarball: "rtl8821cu-5.12.0.4.tar.gz"
 
 # =============================================================================
 # device_tree  (overlays applied via the extlinux OVERLAYS key — require reboot)

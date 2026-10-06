@@ -1,0 +1,36 @@
+---
+- name: Install the Wi-Fi rfkill agent
+  ansible.builtin.copy:
+    src: uav-wifi-rfkill.py
+    dest: /usr/local/lib/uav/uav-wifi-rfkill.py
+    mode: "0755"
+  notify: Restart uav-wifi-rfkill
+
+- name: Install the uav-wifi-rfkill unit
+  ansible.builtin.template:
+    src: uav-wifi-rfkill.service.j2
+    dest: /etc/systemd/system/uav-wifi-rfkill.service
+    mode: "0644"
+  notify: Restart uav-wifi-rfkill
+
+- name: Enable the agent
+  ansible.builtin.systemd:
+    name: uav-wifi-rfkill.service
+    enabled: true
+    state: started
+    daemon_reload: true
+  when: wifi_rfkill_enabled
+
+- name: Disable the agent and leave the radio open
+  ansible.builtin.systemd:
+    name: uav-wifi-rfkill.service
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  when: not wifi_rfkill_enabled
+
+- name: Make sure the radio is not left blocked when the agent is disabled
+  ansible.builtin.command:
+    cmd: "rfkill unblock {{ wifi_rfkill_type }}"
+  changed_when: false
+  when: not wifi_rfkill_enabled

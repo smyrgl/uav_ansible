@@ -259,6 +259,7 @@ discards anything written to it).
 | `lidar_view` | GPU (EGL) chase-camera render of the LIO map, the live Avia and E1R scans and the X950's URDF → NVENC RTSP `:8555/lidar`, the camera's stream 2 in QGC; rendered only while watched |
 | `hflow` | H-Flow over the FC's CAN2 bus, read listen-only on the Jetson's can0 → PX4-typed ROS 2 topics + Range |
 | `mavlink_router` | MAVLink hub: PX4 (TELEM2 UART) ↔ QGC (TCP 5760) ↔ onboard apps (UDP 14540) |
+| `wifi_rfkill` | Wi-Fi radio soft-blocked while the autopilot is armed (its HEARTBEAT via mavlink-router), released after disarm, on silence and on stop: the permanent uplink dongle shares 2.4/5.8 GHz with the UniRC link |
 | `rt_tuning` | soft-RT: isolation, SCHED_FIFO, mlock, IRQ affinity, governor |
 | `rt_kernel` | **parked** — opt-in, measurement-gated PREEMPT_RT |
 | `isaac_ros` | NVIDIA Isaac ROS apt repository and packages, pinned (4.6); back since 2026-10-02 for `vslam` (cuVSLAM) |

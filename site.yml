@@ -52,6 +52,8 @@
       tags: ['px4_link']
     - role: mavlink_router
       tags: ['mavlink_router']
+    - role: wifi_rfkill          # Wi-Fi radio off while armed (shares 2.4/5.8 GHz with the UniRC link)
+      tags: ['wifi_rfkill']
     - role: mavlink_camera
       tags: ['mavlink_camera']
     - role: ros_runtime
