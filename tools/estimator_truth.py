@@ -9,18 +9,21 @@ position of the main antenna, 50 Hz, with the solution mode) and
 so association is by stamp.
 
 Geometry. The receiver positions the main antenna, the estimators position
-`base_link`; each estimator pose is carried to the antenna with the URDF lever
-arm before comparing (so the comparison is exact under any attitude). The
+`base_link`; each estimator pose is carried to the antenna with the lever arm
+base_link -> gnss_main_link read from the bag's own /tf_static (the URDF as it was
+when the bag was recorded), so the comparison is exact under any attitude and no
+geometry is configured here (--lever-arm overrides it). The
 reference heading is used as the receiver reports it: the owner configures the
 antenna-to-vehicle offset in the receiver, this tool applies none unless told.
 
 Alignment. PX4's local origin and local ENU are gravity-aligned, so those frames
 differ by a yaw and a translation: a 4-DoF least-squares alignment, well
 conditioned even on a straight line, is the model and APE is the position error
-after it. FAST-LIO's camera_init is its first IMU pose and is only as level as
-the sensor was at start (5.4 deg off on 2026-10-05), so the full SE(3) Umeyama
-fit is reported alongside whenever the motion spans three directions: its tilt
-angle, and `ape_se3`, the error with that tilt removed. A large APE with a small
+after it. FAST-LIO's camera_init is gravity-aligned at start since 2026-10-06
+(roles/lio, patch_fast_lio.py); before that it was the first IMU pose, as level as
+the sensor happened to be (5.4 deg off on 2026-10-05). The full SE(3) Umeyama fit
+is reported alongside whenever the motion spans three directions: its tilt angle,
+and `ape_se3`, the error with that tilt removed. A large APE with a small
 `ape_se3` is a frame that is not gravity-aligned, not drift. RPE(1 s) compares
 1 s displacement vectors; yaw is compared sample by sample after the alignment
 yaw (offset, spread, drift).
@@ -52,8 +55,26 @@ RTK_FIXED, RTK_FLOAT = 4, 5  # PVTGeodetic mode, low nibble
 MOVING_BASE_FIXED, MOVING_BASE_FLOAT = 7, 8
 A_WGS84, F_WGS84 = 6378137.0, 1 / 298.257223563
 NS = 1_000_000_000
-# gnss_main_link in base_link from x950_description (mount at (-0.334278, 0.336696, 0.0925), antenna 0.03048 above)
-DEFAULT_LEVER_ARM = (-0.334278, 0.336696, 0.12298)
+
+
+def lever_arm_from_tf_static(messages, base_frame, frame):
+    """frame's origin in base_frame from recorded /tf_static messages (a parent chain), or None."""
+    import numpy as np
+    parent = {}
+    for message in messages:
+        for t in message.transforms:
+            tr, q = t.transform.translation, t.transform.rotation
+            parent[t.child_frame_id.lstrip("/")] = (t.header.frame_id.lstrip("/"), np.array([tr.x, tr.y, tr.z]),
+                                                    quat_to_matrix(np.array([[q.x, q.y, q.z, q.w]]))[0])
+    point, name = np.zeros(3), frame
+    for _ in range(64):
+        if name == base_frame:
+            return tuple(float(v) for v in point)
+        if name not in parent:
+            return None
+        name, translation, rotation = parent[name]
+        point = rotation @ point + translation
+    return None
 
 
 def wrap(angle):
@@ -383,8 +404,10 @@ def main(argv=None):
     ap.add_argument("--gate-estimator", default="/lio/odometry", help="the estimator the gates apply to")
     ap.add_argument("--pvt-topic", default="/gnss/pvtgeodetic")
     ap.add_argument("--heading-topic", default="/gnss/atteuler")
-    ap.add_argument("--lever-arm", default=",".join(str(v) for v in DEFAULT_LEVER_ARM),
-                    help="main antenna in base_link, metres (x,y,z)")
+    ap.add_argument("--lever-arm", default="",
+                    help="main antenna in base_link, metres (x,y,z); default: --antenna-frame from the bag's /tf_static")
+    ap.add_argument("--antenna-frame", default="gnss_main_link", help="the main antenna's frame in the URDF")
+    ap.add_argument("--base-frame", default="base_link")
     ap.add_argument("--heading-offset-deg", type=float, default=0.0,
                     help="added to the receiver's heading; 0: the receiver already reports vehicle heading")
     ap.add_argument("--allow-float", action="store_true", help="accept RTK-float reference samples too")
@@ -402,11 +425,17 @@ def main(argv=None):
     ap.add_argument("--rpe-yaw-max-deg", type=float, default=1.0)
     ap.add_argument("--out", default="")
     args = ap.parse_args(argv)
-    lever = tuple(float(v) for v in args.lever_arm.split(","))
-    if len(lever) != 3:
-        ap.error("lever-arm needs x,y,z")
     estimators = [e for e in args.estimators.split(",") if e]
-    bag = read_bag(args.bag, estimators + [args.pvt_topic, args.heading_topic, args.heading_cov_topic])
+    bag = read_bag(args.bag, estimators + [args.pvt_topic, args.heading_topic, args.heading_cov_topic, "/tf_static"])
+    if args.lever_arm:
+        lever = tuple(float(v) for v in args.lever_arm.split(","))
+        if len(lever) != 3:
+            ap.error("lever-arm needs x,y,z")
+    else:
+        lever = lever_arm_from_tf_static(bag.get("/tf_static", []), args.base_frame, args.antenna_frame)
+        if lever is None:
+            print(f"TRUTH SKIPPED: no {args.base_frame} -> {args.antenna_frame} in the bag's /tf_static (pass --lever-arm)")
+            return 2
     ref_t, ref_xyz, ref_yaw, info = reference_from_bag(bag, args.pvt_topic, args.heading_topic,
                                                        args.heading_offset_deg, args.allow_float, allow_float_heading=args.allow_float_heading, att_cov_topic=args.heading_cov_topic, heading_max_std_deg=args.heading_max_std_deg or None,
                                                        heading_convention=args.heading_convention)

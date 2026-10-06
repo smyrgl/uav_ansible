@@ -21,6 +21,9 @@ def circle_flight(n=1200, radius=20.0, hz=20.0):
     return t, p, yaw
 
 
+# gnss_main_link in base_link (x950_description): what the scorer reads from a bag's /tf_static.
+MAIN_ANTENNA = (-0.334278, 0.336696, 0.12298)
+
 class Geometry(unittest.TestCase):
     def test_enu_scale_and_axes(self):
         lat0, lon0 = math.radians(40.0), math.radians(-105.0)
@@ -68,7 +71,7 @@ class Scoring(unittest.TestCase):
 
     def test_perfect_estimator_in_a_rotated_frame_scores_zero(self):
         t, p, yaw = circle_flight()
-        lever = np.array(et.DEFAULT_LEVER_ARM)
+        lever = np.array(MAIN_ANTENNA)
         ref_t, ref_xyz, ref_yaw = self.reference(t, p, yaw, lever)
         r = et.rotz(0.4); est_p = p @ r.T + np.array([10.0, 20.0, -1.0]); est_yaw = et.wrap(yaw + 0.4)
         s = et.score_estimator(t, est_p, yaw_quat(est_yaw), lever, ref_t, ref_xyz, ref_yaw)
@@ -82,7 +85,7 @@ class Scoring(unittest.TestCase):
     def test_noise_and_drift_show_up_where_expected(self):
         rng = np.random.default_rng(1)
         t, p, yaw = circle_flight()
-        lever = np.array(et.DEFAULT_LEVER_ARM)
+        lever = np.array(MAIN_ANTENNA)
         ref_t, ref_xyz, ref_yaw = self.reference(t, p, yaw, lever)
         drift = np.outer((t - t[0]) / et.NS, [0.01, 0.0, 0.0])          # 1 cm/s along x: 0.6 m over the minute
         est_p = p + drift + rng.normal(0, 0.02, p.shape)
@@ -97,7 +100,7 @@ class Scoring(unittest.TestCase):
         """FAST-LIO's camera_init is its first IMU pose: a 5 deg tilt gives a large 4-DoF APE while the
         SE(3) fit removes it, and the tilt itself is reported."""
         t, p, yaw = circle_flight()
-        lever = np.array(et.DEFAULT_LEVER_ARM)
+        lever = np.array(MAIN_ANTENNA)
         ref_t, ref_xyz, ref_yaw = self.reference(t, p, yaw, lever)
         a = math.radians(5.0)
         tilt = np.array([[1.0, 0.0, 0.0], [0.0, math.cos(a), -math.sin(a)], [0.0, math.sin(a), math.cos(a)]])
@@ -132,7 +135,7 @@ class Scoring(unittest.TestCase):
         """A 10 Hz heading during a 60 deg/s yaw: snapping it to the 20 Hz pose grid would be 25 ms off
         (1.5 deg per sample, 3 deg over a 1 s pair); interpolation on its own stamps is exact."""
         t, p, yaw = circle_flight(n=1200, hz=20.0)
-        lever = np.array(et.DEFAULT_LEVER_ARM)
+        lever = np.array(MAIN_ANTENNA)
         ref_t, ref_xyz, _ = self.reference(t, p, yaw, lever)
         turn = np.linspace(0, math.radians(60.0) * (t[-1] - t[0]) / et.NS, len(t))   # 60 deg/s on top of the tangent
         yaw_fast = et.wrap(yaw + turn)
@@ -146,7 +149,7 @@ class Scoring(unittest.TestCase):
         """Headings stamped 80 ms late during a 60 deg/s yaw: the raw 1 s yaw RPE is several degrees,
         the fit finds the lag and the compensated metric is clean."""
         t, p, yaw = circle_flight(n=1200, hz=20.0)
-        lever = np.array(et.DEFAULT_LEVER_ARM)
+        lever = np.array(MAIN_ANTENNA)
         ref_t, ref_xyz, _ = self.reference(t, p, yaw, lever)
         rate = math.radians(60.0) * np.sin(np.linspace(0, 6 * math.pi, len(t)))      # yaw rate swinging +-60 deg/s
         yaw_fast = et.wrap(yaw + np.cumsum(rate) * (t[1] - t[0]) / et.NS)
@@ -159,14 +162,14 @@ class Scoring(unittest.TestCase):
     def test_stationary_reference_is_reported_not_scored(self):
         t = (1_791_200_000 * et.NS + np.arange(200) * et.NS // 10).astype(np.int64)
         p = np.zeros((200, 3)); yaw = np.zeros(200)
-        s = et.score_estimator(t, p, yaw_quat(yaw), et.DEFAULT_LEVER_ARM, t, p + 0.01, yaw)
+        s = et.score_estimator(t, p, yaw_quat(yaw), MAIN_ANTENNA, t, p + 0.01, yaw)
         self.assertIn("alignment not defined", s["skipped"])
 
     def test_reference_gaps_mask_samples(self):
         t, p, yaw = circle_flight(n=600)
-        ref_t, ref_xyz, ref_yaw = self.reference(t, p, yaw, et.DEFAULT_LEVER_ARM)
+        ref_t, ref_xyz, ref_yaw = self.reference(t, p, yaw, MAIN_ANTENNA)
         keep = np.ones(len(t), bool); keep[200:300] = False                     # a 5 s hole in the reference
-        s = et.score_estimator(t, p, yaw_quat(yaw), et.DEFAULT_LEVER_ARM, ref_t[keep], ref_xyz[keep], ref_yaw[keep])
+        s = et.score_estimator(t, p, yaw_quat(yaw), MAIN_ANTENNA, ref_t[keep], ref_xyz[keep], ref_yaw[keep])
         self.assertLess(s["matched"], len(t)); self.assertGreater(s["matched"], 400)
 
     def test_interpolation_wraps_yaw(self):
@@ -175,6 +178,20 @@ class Scoring(unittest.TestCase):
         _xyz, yaw, ok = et.interpolate_reference(ref_t, np.zeros((2, 3)), ref_yaw, np.array([et.NS // 2]), 2 * et.NS)
         self.assertAlmostEqual(abs(float(yaw[0])), math.pi, places=6)
         self.assertTrue(bool(ok[0]))
+
+
+class LeverArmFromTf(unittest.TestCase):
+    def test_chains_the_recorded_static_transforms(self):
+        from types import SimpleNamespace as N
+        def tf(parent, child, xyz, q=(0.0, 0.0, 0.0, 1.0)):
+            return N(header=N(frame_id=parent), child_frame_id=child,
+                     transform=N(translation=N(x=xyz[0], y=xyz[1], z=xyz[2]), rotation=N(x=q[0], y=q[1], z=q[2], w=q[3])))
+        yaw = (0.0, 0.0, 0.9976, 0.0698)              # the main mount's recorded rotation (2026-10-05 bag)
+        message = N(transforms=[tf("base_link", "gnss_main_mount_link", (-0.334278, 0.336696, 0.0925), yaw),
+                                tf("gnss_main_mount_link", "gnss_main_link", (0.0, 0.0, 0.03048))])
+        lever = et.lever_arm_from_tf_static([message], "base_link", "gnss_main_link")
+        np.testing.assert_allclose(lever, MAIN_ANTENNA, atol=1e-5)
+        self.assertIsNone(et.lever_arm_from_tf_static([message], "base_link", "gnss_aux_link"))
 
 
 if __name__ == "__main__":
