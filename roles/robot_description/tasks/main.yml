@@ -109,3 +109,13 @@
     state: started
     daemon_reload: true
 
+
+# tools/mount_check.py: the sensor mounts against this description, from every
+# sensor's view of the floor and from the accelerometers (bench check after any
+# re-mount; README). It reads TF through lio_extrinsic.py, installed beside it by
+# the lio role.
+- name: Install the mount check
+  ansible.builtin.copy:
+    src: "{{ playbook_dir }}/tools/mount_check.py"
+    dest: /usr/local/lib/uav/mount_check.py
+    mode: "0755"

@@ -152,10 +152,12 @@
   loop:
     - estimator_truth.py
     - test_estimator_truth.py
+    - mount_check.py              # the sensor mounts against the URDF, here from a bag (--bag)
+    - test_mount_check.py
 
-- name: Run the estimator-truth tests in the scoring environment
+- name: Run the estimator-truth and mount-check tests in the scoring environment
   ansible.builtin.command:
-    argv: ["{{ replay_venv }}/bin/python", -m, unittest, -q, test_estimator_truth]
+    argv: ["{{ replay_venv }}/bin/python", -m, unittest, -q, test_estimator_truth, test_mount_check]
     chdir: /usr/local/lib/uav
   environment:
     PYTHONDONTWRITEBYTECODE: "1"

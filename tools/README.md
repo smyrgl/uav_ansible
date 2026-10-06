@@ -35,3 +35,12 @@ limits the datasets. Tests: `python3 -m unittest test_ulog2mcap` in `tools/`
 are installed; pyulog's own `test/sample.ulg` works but has no timesync or
 PPS data, so the UTC path is covered by the synthetic tests until a log from
 this FC is converted).
+
+## mount_check.py — the sensor mounts against the URDF
+
+The bench check after any re-mount (roles/robot_description README): with the
+aircraft on a flat floor, every depth sensor's floor plane and every IMU's
+gravity, carried into `base_link` through the frames their own messages name,
+compared with each other and with PX4's gravity. Live on the Jetson, or
+`--bag <bag> --start S` on the replay host. No sensor pose is configured in the
+tool: it checks whatever the description says.
