@@ -5,9 +5,11 @@ FAST-LIO publishes the pose of the Avia's built-in IMU ("body") in its own
 start frame ("camera_init"), stamped in the Avia's PTP-locked UTC, with no
 twist. This republishes it as base_link odometry on /lio/odometry for
 robot_localization (and later PX4):
-- every pose is moved from the IMU to base_link through the IMU's lever arm
-  (nominal URDF mount + the Avia's factory IMU offset, axes aligned), so
-  differencing base_link positions accounts for rotation about base_link;
+- every pose is moved from the IMU to base_link through the IMU's mount,
+  base_link -> avia_imu_frame from /tf_static: the URDF (the Avia's mount, now
+  45 deg nose-down) and robot_description's factory IMU offset. Position and
+  attitude both: differencing base_link positions accounts for rotation about
+  base_link, and the attitude is base_link's, not the pitched IMU's;
 - the twist is a central difference of three consecutive base_link poses,
   rotated into the middle pose's body frame and stamped with its time;
 - the twist covariance is a diagonal floor (FAST-LIO publishes none);
@@ -36,11 +38,14 @@ def rotate_inverse(q, v):
     return rotate((-q[0], -q[1], -q[2], q[3]), v)
 
 
-def base_from_imu(position, quaternion, lever_arm):
-    """base_link position for an IMU pose, the IMU sitting at lever_arm in
-    base_link with aligned axes: p_base = p_imu - R(q) r."""
-    r = rotate(quaternion, lever_arm)
-    return tuple(p - d for p, d in zip(position, r))
+def base_from_imu(position, quaternion, mount):
+    """base_link's pose for an IMU pose, the IMU mounted at mount = (r, q_mount) in
+    base_link: T_w_base = T_w_imu T_base_imu^-1, so q_base = q q_mount^-1 and
+    p_base = p - R(q_base) r. Returns (position, quaternion)."""
+    r, q_mount = mount
+    q_base = quat_multiply(quaternion, (-q_mount[0], -q_mount[1], -q_mount[2], q_mount[3]))
+    offset = rotate(q_base, r)
+    return tuple(p - d for p, d in zip(position, offset)), q_base
 
 
 def quat_multiply(a, b):
@@ -107,13 +112,12 @@ def create_bridge_node(options):
     from rclpy.time import Time
     from tf2_ros import Buffer, StaticTransformBroadcaster, TransformException, TransformListener
 
-    lever_arm = tuple(options.imu_lever_arm)
-
     class Bridge(Node):
         def __init__(self):
             super().__init__("lio_bridge")
             self.velocity = CentralVelocity()
-            self.counts = {"odom_in": 0, "odom_out": 0, "anchors": 0}
+            self.counts = {"odom_in": 0, "odom_out": 0, "anchors": 0, "no_mount": 0}
+            self.mount, self.mount_read = None, None   # base_link -> the IMU, from /tf_static
             self.tf_buffer = Buffer()
             self.tf_listener = TransformListener(self.tf_buffer, self)
             self.static_tf = StaticTransformBroadcaster(self)
@@ -125,13 +129,35 @@ def create_bridge_node(options):
             self.diag_pub = self.create_publisher(DiagnosticArray, "/diagnostics", 10)
             self._diag = (DiagnosticArray, DiagnosticStatus, KeyValue)
             self.create_timer(1.0, self._diagnose)
-            self.get_logger().info(f"lio bridge: {options.input_topic} (IMU at {lever_arm} m in base_link) -> {options.odometry_topic}")
+            self.get_logger().info(f"lio bridge: {options.input_topic} ({options.imu_frame} from /tf_static) -> {options.odometry_topic}")
+
+        def _mount(self):
+            """base_link -> the IMU as (translation, quaternion), re-read every mount_refresh s."""
+            now = time.monotonic()
+            if self.mount is not None and now - self.mount_read < options.mount_refresh:
+                return self.mount
+            try:
+                tf = self.tf_buffer.lookup_transform(options.base_frame, options.imu_frame, self._Time())
+            except self._TransformException:
+                return self.mount
+            t, r = tf.transform.translation, tf.transform.rotation
+            mount = ((t.x, t.y, t.z), (r.x, r.y, r.z, r.w))
+            if mount != self.mount:
+                self.get_logger().info(f"{options.base_frame} -> {options.imu_frame}: t {tuple(round(v, 4) for v in mount[0])} m, "
+                                       f"q {tuple(round(v, 4) for v in mount[1])}")
+            self.mount, self.mount_read = mount, now
+            return mount
 
         def _odom(self, message):
             self.counts["odom_in"] += 1
+            mount = self._mount()
+            if mount is None:
+                self.counts["no_mount"] += 1
+                self.get_logger().warning(f"no transform {options.base_frame} -> {options.imu_frame} yet: pose dropped",
+                                          throttle_duration_sec=10)
+                return
             p, q = message.pose.pose.position, message.pose.pose.orientation
-            quaternion = (q.x, q.y, q.z, q.w)
-            base = base_from_imu((p.x, p.y, p.z), quaternion, lever_arm)
+            base, quaternion = base_from_imu((p.x, p.y, p.z), (q.x, q.y, q.z, q.w), mount)
             stamp = message.header.stamp.sec * 1_000_000_000 + message.header.stamp.nanosec
             result = self.velocity.add(stamp, base, quaternion, message)
             if result is None:
@@ -143,6 +169,8 @@ def create_bridge_node(options):
             message.header.frame_id = options.odom_frame
             message.child_frame_id = options.base_frame
             message.pose.pose.position.x, message.pose.pose.position.y, message.pose.pose.position.z = position
+            o = message.pose.pose.orientation
+            o.x, o.y, o.z, o.w = quaternion
             linear, angular = message.twist.twist.linear, message.twist.twist.angular
             linear.x, linear.y, linear.z = vx, vy, vz
             angular.x = angular.y = angular.z = 0.0
@@ -179,7 +207,9 @@ def create_bridge_node(options):
             rate = len(self.arrivals) / 5.0
             latencies, self.latencies = self.latencies[-50:], []
             latency = sorted(latencies)[len(latencies) // 2] if latencies else None
-            if self.last_odom is None or mono - self.last_odom > 1.0:
+            if self.mount is None:
+                level, text = DiagnosticStatus_.WARN, f"No transform {options.base_frame} -> {options.imu_frame}"
+            elif self.last_odom is None or mono - self.last_odom > 1.0:
                 level = DiagnosticStatus_.ERROR if self.last_odom else DiagnosticStatus_.WARN
                 text = "No LiDAR-inertial odometry"
             elif rate < options.min_rate_hz or (latency is not None and latency > options.max_latency_s):
@@ -188,6 +218,9 @@ def create_bridge_node(options):
                 level, text = DiagnosticStatus_.OK, f"Odometry at {rate:.1f} Hz, Avia UTC (PTP)"
             values = {"odometry_hz": round(rate, 1), "latency_ms": None if latency is None else round(latency * 1e3, 1),
                       "velocity_resets": self.velocity.resets, **self.counts}
+            if self.mount is not None:
+                values[f"{options.base_frame} -> {options.imu_frame}"] = "t (%.4f, %.4f, %.4f) m, q (%.4f, %.4f, %.4f, %.4f)" % (
+                    *self.mount[0], *self.mount[1])
             out = DiagnosticArray_()
             out.header.stamp = self.get_clock().now().to_msg()
             out.status = [DiagnosticStatus_(level=level, name="lio", hardware_id="FAST-LIO2 (Livox Avia + IMU)",
@@ -225,8 +258,8 @@ def main():
     parser.add_argument("--odom-frame", default="camera_init", help="FAST-LIO's own world frame (it is that frame)")
     parser.add_argument("--anchor-parent", default="odom", help="the TF frame FAST-LIO's frame is anchored under")
     parser.add_argument("--base-frame", default="base_link")
-    parser.add_argument("--imu-lever-arm", type=float, nargs=3, required=True, metavar=("X", "Y", "Z"),
-                        help="the IMU's position in base_link, m")
+    parser.add_argument("--imu-frame", default="avia_imu_frame", help="FAST-LIO's IMU (body) frame in the URDF")
+    parser.add_argument("--mount-refresh", type=float, default=10.0, help="s between re-reads of the IMU's mount")
     parser.add_argument("--twist-stddev", type=float, default=0.05)
     parser.add_argument("--min-rate-hz", type=float, default=8.0)
     parser.add_argument("--max-latency-s", type=float, default=0.35)   # one frame of central difference + processing

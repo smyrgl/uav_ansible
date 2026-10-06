@@ -5,3 +5,6 @@ xacro_mappings: {{ robot_description_xacro_mappings | to_json }}
 
 avia_lidar_xyz: {{ robot_description_avia_lidar_xyz | to_json }}
 avia_lidar_rpy: {{ robot_description_avia_lidar_rpy | to_json }}
+# The Avia's IMU in its LiDAR frame (Livox factory offset): FAST-LIO's extrinsic.
+avia_imu_xyz: {{ robot_description_avia_imu_xyz | to_json }}
+avia_imu_rpy: {{ robot_description_avia_imu_rpy | to_json }}

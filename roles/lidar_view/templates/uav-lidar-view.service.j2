@@ -1,6 +1,6 @@
 [Unit]
 Description=LiDAR map view (FAST-LIO map, Avia + E1R scans, X950 chase camera; GPU-rendered, RTSP {{ lidar_view_rtsp_port }}{{ lidar_view_rtsp_path }})
-After=network-online.target uav-lio-map.service
+After=network-online.target uav-lio-map.service uav-description.service
 Wants=network-online.target
 PartOf=uav-ros.target
 StartLimitIntervalSec=0
@@ -14,7 +14,7 @@ SupplementaryGroups=video render
 EnvironmentFile={{ lidar_view_environment_file }}
 Environment=ROS_LOG_DIR=/var/log/uav-ros
 Environment=PYOPENGL_PLATFORM=egl
-ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/uav_lidar_view.py --urdf {{ lidar_view_description_share }}/urdf/x950.urdf --package-dir x950_description={{ lidar_view_description_share }} --imu-lever-arm {{ lidar_view_imu_lever_arm | join(" ") }} --avia-mount {{ lidar_view_avia_mount | join(" ") }} --e1r-mount {{ lidar_view_e1r_mount | join(" ") }} --map-topic {{ lidar_view_map_topic }} --scan-topic {{ lidar_view_scan_topic }} --e1r-topic {{ lidar_view_e1r_topic }} --odometry-topic {{ lidar_view_odometry_topic }} --width {{ lidar_view_width }} --height {{ lidar_view_height }} --fps {{ lidar_view_fps }} --fovy {{ lidar_view_fovy_deg }} --bitrate {{ lidar_view_bitrate | int }} --codec {{ lidar_view_codec }} --port {{ lidar_view_rtsp_port }} --mount {{ lidar_view_rtsp_path }} --advertised-uri {{ lidar_view_advertised_uri }} --chase-distance {{ lidar_view_chase_distance_m }} --chase-max-distance {{ lidar_view_chase_max_distance_m }} --cutaway-above {{ lidar_view_cutaway_above_m }} --edl-strength {{ lidar_view_edl_strength }} --safe-area {{ lidar_view_safe_area | join(" ") }} --promote {{ lidar_view_promote | int }}'
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/uav_lidar_view.py --urdf {{ lidar_view_description_share }}/urdf/x950.urdf --package-dir x950_description={{ lidar_view_description_share }} --imu-frame {{ lidar_view_imu_frame }} --avia-frame {{ lidar_view_avia_frame }} --e1r-frame {{ lidar_view_e1r_frame }} --map-topic {{ lidar_view_map_topic }} --scan-topic {{ lidar_view_scan_topic }} --e1r-topic {{ lidar_view_e1r_topic }} --odometry-topic {{ lidar_view_odometry_topic }} --width {{ lidar_view_width }} --height {{ lidar_view_height }} --fps {{ lidar_view_fps }} --fovy {{ lidar_view_fovy_deg }} --bitrate {{ lidar_view_bitrate | int }} --codec {{ lidar_view_codec }} --port {{ lidar_view_rtsp_port }} --mount {{ lidar_view_rtsp_path }} --advertised-uri {{ lidar_view_advertised_uri }} --chase-distance {{ lidar_view_chase_distance_m }} --chase-max-distance {{ lidar_view_chase_max_distance_m }} --cutaway-above {{ lidar_view_cutaway_above_m }} --edl-strength {{ lidar_view_edl_strength }} --safe-area {{ lidar_view_safe_area | join(" ") }} --promote {{ lidar_view_promote | int }}'
 Restart=on-failure
 RestartSec=5
 KillSignal=SIGTERM

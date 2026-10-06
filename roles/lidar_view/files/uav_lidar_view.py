@@ -64,6 +64,25 @@ def transform(xyz=(0.0, 0.0, 0.0), rpy=(0.0, 0.0, 0.0)):
     return t
 
 
+def matrix_quat(r):
+    """Unit quaternion (x, y, z, w) of a 3x3 rotation matrix."""
+    t = np.trace(r)
+    if t > 0:
+        s = math.sqrt(t + 1.0) * 2
+        q = ((r[2, 1] - r[1, 2]) / s, (r[0, 2] - r[2, 0]) / s, (r[1, 0] - r[0, 1]) / s, 0.25 * s)
+    elif r[0, 0] > r[1, 1] and r[0, 0] > r[2, 2]:
+        s = math.sqrt(1.0 + r[0, 0] - r[1, 1] - r[2, 2]) * 2
+        q = (0.25 * s, (r[0, 1] + r[1, 0]) / s, (r[0, 2] + r[2, 0]) / s, (r[2, 1] - r[1, 2]) / s)
+    elif r[1, 1] > r[2, 2]:
+        s = math.sqrt(1.0 + r[1, 1] - r[0, 0] - r[2, 2]) * 2
+        q = ((r[0, 1] + r[1, 0]) / s, 0.25 * s, (r[1, 2] + r[2, 1]) / s, (r[0, 2] - r[2, 0]) / s)
+    else:
+        s = math.sqrt(1.0 + r[2, 2] - r[0, 0] - r[1, 1]) * 2
+        q = ((r[0, 2] + r[2, 0]) / s, (r[1, 2] + r[2, 1]) / s, 0.25 * s, (r[1, 0] - r[0, 1]) / s)
+    q = np.asarray(q, float)
+    return tuple(float(v) for v in q / np.linalg.norm(q))
+
+
 def yaw_of(q):
     x, y, z, w = q
     return math.atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z))
@@ -105,10 +124,14 @@ def slerp(q0, q1, u):
     return q / np.linalg.norm(q)
 
 
-def base_from_imu(position, q, lever_arm):
-    """base_link position for FAST-LIO's IMU pose (the IMU at lever_arm in base_link, axes
-    aligned, as the lio bridge has it): p_base = p_imu - R(q) r."""
-    return np.asarray(position, float) - quat_matrix(*q) @ np.asarray(lever_arm, float)
+def base_from_imu(position, q, mount):
+    """base_link's pose for FAST-LIO's IMU pose, mount being the IMU's 4x4 pose in base_link
+    (the URDF's avia_imu_frame, as the lio bridge has it): T_w_base = T_w_imu mount^-1.
+    Returns (position (3,), quaternion (x, y, z, w))."""
+    t = np.eye(4)
+    t[:3, :3], t[:3, 3] = quat_matrix(*q), position
+    base = t @ np.linalg.inv(mount)
+    return base[:3, 3], matrix_quat(base[:3, :3])
 
 
 class PoseBuffer:
@@ -527,14 +550,12 @@ def _origin(element):
                      _floats(o.get("rpy") if o is not None else None, (0, 0, 0)))
 
 
-def load_urdf_model(urdf_path, package_dirs):
-    """The URDF's mesh visuals in base_link coordinates: a list of (triangles (n, 3, 3), rgba)."""
-    root = ET.parse(urdf_path).getroot()
-    materials = {}
-    for m in root.findall("material"):
-        color = m.find("color")
-        if color is not None:
-            materials[m.get("name")] = _floats(color.get("rgba"), (0.5, 0.5, 0.5, 1.0))
+def _urdf_root(source):
+    """A URDF as XML text (/robot_description) or a file path."""
+    return ET.fromstring(source) if source.lstrip().startswith("<") else ET.parse(source).getroot()
+
+
+def _link_transforms(root):
     parent = {j.find("child").get("link"): (j.find("parent").get("link"), _origin(j)) for j in root.findall("joint")}
 
     def link_transform(name):
@@ -543,6 +564,25 @@ def load_urdf_model(urdf_path, package_dirs):
             name, tj = parent[name]
             t = tj @ t
         return t
+    return link_transform
+
+
+def urdf_frames(source):
+    """Every link's 4x4 pose in the URDF's root (base_link)."""
+    root = _urdf_root(source)
+    link_transform = _link_transforms(root)
+    return {link.get("name"): link_transform(link.get("name")) for link in root.findall("link")}
+
+
+def load_urdf_model(source, package_dirs):
+    """The URDF's mesh visuals in base_link coordinates: a list of (triangles (n, 3, 3), rgba)."""
+    root = _urdf_root(source)
+    materials = {}
+    for m in root.findall("material"):
+        color = m.find("color")
+        if color is not None:
+            materials[m.get("name")] = _floats(color.get("rgba"), (0.5, 0.5, 0.5, 1.0))
+    link_transform = _link_transforms(root)
 
     def resolve(uri):
         if uri.startswith("package://"):
@@ -1324,7 +1364,6 @@ def create_node(options, scene, stream):
     from sensor_msgs.msg import PointCloud2
     from std_msgs.msg import String, UInt32
 
-    lever_arm = np.asarray(options.imu_lever_arm, float)
     latched = QoSProfile(depth=1, reliability=ReliabilityPolicy.RELIABLE, durability=DurabilityPolicy.TRANSIENT_LOCAL)
 
     class LidarView(Node):
@@ -1333,6 +1372,10 @@ def create_node(options, scene, stream):
             self.heavy = []                       # map, scan and E1R subscriptions, only while watched
             self.last_odom = None
             self.stats = {}
+            # The model and every mount from the description robot_state_publisher serves.
+            self.description, self.frames, self.imu_mount = None, None, None
+            self.description_ready = threading.Event()
+            self.create_subscription(String, options.description_topic, self._description, latched)
             self.create_subscription(Odometry, options.odometry_topic, self._odom, 50)
             # The lio watchdog's verdict (why the map stopped) and the map's epoch (when what
             # this view accumulated must go: points taken back, or a new map).
@@ -1343,10 +1386,22 @@ def create_node(options, scene, stream):
             self.diag_pub = self.create_publisher(DiagnosticArray, "/diagnostics", 10)
             self.create_timer(1.0, self._diagnose)
 
+        def _description(self, message):
+            frames = urdf_frames(message.data)
+            missing = [f for f in (options.imu_frame, options.avia_frame, options.e1r_frame) if f not in frames]
+            if missing:
+                self.get_logger().error(f"{options.description_topic} lacks {', '.join(missing)}")
+                return
+            self.description, self.frames, self.imu_mount = message.data, frames, frames[options.imu_frame]
+            if not self.description_ready.is_set():
+                self.get_logger().info(f"model and mounts from {options.description_topic} ({len(frames)} links)")
+            self.description_ready.set()
+
         def _odom(self, message):
+            if self.imu_mount is None:
+                return                            # no description yet
             p, q = message.pose.pose.position, message.pose.pose.orientation
-            quat = (q.x, q.y, q.z, q.w)
-            base = base_from_imu((p.x, p.y, p.z), quat, lever_arm)
+            base, quat = base_from_imu((p.x, p.y, p.z), (q.x, q.y, q.z, q.w), self.imu_mount)
             t = message.header.stamp.sec + message.header.stamp.nanosec * 1e-9
             newest = scene.poses.newest()
             if newest is not None and (t < newest[0] - 1.0 or t > newest[0] + 5.0 or
@@ -1441,7 +1496,7 @@ def create_node(options, scene, stream):
 
 
 def render_loop(options, scene, stream, node, stop, snapshot=None):
-    parts = load_urdf_model(options.urdf, dict(pd.split("=", 1) for pd in options.package_dir))
+    parts = load_urdf_model(options.description or options.urdf, dict(pd.split("=", 1) for pd in options.package_dir))
     mesh = mesh_vertices(parts)
     renderer = Renderer(options.width, options.height, options.map_capacity, 400_000, mesh, scene.trail.cap)
     # Rotor discs as two rings per motor (decorative: the URDF has no propellers), in base_link.
@@ -1466,8 +1521,7 @@ def _render(options, scene, stream, node, stop, snapshot, renderer, mesh, rotors
     proj = perspective(options.fovy, options.width / options.height, 0.3, 3000.0)
     focal = options.height / 2 / math.tan(math.radians(options.fovy) / 2)
     camera = ChaseCamera(options.fovy, options.chase_distance, options.chase_max_distance)
-    avia_mount = transform(options.avia_mount[:3], options.avia_mount[3:])
-    e1r_mount = transform(options.e1r_mount[:3], options.e1r_mount[3:])
+    avia_mount, e1r_mount = options.frames[options.avia_frame], options.frames[options.e1r_frame]
     avia_lines, e1r_lines, ring = cone_lines(AVIA_FOV), pyramid_lines(E1R_FOV), ring_lines(1.0)
     span = float(np.ptp(mesh[:, :2], axis=0).max()) if len(mesh) else 1.0       # the airframe across, m
     zrange, zrange_time, hud_time, probe_time = (-1.0, 5.0), 0.0, 0.0, 0.0
@@ -1541,7 +1595,7 @@ def _render(options, scene, stream, node, stop, snapshot, renderer, mesh, rotors
             clip_z = float(position[2]) + options.cutaway_above if enclosed else 1e9
             colors = [style["avia_fov_color"], style["e1r_fov_color"], style["plumb_color"], style["plumb_color"]]
             pieces = [place(avia_lines, model, avia_mount, min(max(0.18 * camera.length, 1.5), 6.0)),
-                      place(e1r_lines, model, e1r_mount, min(max(agl + float(options.e1r_mount[2]) - 0.05, 0.3), 80.0)),
+                      place(e1r_lines, model, e1r_mount, min(max(agl + float(e1r_mount[2, 3]) - 0.05, 0.3), 80.0)),
                       np.array([position, (position[0], position[1], ground)]),
                       ring * max(0.45, 0.035 * camera.length) + np.array([position[0], position[1], ground + 0.02])]
             # Never smaller than model_min_px across (at most 3x true size): from a long boom the
@@ -1637,7 +1691,7 @@ def first_returns(points, sensor, inside, max_range, bin_deg=0.25, cap=24000, rn
     return points[first]
 
 
-def demo_site(scene, agl, heading_deg, avia_mount, e1r_mount, lever_arm, seed=7):
+def demo_site(scene, agl, heading_deg, avia_mount, e1r_mount, seed=7):
     """A synthetic site for --demo (no ROS): rolling ground with a road, trees and a building,
     the aircraft agl above it at the end of a curving trail, and live scans cut from the
     site by each sensor's field of view. For tuning the look and checking the framing."""
@@ -1697,8 +1751,7 @@ def demo_site(scene, agl, heading_deg, avia_mount, e1r_mount, lever_arm, seed=7)
         scene.poses.add(100.0 + 0.1 * i, position, q, arrival=now - 0.5 + 0.1 * i)
     pose = np.eye(4)
     pose[:3, :3], pose[:3, 3] = quat_matrix(*q), position
-    avia = pose @ transform(avia_mount[:3], avia_mount[3:])
-    e1r = pose @ transform(e1r_mount[:3], e1r_mount[3:])
+    avia, e1r = pose @ avia_mount, pose @ e1r_mount
     ta, tb = (math.tan(math.radians(v) / 2) for v in AVIA_FOV)
     scene.scan = first_returns(site, avia, lambda x, y, z: (x > 0) & ((y / (ta * x)) ** 2 + (z / (tb * x)) ** 2 < 1),
                                200.0, rng=rng)
@@ -1735,14 +1788,14 @@ def main():
     parser.add_argument("--health-topic", default="/lio/health", help="the lio watchdog's verdict on FAST-LIO")
     parser.add_argument("--map-topic-base", dest="map_topic_base", default="/lio/map",
                         help="lio_map's base topic (its /epoch says when to reload)")
-    parser.add_argument("--imu-lever-arm", type=float, nargs=3, default=[0.22035, -0.02626, 0.1384],
-                        metavar=("X", "Y", "Z"), help="the Avia IMU in base_link (the lio bridge's)")
-    parser.add_argument("--urdf", required=True)
+    parser.add_argument("--description-topic", default="/robot_description",
+                        help="the URDF robot_state_publisher serves: the model and every mount below")
+    parser.add_argument("--description-timeout", type=float, default=120.0, help="s to wait for it at start")
+    parser.add_argument("--urdf", required=True, help="the model for --demo (and if the description never comes)")
     parser.add_argument("--package-dir", action="append", default=[], help="name=path for package:// URIs")
-    parser.add_argument("--avia-mount", type=float, nargs=6, default=[0.262, -0.003, 0.110, 0, 0, 0],
-                        metavar=("X", "Y", "Z", "ROLL", "PITCH", "YAW"), help="base_link -> the Avia's LiDAR frame")
-    parser.add_argument("--e1r-mount", type=float, nargs=6, default=[-0.084, 0, -0.0793, 0, 1.570796, 0],
-                        metavar=("X", "Y", "Z", "ROLL", "PITCH", "YAW"), help="base_link -> the E1R's LiDAR frame")
+    parser.add_argument("--imu-frame", default="avia_imu_frame", help="FAST-LIO's IMU (body) frame")
+    parser.add_argument("--avia-frame", default="avia_nominal_lidar_frame", help="the Avia's LiDAR frame (its FOV)")
+    parser.add_argument("--e1r-frame", default="e1r_nominal_lidar_frame", help="the E1R's LiDAR frame (its FOV)")
     parser.add_argument("--width", type=int, default=1280)
     parser.add_argument("--height", type=int, default=720)
     parser.add_argument("--fps", type=int, default=30)
@@ -1780,9 +1833,16 @@ def main():
                         help="no ROS: render a synthetic site with the aircraft AGL metres up to --snapshot")
     parser.add_argument("--demo-heading", type=float, default=30.0, help="deg, ENU")
     options, ros_args = parser.parse_known_args()
+    options.description = None
     if options.demo is not None:
+        # No ROS: the URDF file, which lacks the description's runtime Avia frames; the Avia's
+        # own link stands in for them in the synthetic scene.
+        frames = urdf_frames(options.urdf)
+        for name, fallbacks in ((options.avia_frame, ("avia_link",)), (options.imu_frame, (options.avia_frame, "avia_link"))):
+            frames.setdefault(name, next(frames[f] for f in fallbacks if f in frames))
+        options.frames = frames
         scene = Scene(options.voxel, options.map_capacity, options.trail_step, options.promote)
-        demo_site(scene, options.demo, options.demo_heading, options.avia_mount, options.e1r_mount, options.imu_lever_arm)
+        demo_site(scene, options.demo, options.demo_heading, frames[options.avia_frame], frames[options.e1r_frame])
         options.always_on = True
         render_loop(options, scene, None, Offline(), threading.Event(), options.snapshot or "demo.png")
         return
@@ -1802,6 +1862,10 @@ def main():
     spin = threading.Thread(target=executor.spin, daemon=True, name="lidar-view-ros")
     spin.start()
     try:
+        if not node.description_ready.wait(options.description_timeout):
+            raise SystemExit(f"no {options.description_topic} with {options.imu_frame}, {options.avia_frame} and "
+                             f"{options.e1r_frame} in {options.description_timeout:.0f} s (is uav-description running?)")
+        options.description, options.frames = node.description, node.frames
         if options.snapshot:
             stop.wait(options.wait)
         render_loop(options, scene, stream, node, stop, options.snapshot or None)

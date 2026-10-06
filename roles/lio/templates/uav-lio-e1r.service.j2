@@ -12,7 +12,7 @@ User={{ lio_service_user }}
 Group={{ lio_service_user }}
 EnvironmentFile={{ lio_environment_file }}
 Environment=ROS_LOG_DIR=/var/log/uav-ros
-ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/lio_register.py --name e1r --input-topic {{ lio_e1r_topic }} --time-field {{ lio_e1r_time_field }} --output-topic {{ lio_e1r_registered_topic }} --imu-lever-arm {{ lio_imu_lever_arm | join(" ") }} --min-range {{ lio_e1r_min_range_m }} --max-range {{ lio_e1r_max_range_m }} --max-pose-gap {{ lio_e1r_max_pose_gap_s }} --max-wait {{ lio_e1r_max_wait_s }}'
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/lio_register.py --name e1r --input-topic {{ lio_e1r_topic }} --time-field {{ lio_e1r_time_field }} --output-topic {{ lio_e1r_registered_topic }} --imu-frame {{ lio_imu_frame }} --min-range {{ lio_e1r_min_range_m }} --max-range {{ lio_e1r_max_range_m }} --max-pose-gap {{ lio_e1r_max_pose_gap_s }} --max-wait {{ lio_e1r_max_wait_s }}'
 Restart=on-failure
 RestartSec=5
 KillSignal=SIGINT

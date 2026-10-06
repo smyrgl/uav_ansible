@@ -53,6 +53,27 @@ def add_nominal_avia_frame(robot, config):
     ET.SubElement(joint, "origin", **pose)
 
 
+def add_avia_imu_frame(robot, config):
+    """The Avia's built-in IMU under its LiDAR frame: Livox's factory offset, axes aligned
+    (FAST-LIO's avia.yaml gives the LiDAR in the IMU frame, (0.04165, 0.02326, -0.0284)).
+    FAST-LIO's IMU-to-LiDAR extrinsic and every consumer of its poses read this frame."""
+    parent, child = "avia_nominal_lidar_frame", "avia_imu_frame"
+    links = {element.get("name") for element in robot.findall("link")}
+    if parent not in links or child in links:
+        raise ValueError(f"Cannot create Avia frame {parent} -> {child}")
+    pose = {}
+    for key, default in (("xyz", [-0.04165, -0.02326, 0.0284]), ("rpy", [0.0, 0.0, 0.0])):
+        values = config.get(f"avia_imu_{key}", default)
+        if not isinstance(values, list) or len(values) != 3 or not all(math.isfinite(float(v)) for v in values):
+            raise ValueError(f"Invalid Avia IMU {key}: {values}")
+        pose[key] = " ".join(str(float(v)) for v in values)
+    ET.SubElement(robot, "link", name=child)
+    joint = ET.SubElement(robot, "joint", name="avia_imu_joint", type="fixed")
+    ET.SubElement(joint, "parent", link=parent)
+    ET.SubElement(joint, "child", link=child)
+    ET.SubElement(joint, "origin", **pose)
+
+
 def _launch_setup(context):
     config_path = Path(LaunchConfiguration("config_file").perform(context))
     config = yaml.safe_load(config_path.read_text())
@@ -74,6 +95,7 @@ def _launch_setup(context):
     if config.get("native_d555_aliases", True):
         add_nominal_d555_aliases(robot)
     add_nominal_avia_frame(robot, config)
+    add_avia_imu_frame(robot, config)
     return [Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",

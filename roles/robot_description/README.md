@@ -18,6 +18,15 @@ These are **nominal mechanical estimates**, not a claim of measured calibration.
 The authored geometry and Xacro are not modified. Disable the aliases before
 deploying another publisher that owns the same native frame IDs.
 
+The launch also adds two Avia frames from `/etc/uav/ros/description.yaml`:
+`avia_nominal_lidar_frame` under `avia_link` (`avia_lidar_xyz/rpy`, the ranging
+origin) and `avia_imu_frame` under it (`avia_imu_xyz/rpy`, Livox's factory IMU
+offset). Nothing else in the repository carries sensor geometry: FAST-LIO's
+IMU-to-LiDAR extrinsic, the lio bridge, the E1R registration, the LiDAR map view
+and the bag tools all look these frames up in TF (live) or in the bag's
+`/tf_static` (offline), so a calibration written here reaches all of them at
+their next start.
+
 Pose overrides can be supplied through `robot_description_xacro_mappings`, using
 the existing Xacro argument names and space-separated metre/radian values. They
 are checked against the exported model at launch. E1R data should use

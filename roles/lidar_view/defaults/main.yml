@@ -17,12 +17,11 @@ lidar_view_map_topic: /lio/map/updates     # lio_map's 5 cm voxels; the whole ma
 lidar_view_scan_topic: /cloud_registered   # the live Avia scan (white)
 lidar_view_e1r_topic: "{{ lio_e1r_registered_topic | default('/lio/registered/e1r') }}"   # the live E1R scan (magenta)
 lidar_view_odometry_topic: /Odometry       # FAST-LIO's IMU pose, moved to base_link here
-lidar_view_imu_lever_arm: "{{ lio_imu_lever_arm | default([0.22035, -0.02626, 0.1384]) }}"
-# Field-of-view outlines: base_link -> each LiDAR frame (x y z roll pitch yaw),
-# the nominal mounts (avia_nominal_lidar_frame from robot_description's Avia
-# datum; e1r_nominal_lidar_frame from the URDF: under the body, looking down).
-lidar_view_avia_mount: [0.262, -0.003, 0.110, 0, 0, 0]
-lidar_view_e1r_mount: [-0.084, 0, -0.0793, 0, 1.570796, 0]
+# Geometry: the model, FAST-LIO's IMU and both fields of view come from the
+# description robot_state_publisher serves (/robot_description), by frame name.
+lidar_view_imu_frame: "{{ lio_imu_frame | default('avia_imu_frame') }}"
+lidar_view_avia_frame: "{{ lio_lidar_frame | default('avia_nominal_lidar_frame') }}"
+lidar_view_e1r_frame: e1r_nominal_lidar_frame
 
 # The chase camera: a boom behind the aircraft, at least this long, that
 # lengthens and steepens with height above the ground (from the E1R's

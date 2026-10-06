@@ -45,7 +45,25 @@ class GeometryTest(unittest.TestCase):
 
     def test_base_from_imu_rotates_the_lever_arm(self):
         q = (0, 0, math.sin(math.pi / 4), math.cos(math.pi / 4))      # yaw 90 deg
-        np.testing.assert_allclose(lv.base_from_imu((10, 0, 1), q, (0.2, 0, 0.1)), (10, -0.2, 0.9), atol=1e-12)
+        p, q_base = lv.base_from_imu((10, 0, 1), q, lv.transform((0.2, 0, 0.1)))
+        np.testing.assert_allclose(p, (10, -0.2, 0.9), atol=1e-12)
+        np.testing.assert_allclose(q_base, q, atol=1e-12)
+
+    def test_base_from_imu_takes_the_pitched_mount_out(self):
+        """The Avia IMU 45 deg nose-down in base_link: a level aircraft's IMU pose is pitched, its base is not."""
+        mount = lv.transform((0.234, -0.023, 0.089), (0, math.pi / 4, 0))
+        world_base = lv.transform((5.0, 1.0, 20.0), (0, 0, 0.3))
+        imu = world_base @ mount
+        p, q = lv.base_from_imu(imu[:3, 3], lv.matrix_quat(imu[:3, :3]), mount)
+        np.testing.assert_allclose(p, (5.0, 1.0, 20.0), atol=1e-12)
+        np.testing.assert_allclose(lv.quat_matrix(*q), world_base[:3, :3], atol=1e-12)
+
+    def test_frames_come_from_the_description_text(self):
+        urdf = """<robot name="t"><link name="base_link"/><link name="avia_link"/><link name="avia_imu_frame"/>
+          <joint name="a" type="fixed"><parent link="base_link"/><child link="avia_link"/><origin xyz="0.18 0 0.05" rpy="0 0.785398 0"/></joint>
+          <joint name="b" type="fixed"><parent link="avia_link"/><child link="avia_imu_frame"/><origin xyz="0 0 0.1" rpy="0 0 0"/></joint></robot>"""
+        frames = lv.urdf_frames(urdf)
+        np.testing.assert_allclose(frames["avia_imu_frame"][:3, 3], (0.18 + 0.1 * math.sin(0.785398), 0, 0.05 + 0.1 * math.cos(0.785398)), atol=1e-6)
 
     def test_slerp_halfway(self):
         q = lv.slerp((0, 0, 0, 1), (0, 0, math.sin(0.5), math.cos(0.5)), 0.5)

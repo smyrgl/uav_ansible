@@ -1,5 +1,5 @@
 [Unit]
-Description=FAST-LIO watchdog (log + odometry -> /lio/health; restarts uav-lio when it stays diverged)
+Description=FAST-LIO watchdog (log + odometry -> /lio/health for the map and the E1R registration)
 After=network-online.target uav-lio.service
 Wants=network-online.target
 PartOf=uav-ros.target
@@ -14,7 +14,7 @@ Group={{ lio_service_user }}
 SupplementaryGroups=systemd-journal
 EnvironmentFile={{ lio_environment_file }}
 Environment=ROS_LOG_DIR=/var/log/uav-ros
-ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/lio_watchdog.py --unit uav-lio.service --restart-unit uav-lio.service --sustain {{ lio_watchdog_sustain_s }} --restart-after {{ lio_watchdog_restart_after_s }} --restart-min-interval {{ lio_watchdog_restart_min_interval_s }} --restarts-per-hour {{ lio_watchdog_restarts_per_hour | int }}{{ '' if lio_watchdog_restart | bool else ' --no-restart' }}'
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash; exec /usr/bin/python3 /usr/local/lib/uav/lio_watchdog.py --unit uav-lio.service --sustain {{ lio_watchdog_sustain_s }} --max-speed {{ lio_max_speed_mps }}'
 Restart=on-failure
 RestartSec=5
 KillSignal=SIGINT

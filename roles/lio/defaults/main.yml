@@ -17,16 +17,29 @@ lio_build_jobs: 4                          # the IKFoM templates are memory-hung
 
 lio_lidar_topic: /avia/custom
 lio_imu_topic: /avia/imu
-# Avia preprocessing: FAST-LIO's own avia.yaml discards everything within 4 m;
-# 1.5 m keeps the near ground at low altitude and still drops the airframe.
-lio_blind_m: 1.5
+# Avia preprocessing: FAST-LIO's own avia.yaml discards everything within 4 m.
+# The Avia returns nothing closer than 1.00 m anyway (minimum range over twelve
+# bags, 2026-10-06), and in the A-S+ cage no part of the airframe is in its field
+# of view (integration report: 0 % at every origin), so the blind radius is the
+# sensor's own. It matters on the ground: 45 deg nose-down on the skids, the Avia
+# sees flat ground only out to 2.8 m, and 1.5 m left FAST-LIO a sliver of it.
+lio_blind_m: 1.0
 lio_point_filter_num: 3                    # every 3rd point
 lio_filter_size_surf_m: 0.5
 lio_filter_size_map_m: 0.5
-# The Avia's built-in IMU relative to its LiDAR (factory; FAST-LIO's avia.yaml):
-# LiDAR origin in the IMU frame, axes aligned.
-lio_extrinsic_t: [0.04165, 0.02326, -0.0284]
-lio_extrinsic_r: [1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0]
+# Geometry comes from the URDF, never from here. FAST-LIO's IMU-to-LiDAR
+# extrinsic is read from TF (lio_imu_frame -> lio_lidar_frame, both published by
+# robot_description) into lio_extrinsic_file before every start; the bridge, the
+# E1R registration and the map view look up base_link -> lio_imu_frame.
+lio_imu_frame: avia_imu_frame
+lio_lidar_frame: avia_nominal_lidar_frame
+lio_extrinsic_file: /run/uav-lio/fast_lio_extrinsic.yaml
+# FAST-LIO (patched at build, files/patch_fast_lio.py) exits when lost, for
+# systemd to restart it: no scan matched to the map for lio_lost_exit_s of LiDAR
+# time, or faster than lio_max_speed_mps for lio_overspeed_s.
+lio_lost_exit_s: 3.0
+lio_max_speed_mps: 30.0
+lio_overspeed_s: 0.5
 lio_publish_scans: true                    # /cloud_registered (world frame): feeds the voxel map
 # Full undistorted scans on /cloud_registered (~24k points x 48 B per frame,
 # ~11 MB/s on the local DDS) rather than the 0.5 m feature cloud; the voxel map
@@ -50,11 +63,9 @@ lio_map_publish_period_s: 10.0             # overview
 lio_map_promote_voxels: 3
 lio_map_dir: /data/maps
 
-# Bridge: FAST-LIO's IMU pose -> base_link odometry on lio_odometry_topic.
+# Bridge: FAST-LIO's IMU pose -> base_link odometry on lio_odometry_topic,
+# through base_link -> lio_imu_frame from /tf_static.
 lio_odometry_topic: /lio/odometry
-# The Avia IMU in base_link: base_link -> avia_nominal_lidar_frame (URDF,
-# (0.262, -0.003, 0.110), level) plus the IMU in the LiDAR frame (-T above).
-lio_imu_lever_arm: [0.22035, -0.02626, 0.1384]
 lio_twist_stddev_mps: 0.05
 
 # The E1R in the same map: lio_register.py places every E1R point in
@@ -74,16 +85,11 @@ lio_e1r_max_pose_gap_s: 0.25               # bracketing poses further apart: FAS
 lio_e1r_max_wait_s: 0.5                    # for the first pose after a frame's last point
 
 # Divergence (README): the watchdog reads FAST-LIO's log ("No Effective Points!",
-# "No point, skip this scan!") and odometry (impossible speeds, leaps), publishes
-# /lio/health, and the E1R registration and the map stop on DIVERGED (the map
-# taking back what arrived since the onset). A run of evidence this long is a
-# divergence; shorter ones (a featureless moment) are only 'degraded'.
+# "No point, skip this scan!", "FAST-LIO lost") and odometry (impossible speeds,
+# leaps), publishes /lio/health, and the E1R registration and the map stop on
+# DIVERGED (the map taking back what arrived since the onset). A run of evidence
+# this long is a divergence; shorter ones (a featureless moment) are only
+# 'degraded'. It restarts nothing: FAST-LIO exits when lost (lio_lost_exit_s,
+# longer than this) and systemd restarts it, every time.
 lio_watchdog_enabled: true
 lio_watchdog_sustain_s: 2.0
-# Restart FAST-LIO (systemctl, allowed by a polkit rule for this unit alone) after
-# this long diverged, at most once per interval and this many times an hour; then
-# give up and say so (an aircraft facing a wall diverges again at once).
-lio_watchdog_restart: true
-lio_watchdog_restart_after_s: 10.0
-lio_watchdog_restart_min_interval_s: 120.0
-lio_watchdog_restarts_per_hour: 5

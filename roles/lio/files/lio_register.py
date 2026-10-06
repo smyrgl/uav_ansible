@@ -5,14 +5,15 @@ For the down-looking E1R, whose field of view never overlaps the Avia's: every
 point is placed in camera_init with the pose of the Avia's IMU ("body") at that
 point's own firing time, interpolated between FAST-LIO's poses (/Odometry: the
 IMU in camera_init at each scan's end, 10 Hz; linear in position, slerp in
-attitude), through the sensor's mount:
+attitude), through the sensor's mount in the IMU frame:
 
-    p_ci = R_ci_body(t) (R_base_s p_s + t_base_s - r_imu) + p_ci_body(t)
+    p_ci = R_ci_body(t) (R_body_s p_s + t_body_s) + p_ci_body(t)
+    T_body_s = T_base_imu^-1 T_base_s
 
-with base_link -> sensor from /tf_static (the URDF's nominal extrinsic until it
-is calibrated, re-read every few seconds; only the static tree is read, since
-following /tf at ~70 Hz cost more CPU than the registration) and r_imu the
-IMU's lever arm in base_link (axes aligned, as in the lio bridge). The pose is
+with base_link -> sensor and base_link -> the IMU (avia_imu_frame) both from
+/tf_static: the URDF, nominal until calibrated, re-read every few seconds (only
+the static tree is read, since following /tf at ~70 Hz cost more CPU than the
+registration). No geometry is configured here. The pose is
 interpolated once per firing time (the E1R fires 64 points at once) and
 composed with the mount there, so each point is transformed once. A frame
 waits for the first
@@ -139,6 +140,14 @@ def decode(message, time_field):
     return xyz, raw["intensity"].astype(np.float32), raw[time_field].astype(np.float64)
 
 
+def sensor_in_imu(base_imu, base_sensor):
+    """(rotation, translation) of the sensor in the IMU frame from both mounts in base_link,
+    each (rotation 3x3, translation 3): T_imu_s = T_base_imu^-1 T_base_s."""
+    r_bi, t_bi = base_imu
+    r_bs, t_bs = base_sensor
+    return r_bi.T @ r_bs, r_bi.T @ (np.asarray(t_bs, float) - np.asarray(t_bi, float))
+
+
 def rpy_degrees(rotation):
     return (math.degrees(math.atan2(rotation[2, 1], rotation[2, 2])),
             math.degrees(math.asin(max(-1.0, min(1.0, -rotation[2, 0])))),
@@ -155,8 +164,6 @@ def create_register_node(options):
     from std_msgs.msg import String
     from tf2_msgs.msg import TFMessage
     from tf2_ros import Buffer, TransformException
-
-    lever_arm = np.array(options.imu_lever_arm, float)
 
     class Register(Node):
         def __init__(self):
@@ -186,7 +193,7 @@ def create_register_node(options):
             self.create_timer(0.25, self._flush)     # frames are flushed on each pose; this drops stale ones
             self.create_timer(1.0, self._diagnose)
             self.get_logger().info(f"{options.input_topic} -> {options.output_topic} with {options.odometry_topic} poses "
-                                   f"(IMU at {tuple(lever_arm)} m in {options.base_frame})")
+                                   f"(the IMU is {options.imu_frame}; mounts from /tf_static)")
 
         def _odom(self, message):
             p, q = message.pose.pose.position, message.pose.pose.orientation
@@ -238,17 +245,16 @@ def create_register_node(options):
             self.counts["points_in"] += len(xyz)
             keep = range_gate(xyz, options.min_range, options.max_range)
             self.counts["points_range_gated"] += int(len(keep) - keep.sum())
-            extrinsic = self._extrinsic(message.header.frame_id)
-            if extrinsic is None:
+            extrinsic, imu = self._extrinsic(message.header.frame_id), self._extrinsic(options.imu_frame)
+            if extrinsic is None or imu is None:
                 self.counts["frames_no_extrinsic"] += 1
-                self.get_logger().warning(f"no transform {options.base_frame} -> {message.header.frame_id} yet",
-                                          throttle_duration_sec=10)
+                missing = message.header.frame_id if extrinsic is None else options.imu_frame
+                self.get_logger().warning(f"no transform {options.base_frame} -> {missing} yet", throttle_duration_sec=10)
                 return
             if not keep.any():
                 self.counts["frames_empty"] += 1
                 return
-            rotation, translation = extrinsic
-            mount = (rotation, translation - lever_arm)                   # the sensor in the IMU frame
+            mount = sensor_in_imu(imu, extrinsic)                         # the sensor in the IMU frame
             times = np.round(seconds[keep] * 1e9).astype(np.int64)
             if len(self.pending) >= options.max_pending:
                 self.pending.popleft()
@@ -362,8 +368,7 @@ def main():
     parser.add_argument("--odometry-topic", default="/Odometry", help="FAST-LIO's IMU pose")
     parser.add_argument("--health-topic", default="/lio/health", help="the lio watchdog's verdict on FAST-LIO")
     parser.add_argument("--base-frame", default="base_link")
-    parser.add_argument("--imu-lever-arm", type=float, nargs=3, required=True, metavar=("X", "Y", "Z"),
-                        help="the IMU's position in base_link, m")
+    parser.add_argument("--imu-frame", default="avia_imu_frame", help="FAST-LIO's IMU (body) frame in the URDF")
     parser.add_argument("--min-range", type=float, default=0.1, help="m")
     parser.add_argument("--max-range", type=float, default=0.0, help="m; 0 = no limit")
     parser.add_argument("--max-pose-gap", type=float, default=0.25, help="s between bracketing poses")

@@ -1,8 +1,10 @@
 [Unit]
 Description=FAST-LIO2 LiDAR-inertial odometry (Livox Avia + its built-in IMU)
-After=network-online.target uav-avia.service
-Wants=network-online.target
+# The IMU-to-LiDAR extrinsic comes from the description's TF tree.
+After=network-online.target uav-avia.service uav-description.service
+Wants=network-online.target uav-description.service
 PartOf=uav-ros.target
+# FAST-LIO exits when it is lost; it is restarted every time, never given up on.
 StartLimitIntervalSec=0
 
 [Service]
@@ -12,9 +14,11 @@ Group={{ lio_service_user }}
 EnvironmentFile={{ lio_environment_file }}
 Environment=ROS_LOG_DIR=/var/log/uav-ros
 WorkingDirectory=/var/lib/uav-ros
-ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ lio_workspace }}/install/local_setup.bash && exec {{ lio_workspace }}/install/lib/fast_lio/fastlio_mapping --ros-args --params-file {{ lio_config_path }}'
-Restart=on-failure
-RestartSec=5
+RuntimeDirectory=uav-lio
+ExecStartPre=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && exec /usr/bin/python3 /usr/local/lib/uav/lio_extrinsic.py --out {{ lio_extrinsic_file }} --imu-frame {{ lio_imu_frame }} --lidar-frame {{ lio_lidar_frame }}'
+ExecStart=/bin/bash -c 'source /opt/ros/{{ ros_distro }}/setup.bash && source {{ lio_workspace }}/install/local_setup.bash && exec {{ lio_workspace }}/install/lib/fast_lio/fastlio_mapping --ros-args --params-file {{ lio_config_path }} --params-file {{ lio_extrinsic_file }}'
+Restart=always
+RestartSec=2
 KillSignal=SIGINT
 TimeoutStopSec=30
 StateDirectory=uav-ros

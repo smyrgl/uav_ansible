@@ -43,20 +43,45 @@
     path: "{{ lio_source_dir }}/CMakeLists.txt"
   register: lio_tree
 
-# FAST-LIO's CMakeLists forces C++14; Jazzy's rclcpp headers need C++17
-# (std::is_convertible_v, ...). The pinned checkout stays pristine; the copy
-# colcon builds gets the standard switched.
-- name: Prepare the FAST-LIO build tree (C++17)
+# The pinned checkout stays pristine; the copy colcon builds gets uav_ansible's
+# edits (files/patch_fast_lio.py: C++17, a gravity-aligned world frame, exit when
+# lost). The copy records the patch script's fingerprint, so a changed script
+# re-prepares and rebuilds it.
+- name: Create the uav script directory
+  ansible.builtin.file:
+    path: /usr/local/lib/uav
+    state: directory
+    mode: "0755"
+
+- name: Install FAST-LIO's patch script
+  ansible.builtin.copy:
+    src: patch_fast_lio.py
+    dest: /usr/local/lib/uav/patch_fast_lio.py
+    mode: "0755"
+
+- name: Fingerprint the patch script
+  ansible.builtin.command: /usr/bin/python3 /usr/local/lib/uav/patch_fast_lio.py --fingerprint
+  register: lio_patch_fingerprint
+  changed_when: false
+
+- name: Read the build tree's patch marker
+  ansible.builtin.slurp:
+    src: "{{ lio_source_dir }}/.uav_patches"
+  register: lio_patch_marker
+  failed_when: false
+
+- name: Prepare the FAST-LIO build tree (uav_ansible's patches)
   ansible.builtin.shell: |
     set -e
     rm -rf {{ lio_source_dir }}
     cp -a {{ lio_checkout_dir }} {{ lio_source_dir }}
     rm -rf {{ lio_source_dir }}/.git
-    sed -i -e 's/c++14/c++17/g' -e 's/CMAKE_CXX_STANDARD 14/CMAKE_CXX_STANDARD 17/' {{ lio_source_dir }}/CMakeLists.txt
-    grep -q 'CMAKE_CXX_STANDARD 17' {{ lio_source_dir }}/CMakeLists.txt
+    /usr/bin/python3 /usr/local/lib/uav/patch_fast_lio.py {{ lio_source_dir }}
   args:
     executable: /bin/bash
-  when: lio_checkout is changed or not lio_tree.stat.exists
+  when: >-
+    lio_checkout is changed or not lio_tree.stat.exists or
+    ((lio_patch_marker.content | default('') | b64decode | trim) != lio_patch_fingerprint.stdout)
   register: lio_source
 
 - name: Check for the FAST-LIO executable

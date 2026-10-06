@@ -27,8 +27,8 @@
       fov_degree: 90.0
       det_range: 450.0
       extrinsic_est_en: false
-      extrinsic_T: {{ lio_extrinsic_t | to_json }}
-      extrinsic_R: {{ lio_extrinsic_r | to_json }}
+      # extrinsic_T / extrinsic_R: the IMU-to-LiDAR transform from the URDF, written
+      # to {{ lio_extrinsic_file }} by lio_extrinsic.py before every start.
     publish:
       path_en: false
       effect_map_en: false
@@ -39,3 +39,7 @@
     pcd_save:
       pcd_save_en: false
       interval: -1
+    uav:                                # patch_fast_lio.py: exit when lost, systemd restarts
+      lost_exit_s: {{ lio_lost_exit_s | float }}
+      max_speed_mps: {{ lio_max_speed_mps | float }}
+      overspeed_s: {{ lio_overspeed_s | float }}

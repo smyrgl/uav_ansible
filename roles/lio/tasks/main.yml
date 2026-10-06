@@ -72,22 +72,12 @@
         state: "{{ 'started' if lio_e1r_enabled | bool else 'stopped' }}"
         daemon_reload: true
 
-    # The watchdog runs as the service user; this rule lets that user restart
-    # FAST-LIO's unit and nothing else (polkit, so NoNewPrivileges services can).
-    - name: Allow the LIO watchdog to restart FAST-LIO
-      ansible.builtin.template:
-        src: 60-uav-lio-watchdog.rules.j2
-        dest: /etc/polkit-1/rules.d/60-uav-lio-watchdog.rules
-        owner: root
-        group: root
-        mode: "0644"
-      when: lio_watchdog_enabled | bool and lio_watchdog_restart | bool
-
-    - name: Remove the restart permission when the watchdog may not restart
+    # Retired 2026-10-06: the watchdog no longer restarts FAST-LIO (it exits when
+    # lost and systemd restarts it), so its polkit permission goes.
+    - name: Remove the watchdog's old permission to restart FAST-LIO
       ansible.builtin.file:
         path: /etc/polkit-1/rules.d/60-uav-lio-watchdog.rules
         state: absent
-      when: not (lio_watchdog_enabled | bool and lio_watchdog_restart | bool)
 
     - name: Install the LIO watchdog unit
       ansible.builtin.template:

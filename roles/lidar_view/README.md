@@ -53,10 +53,15 @@ MAVLink camera's second stream.
   leaps, meaning more than 25 m and faster than 60 m/s, or when its time goes
   back or skips 5 s; that is FAST-LIO restarting with a new origin. Three
   leaps in 10 s show "FAST-LIO DIVERGED".
-- **The X950**: about 390k triangles from `x950.urdf`, at FAST-LIO's pose. The
-  pose is interpolated (see *Timing*) and moved from the IMU to `base_link`
-  through the lio bridge's lever arm. The carbon finish is lifted toward a
-  warm grey and rim-lit so the airframe reads against a dark map.
+- **The X950**: about 390k triangles from the description robot_state_publisher
+  serves (`/robot_description`), at FAST-LIO's pose. The pose is interpolated
+  (see *Timing*) and moved from the IMU to `base_link` through the IMU's mount
+  in that description (`avia_imu_frame`, pitched 45 deg in the A-S+ cage), as
+  the lio bridge does. The two fields of view hang on `avia_nominal_lidar_frame`
+  and `e1r_nominal_lidar_frame` from the same description: no geometry is
+  configured here, so a re-mount or a calibration shows up after a restart.
+  The carbon finish is lifted toward a warm grey and rim-lit so the airframe
+  reads against a dark map.
   - The URDF has motors but no propellers. Two rings per motor stand in for
     the rotor discs (`--rotor-radius`, 0.25 m; decorative). They are what
     makes the airframe read as a quadcopter from a long boom; its 1–2 px
@@ -208,7 +213,6 @@ Run it as any user with the ROS environment:
 
 ```bash
 PYOPENGL_PLATFORM=egl python3 /usr/local/lib/uav/uav_lidar_view.py --snapshot /tmp/view.png \
-  --imu-lever-arm 0.22035 -0.02626 0.1384 \
   --urdf /opt/uav/ros/install/share/x950_description/urdf/x950.urdf \
   --package-dir x950_description=/opt/uav/ros/install/share/x950_description
 ```

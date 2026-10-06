@@ -38,10 +38,27 @@ Measured: IMU 203.8 Hz, receipt latency median 1.8 ms (p99 4.8 ms); frames
 
 FAST-LIO is GPL-2.0, so it is fetched at build time, never vendored here: the
 `ROS2` branch pinned at `a4743b0` (2025-01-15) with its ikd-Tree submodule, into
-`/opt/uav/vendor/FAST_LIO`. Its CMakeLists forces C++14, but Jazzy's rclcpp
-headers need C++17 (`std::is_convertible_v`, ...), so colcon builds a copy in
-`/opt/uav/ros/src/FAST_LIO` with the standard switched; the checkout stays
-pristine. On aarch64 its CMake disables the OpenMP nearest-neighbour search
+`/opt/uav/vendor/FAST_LIO`. colcon builds a copy in `/opt/uav/ros/src/FAST_LIO`
+with three edits (`files/patch_fast_lio.py`, GPL-2.0 like what it patches; every
+edit replaces exact text and a missing anchor stops the build); the checkout
+stays pristine, and the copy records the script's fingerprint so a changed
+script rebuilds it:
+
+1. **C++17.** Its CMakeLists forces C++14; Jazzy's rclcpp headers need C++17
+   (`std::is_convertible_v`, ...).
+2. **A gravity-aligned world frame.** `IMU_init` takes gravity from the mean
+   acceleration but leaves the attitude at identity, so `camera_init` was the
+   IMU's attitude at start-up: 5.4° off on 2026-10-05 with the Avia level, and
+   45° with the A-S+ cage. The initial attitude is now the rotation that takes
+   the measured specific force to +z: `camera_init` is level, its x along the
+   IMU's heading at start-up, gravity (0, 0, −g). What remains is the
+   accelerometer bias of the first scans, a fraction of a degree.
+3. **Exit when lost.** No scan matched to the map for `lio_lost_exit_s` (3 s)
+   of LiDAR time, or faster than `lio_max_speed_mps` (30 m/s) for
+   `lio_overspeed_s` (0.5 s): FAST-LIO prints "FAST-LIO lost: ..." and exits,
+   and systemd restarts it (see *Divergence*).
+
+On aarch64 its CMake disables the OpenMP nearest-neighbour search
 (x86 only), so it runs single-threaded. FAST-LIO opens
 `<source>/Log/pos_log.txt` unconditionally and `fclose`s it on exit, so `Log`
 and `PCD` are writable by the service user (`ReadWritePaths`).
@@ -51,8 +68,8 @@ and `PCD` are writable by the service user (`ReadWritePaths`).
 | Setting | Value | Why |
 | --- | --- | --- |
 | `lidar_type`, `scan_line` | 1 (Livox), 6 | the Avia |
-| `blind` | 1.5 m | FAST-LIO's avia.yaml drops everything within 4 m; 1.5 m keeps the near ground and still drops the airframe |
-| `extrinsic_T`, `extrinsic_R` | (0.04165, 0.02326, −0.0284), identity | the Avia's factory LiDAR-to-IMU offset (FAST-LIO's avia.yaml) |
+| `blind` | 1.0 m | the Avia returns nothing closer than 1.00 m (minimum range over twelve bags), and in the A-S+ cage no part of the airframe is in its view (integration report: 0 %), so the blind radius is the sensor's own. On the skids, 45° nose-down, the Avia sees flat ground only out to 2.8 m: 1.5 m left a sliver of it (the top 6° of 77°), 1.0 m twice that |
+| `extrinsic_T`, `extrinsic_R` | from TF, `/run/uav-lio/fast_lio_extrinsic.yaml` | written before every start by `lio_extrinsic.py` from `avia_imu_frame → avia_nominal_lidar_frame` (robot_description; Livox's factory offset, (0.04165, 0.02326, −0.0284), identity) |
 | `point_filter_num`, filters | 3, 0.5 m, 0.5 m | FAST-LIO's Avia defaults |
 | Publishing | `/cloud_registered` (sparse), no path, no PCD | for the dashboard; map saving later |
 
@@ -66,16 +83,32 @@ then coincides with the EKF's at that instant, and its path and
 root (`map`), and `base_link → body` through the two estimators within 1 cm of
 the nominal lever arm.
 
+## Geometry: from the URDF, nowhere else
+
+No sensor pose is configured in this role. robot_description publishes the
+Avia's ranging origin (`avia_nominal_lidar_frame`) and its built-in IMU
+(`avia_imu_frame`, Livox's factory offset) from `/etc/uav/ros/description.yaml`,
+under the mount the URDF gives the Avia (45° nose-down in the A-S+ cage).
+FAST-LIO's IMU-to-LiDAR extrinsic is written from TF before every start
+(`lio_extrinsic.py`, `ExecStartPre`; the unit waits for `uav-description`),
+and the bridge, the E1R registration and the map view look up
+`base_link → avia_imu_frame` in `/tf_static`. A re-mount or a calibration is a
+change to the description; everything here follows at its next start. The
+replay host reads the same frames from each bag's own `/tf_static`, so old bags
+replay with the geometry they were flown with (bags from before
+`avia_imu_frame` get Livox's factory offset as that frame).
+
 ## The bridge (`/usr/local/lib/uav/lio_bridge.py`)
 
 FAST-LIO publishes the pose of the IMU ("body") with no twist. The bridge moves
-every pose to `base_link` through the IMU's lever arm (`lio_imu_lever_arm`:
-base_link → `avia_nominal_lidar_frame` from the URDF, (0.262, −0.003, 0.110) m,
-level, plus the IMU's position in the LiDAR frame), so differencing `base_link`
-positions accounts for rotation about `base_link`. The twist is a central
-difference of three consecutive poses in the middle pose's body frame (one
-frame, 100 ms, of delay), with a diagonal 5 cm/s floor. Both the URDF mount and
-the axes are nominal until extrinsic calibration.
+every pose to `base_link` through the IMU's full mount from `/tf_static`,
+`T_w_base = T_w_imu T_base_imu^-1`: position and attitude. With the Avia
+pitched 45°, the old axes-aligned lever arm would have reported the IMU's
+attitude as base_link's and turned a level 10 m leg into a 45° climb. The twist
+is a central difference of three consecutive `base_link` poses in the middle
+pose's body frame (one frame, 100 ms, of delay), with a diagonal 5 cm/s floor.
+Without the transform the bridge drops poses and its row says so. The mount is
+nominal until extrinsic calibration.
 
 ## The map (`/lio/map`)
 
@@ -165,9 +198,10 @@ FAST-LIO's trajectory and the E1R's mount instead. `uav-lio-e1r.service`
   10 Hz `/Odometry` poses (linear in position, slerp in attitude) and composes
   it with the mount, once per slot: base_link → `e1r_nominal_lidar_frame` from
   `/tf_static` (the URDF: (−0.084, 0, −0.079) m, pitched +90° so the boresight
-  points down and the sensor's "up" points forward), less the IMU lever arm
-  (`lio_imu_lever_arm`). Only the static tree is read: following `/tf` (~70 Hz
-  of small messages) cost about 9 % of a core in Python;
+  points down and the sensor's "up" points forward), expressed in the IMU's
+  frame through `base_link → avia_imu_frame` from the same tree
+  (`T_imu_s = T_base_imu^-1 T_base_s`). Only the static tree is read: following
+  `/tf` (~70 Hz of small messages) cost about 9 % of a core in Python;
 - waits for the first pose after a frame's last point (median 19 ms; FAST-LIO
   publishes ~20 ms after its own scan ends), drops points between poses more
   than `lio_e1r_max_pose_gap_s` (0.25 s) apart (FAST-LIO stalled or restarted
@@ -183,7 +217,7 @@ FAST-LIO's trajectory and the E1R's mount instead. `uav-lio-e1r.service`
 
 The interpolation is exact for constant linear and angular velocity (tested:
 4,000 points fired across 0.7 s at 16 m/s and 1.5 rad/s of yaw on a 10° roll,
-through the nominal mount and lever arm, land within 1 µm). What remains is curvature over the 100 ms between poses: an
+through the nominal mounts (the IMU pitched 45°), land within 1 µm). What remains is curvature over the 100 ms between poses: an
 angular acceleration α leaves up to α Δt²/8 of attitude error mid-interval,
 0.6 mrad (6 mm at 10 m) at 0.5 rad/s², 6 mrad at an aggressive 5 rad/s².
 Propagating the Avia IMU between poses would remove most of it; mapping flight
@@ -222,7 +256,9 @@ its 4 M cap with them (3.94 M of the points).
   systemd-journal`):
   - "No Effective Points!" comes once per filter iteration of a scan whose
     update found nothing to match;
-  - "No point, skip this scan!" comes for a scan without usable points.
+  - "No point, skip this scan!" comes for a scan without usable points;
+  - "FAST-LIO lost: ..." is its last line before it exits (build edit 3): a
+    divergence at once.
 - **Its odometry:** a speed above 30 m/s, or a leap of more than 5 m between
   consecutive poses.
 
@@ -238,7 +274,6 @@ published on every change and every 2 s. It carries:
 - the state, the epoch and the reason;
 - the onset (the run's start less 1 s) and `since`, on the host's monotonic
   clock, which every process on the Jetson shares;
-- the restart bookkeeping;
 - a watchdog session id, so a restarted watchdog's epoch 0 isn't read as
   FAST-LIO restarting.
 
@@ -249,29 +284,30 @@ published on every change and every 2 s. It carries:
   what is left. It bumps `/lio/map/epoch` and sends the whole (clean) map on
   `/lio/map/updates`.
 - **lio_register** stops registering E1R frames (`frames_diverged`).
-- **Both rows go ERROR.** The lidar view says "MAP FROZEN" and when the
-  restart comes.
+- **Both rows go ERROR.** The lidar view says "MAP FROZEN".
 
 On a new epoch the map starts over and the registration forgets its poses: a
-restarted FAST-LIO has a new origin, and a systemd restart pauses the scans
-for only about 4 s, under the map's 10 s gap rule. The bridge's
-`/lio/odometry`, the EKF's input, is left as it was.
+restarted FAST-LIO has a new origin, and a restart pauses the scans for a few
+seconds, under the map's 10 s gap rule. The bridge's `/lio/odometry` is left
+as it was.
 
-**Recovery.** After `lio_watchdog_restart_after_s` (10 s) of divergence, the
-watchdog restarts `uav-lio` with `systemctl restart`. A polkit rule
-(`/etc/polkit-1/rules.d/60-uav-lio-watchdog.rules`) allows the service user
-that one verb on that one unit. Restarts are at least
-`lio_watchdog_restart_min_interval_s` (2 min) apart and at most
-`lio_watchdog_restarts_per_hour` (5) an hour. Past that the watchdog gives up
-and says so ("auto-restart exhausted: reposition, then restart uav-lio"):
-an aircraft facing a wall diverges again at once. FAST-LIO's IMU
-initialisation assumes the aircraft is still, so a restart in flight gives a
-degraded start. FAST-LIO is a shadow estimator here; nothing flies on it.
-`lio_watchdog_restart: false` reports only.
+**Recovery is a crash loop, on purpose.** FAST-LIO exits when it is lost
+(build edit 3, 3 s without a matched scan: longer than the 2 s that make the
+watchdog's DIVERGED, so the map is frozen first) and `uav-lio.service`
+restarts it 2 s later (`Restart=always`, `StartLimitIntervalSec=0`), every
+time, with nothing counting or giving up. An aircraft facing a wall restarts
+every few seconds until it is moved, which costs a log line each time; an
+aircraft that lost track in flight gets FAST-LIO back as soon as there is
+something to match. Until 2026-10-06 the watchdog restarted it instead, through
+a polkit rule, at most five times an hour, and then gave up for the hour: on
+the pad with the 45° Avia that could have spent the budget before take-off.
+The rule is removed on the next converge. FAST-LIO's IMU initialisation
+assumes the aircraft is still, so a restart in flight starts from a level
+frame estimated in motion; it is a shadow estimator here, nothing flies on it.
 
 - The `lio/watchdog` row shows the state, the reason, how long it has been
-  diverged, the restarts and the log lines read. "Blind to FAST-LIO's log"
-  means the journal can't be read.
+  diverged, the epoch (FAST-LIO's restarts) and the log lines read. "Blind to
+  FAST-LIO's log" means the journal can't be read.
 - `ros2 topic echo /lio/health` shows the verdict itself.
 
 ## Measured on the bench (2026-10-02, indoors, vehicle still)

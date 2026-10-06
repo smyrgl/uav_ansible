@@ -8,6 +8,10 @@
 # FAST-LIO, the lio bridge, the voxel map, the E1R registration and the PX4
 # bridge run with use_sim_time; their outputs are recorded beside the bag and
 # the scorer compares /lio/odometry and the saved map with the live ones.
+# Geometry comes from the bag's own /tf_static, as recorded: FAST-LIO's
+# IMU-to-LiDAR extrinsic is read from it before the play, and bags from before
+# avia_imu_frame existed get Livox's factory IMU offset as that frame. FAST-LIO
+# exits when lost and is restarted, as systemd does on the aircraft.
 set -eo pipefail            # no -u: ROS setup scripts reference unset variables
 BAG=""; RATE=1.0; OUT=""; SCORE=1; VIEW=0
 while [ $# -gt 0 ]; do
@@ -25,16 +29,28 @@ OUT="${OUT:-${BAG}_replay_$(date -u +%Y%m%dT%H%M%SZ)}"
 mkdir -p "$OUT"
 set -a; . {{ replay_environment_file }}; set +a
 export ROS_LOG_DIR="$OUT/log"; mkdir -p "$ROS_LOG_DIR"
+rm -f "$OUT/log/.stop"
 source /opt/ros/{{ ros_distro }}/setup.bash
 source {{ ros_health_px4_workspace }}/install/local_setup.bash
 source {{ lio_workspace }}/install/local_setup.bash
 SIM="--ros-args -p use_sim_time:=true"
 PIDS=(); FASTLIO_PID=""
 start() { "$@" >>"$OUT/log/$(basename "$1" | tr -c 'A-Za-z0-9\n' '_').log" 2>&1 & PIDS+=($!); }
+# FAST-LIO, restarted whenever it exits (it exits when lost) until the replay ends.
+fastlio() {
+  while [ ! -e "$OUT/log/.stop" ]; do
+    {{ lio_workspace }}/install/lib/fast_lio/fastlio_mapping --ros-args --params-file {{ lio_config_path }} --params-file "$OUT/fast_lio_extrinsic.yaml" -p use_sim_time:=true
+    status=$?
+    [ -e "$OUT/log/.stop" ] && break
+    echo "$(date -u +%FT%TZ) FAST-LIO exited ($status): restarting"
+    sleep 2
+  done
+}
 cleanup() {
   # FAST-LIO's destructor closes a never-opened position log and segfaults on
   # SIGINT; after the map save nothing of its state is needed: SIGTERM it.
-  [ -n "$FASTLIO_PID" ] && kill -TERM "$FASTLIO_PID" 2>/dev/null || true
+  touch "$OUT/log/.stop"
+  [ -n "$FASTLIO_PID" ] && { pkill -TERM -f '/fast_lio/fastlio_mapping' 2>/dev/null; kill -TERM "$FASTLIO_PID" 2>/dev/null; } || true
   for p in "${PIDS[@]}"; do kill -INT "$p" 2>/dev/null || true; done
   for _ in $(seq 1 100); do kill -0 "${PIDS[@]}" 2>/dev/null || break; sleep 0.1; done   # 10 s for a clean close
   for p in "${PIDS[@]}"; do kill -TERM "$p" 2>/dev/null || true; done
@@ -47,12 +63,18 @@ LEFTOVERS=$(pgrep -f 'fastlio_mapping|/usr/local/lib/uav/lio_|uav_px4_bridge/px4
 if [ -n "$LEFTOVERS" ]; then echo "stopping leftover replay processes: $LEFTOVERS"; kill -TERM $LEFTOVERS 2>/dev/null || true; sleep 2; kill -KILL $LEFTOVERS 2>/dev/null || true; fi
 trap cleanup EXIT
 echo "replay of $BAG -> $OUT (rate $RATE, domain $ROS_DOMAIN_ID)"
-start {{ lio_workspace }}/install/lib/fast_lio/fastlio_mapping --ros-args --params-file {{ lio_config_path }} -p use_sim_time:=true
-FASTLIO_PID=${PIDS[0]}
-start /usr/bin/python3 /usr/local/lib/uav/lio_bridge.py --odometry-topic {{ lio_odometry_topic }} --imu-lever-arm {{ lio_imu_lever_arm | join(" ") }} --twist-stddev {{ lio_twist_stddev_mps }} $SIM
+EXTRINSIC=$({{ replay_venv }}/bin/python /usr/local/lib/uav/lio_extrinsic.py --bag "$BAG" --out "$OUT/fast_lio_extrinsic.yaml" --imu-frame {{ lio_imu_frame }} --lidar-frame {{ lio_lidar_frame }})
+echo "FAST-LIO $EXTRINSIC"
+if [ "${EXTRINSIC#legacy}" != "$EXTRINSIC" ]; then
+  # A bag from before avia_imu_frame: the factory offset stands in for it, for every node.
+  start ros2 run tf2_ros static_transform_publisher $({{ replay_venv }}/bin/python /usr/local/lib/uav/lio_extrinsic.py --legacy-tf --imu-frame {{ lio_imu_frame }} --lidar-frame {{ lio_lidar_frame }})
+fi
+start fastlio
+FASTLIO_PID=${PIDS[-1]}
+start /usr/bin/python3 /usr/local/lib/uav/lio_bridge.py --odometry-topic {{ lio_odometry_topic }} --imu-frame {{ lio_imu_frame }} --twist-stddev {{ lio_twist_stddev_mps }} $SIM
 start /usr/bin/python3 /usr/local/lib/uav/lio_map.py --scan-topics /cloud_registered{{ (' ' ~ lio_e1r_registered_topic) if lio_e1r_enabled else '' }} --voxel {{ lio_map_voxel_m }} --max-points {{ lio_map_max_points | int }} --update-period {{ lio_map_update_period_s }} --overview-voxel {{ lio_map_overview_voxel_m }} --overview-max-points {{ lio_map_overview_max_points | int }} --publish-period {{ lio_map_publish_period_s }} --map-dir "$OUT" --promote {{ lio_map_promote_voxels | int }} $SIM
 {% if lio_e1r_enabled %}
-start /usr/bin/python3 /usr/local/lib/uav/lio_register.py --name e1r --input-topic {{ lio_e1r_topic }} --time-field {{ lio_e1r_time_field }} --output-topic {{ lio_e1r_registered_topic }} --imu-lever-arm {{ lio_imu_lever_arm | join(" ") }} --min-range {{ lio_e1r_min_range_m }} --max-range {{ lio_e1r_max_range_m }} --max-pose-gap {{ lio_e1r_max_pose_gap_s }} --max-wait {{ lio_e1r_max_wait_s }} $SIM
+start /usr/bin/python3 /usr/local/lib/uav/lio_register.py --name e1r --input-topic {{ lio_e1r_topic }} --time-field {{ lio_e1r_time_field }} --output-topic {{ lio_e1r_registered_topic }} --imu-frame {{ lio_imu_frame }} --min-range {{ lio_e1r_min_range_m }} --max-range {{ lio_e1r_max_range_m }} --max-pose-gap {{ lio_e1r_max_pose_gap_s }} --max-wait {{ lio_e1r_max_wait_s }} $SIM
 {% endif %}
 start {{ px4_bridge_workspace }}/install/lib/uav_px4_bridge/px4_bridge --ros-args --params-file {{ px4_bridge_config }} -p use_sim_time:=true
 start ros2 bag record -s mcap --use-sim-time -o "$OUT/replay" --topics {{ lio_odometry_topic }} /lio/map /lio/map/updates /lio/health {{ lio_e1r_registered_topic }} /px4/odometry /tf /tf_static

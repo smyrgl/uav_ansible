@@ -1,4 +1,4 @@
-"""FAST-LIO health: divergence evidence and verdicts, the restart policy, the consumers' view."""
+"""FAST-LIO health: divergence evidence and verdicts, and the consumers' view."""
 import unittest
 
 import lio_health as h
@@ -81,51 +81,28 @@ class Monitor(unittest.TestCase):
         self.assertEqual((m.state, m.evidence_total), (h.OK, 0))
 
 
-class Policy(unittest.TestCase):
-    def diverged(self, since):
-        return {"state": h.DIVERGED, "since_mono": since, "epoch": 0}
+class Lost(unittest.TestCase):
+    """The patched FAST-LIO exits when lost; its last line is a divergence at once."""
 
-    def test_waits_then_spaces_then_gives_up(self):
-        p = h.RestartPolicy(after_s=10, min_interval_s=120, max_per_hour=3)
-        v = self.diverged(100.0)
-        self.assertFalse(p.due(105, v))
-        self.assertAlmostEqual(p.next_in(105, v), 5.0)
-        self.assertTrue(p.due(110, v))
-        p.record(110)
-        self.assertFalse(p.due(200, v))                     # within the minimum interval
-        self.assertAlmostEqual(p.next_in(200, v), 30.0)
-        for t in (230, 350):
-            self.assertTrue(p.due(t, v))
-            p.record(t)
-        self.assertTrue(p.exhausted(500))
-        self.assertFalse(p.due(500, v))
-        self.assertIsNone(p.next_in(500, v))
-        self.assertFalse(p.exhausted(110 + 3601))           # an hour later the oldest has expired
+    LINE = "FAST-LIO lost: no effective points for (s) 3.1, exiting for a restart"
 
-    def test_not_when_healthy_or_disabled(self):
-        self.assertFalse(h.RestartPolicy().due(1000, {"state": h.OK, "since_mono": None, "epoch": 0}))
-        self.assertFalse(h.RestartPolicy(enabled=False).due(1000, self.diverged(0.0)))
+    def test_lost_line_diverges_at_once_dated_to_the_run(self):
+        m = h.DivergenceMonitor(sustain_s=5.0, onset_margin_s=1.0)   # the run alone would not be enough yet
+        feed(m, 10.0, 11.0)
+        self.assertEqual(m.state, h.DEGRADED)
+        m.log_line(11.05, self.LINE)
+        v = m.verdict()
+        self.assertEqual(v["state"], h.DIVERGED)
+        self.assertAlmostEqual(v["onset_mono"], 9.0)
+        self.assertTrue(v["reason"].startswith("FAST-LIO lost: no effective points"))
+        m.log_line(14.0, "IMU Initial Done")                          # systemd restarted it
+        self.assertEqual((m.state, m.epoch), (h.OK, 1))
 
-
-class SavedRestarts(unittest.TestCase):
-    """Live on 2026-10-03 a restarted watchdog restarted FAST-LIO 27 s after its predecessor had."""
-
-    def test_round_trip_within_a_boot_and_not_across(self):
-        import json
-        import os
-        import tempfile
-        import lio_watchdog as w
-        with tempfile.TemporaryDirectory() as d:
-            path = os.path.join(d, "state.json")
-            self.assertEqual(w.load_restarts(path), [])
-            w.save_restarts(path, [100.0, 400.0])
-            self.assertEqual(w.load_restarts(path), [100.0, 400.0])
-            with open(path, "w") as f:
-                json.dump({"boot_id": "another boot", "restarts_mono": [1.0]}, f)
-            self.assertEqual(w.load_restarts(path), [])
-            with open(path, "w") as f:
-                f.write("{not json")
-            self.assertEqual(w.load_restarts(path), [])
+    def test_lost_without_a_run_dates_to_now(self):
+        m = h.DivergenceMonitor(onset_margin_s=1.0)
+        m.log_line(50.0, "FAST-LIO lost: speed (m/s) 41.2, exiting for a restart")
+        self.assertEqual(m.state, h.DIVERGED)
+        self.assertAlmostEqual(m.verdict()["onset_mono"], 49.0)
 
 
 class Follower(unittest.TestCase):

@@ -5,9 +5,11 @@ from types import SimpleNamespace
 
 import numpy as np
 
-from lio_register import PoseBuffer, decode, quaternion_matrices, range_gate, register, slerp
+from lio_register import PoseBuffer, decode, quaternion_matrices, range_gate, register, sensor_in_imu, slerp
 
-LEVER_ARM = np.array([0.22035, -0.02626, 0.1384])          # the Avia IMU in base_link (lio defaults)
+# The Avia IMU in base_link in the A-S+ cage (45 deg nose-down): what /tf_static gives the node.
+IMU_ROTATION = quaternion_matrices(np.array([[0.0, math.sin(math.pi / 8), 0.0, math.cos(math.pi / 8)]]))[0]
+IMU_TRANSLATION = np.array([0.234037, -0.02326, 0.089096])
 E1R_ROTATION = quaternion_matrices(np.array([[0.0, math.sin(math.pi / 4), 0.0, math.cos(math.pi / 4)]]))[0]   # pitch +90 deg
 E1R_TRANSLATION = np.array([-0.084, 0.0, -0.079312])         # base_link -> e1r_nominal_lidar_frame (URDF)
 
@@ -72,7 +74,7 @@ class Buffer(unittest.TestCase):
 class Deskew(unittest.TestCase):
     def test_recovers_world_points_under_constant_motion(self):
         """10 Hz poses of the IMU moving at constant velocity and yaw rate (tilted 10 deg); E1R points fired at
-        many times between them, through the nominal mount and the lever arm, land back on the same world points."""
+        many times between them, through the E1R's and the (pitched) IMU's mounts, land back on the same world points."""
         v, w = np.array([15.0, -5.0, 2.0]), 1.5                                       # 16 m/s, 86 deg/s of yaw
         tilt = (math.sin(math.radians(5)), 0.0, 0.0, math.cos(math.radians(5)))       # 10 deg roll
         b = PoseBuffer()
@@ -87,10 +89,25 @@ class Deskew(unittest.TestCase):
         for i, (p_w, t) in enumerate(zip(world, times_ns / 1e9)):
             r_t = quaternion_matrices(yaw_quaternion(w * t, tilt)[None])[0]
             body = r_t.T @ (p_w - (v * t + [10.0, 5.0, 30.0]))
-            sensor[i] = E1R_ROTATION.T @ (body - E1R_TRANSLATION + LEVER_ARM)
-        out, kept = register(sensor, times_ns, b, E1R_ROTATION, E1R_TRANSLATION - LEVER_ARM)   # as the node does
+            in_base = IMU_ROTATION @ body + IMU_TRANSLATION                          # the IMU (body) frame -> base_link
+            sensor[i] = E1R_ROTATION.T @ (in_base - E1R_TRANSLATION)
+        mount = sensor_in_imu((IMU_ROTATION, IMU_TRANSLATION), (E1R_ROTATION, E1R_TRANSLATION))   # as the node does
+        out, kept = register(sensor, times_ns, b, *mount)
         self.assertTrue(kept.all())
         np.testing.assert_allclose(out, world, atol=1e-6)
+
+    def test_a_level_imu_reduces_to_the_old_lever_arm(self):
+        lever = np.array([0.22035, -0.02626, 0.1384])
+        r, t = sensor_in_imu((np.eye(3), lever), (E1R_ROTATION, E1R_TRANSLATION))
+        np.testing.assert_allclose(r, E1R_ROTATION, atol=1e-12)
+        np.testing.assert_allclose(t, E1R_TRANSLATION - lever, atol=1e-12)
+
+    def test_ignoring_the_imu_pitch_would_misplace_the_e1r(self):
+        """With the Avia pitched 45 deg, the old axes-aligned lever arm puts the E1R tens of cm off."""
+        right = sensor_in_imu((IMU_ROTATION, IMU_TRANSLATION), (E1R_ROTATION, E1R_TRANSLATION))
+        wrong = (E1R_ROTATION, E1R_TRANSLATION - IMU_TRANSLATION)
+        self.assertGreater(np.linalg.norm(right[1] - wrong[1]), 0.2)
+        self.assertAlmostEqual(math.degrees(math.acos((np.trace(right[0].T @ wrong[0]) - 1) / 2)), 45.0, places=6)
 
     def test_ignoring_the_motion_would_smear(self):
         """The same points with one pose for the whole frame miss by metres: the deskew matters."""
