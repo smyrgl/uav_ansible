@@ -8,9 +8,9 @@ visual geometry under `base_link`.
 |---|---|---|
 | base_link | 0, 0, 0 | Original aircraft CAD datum; X forward, Y left, Z up. Not known to be the flight-controller IMU or centre of mass. |
 | avia_mount_link | 0.147660, 0, 0.093250 | Nominal centre of the sandwich bolt field; axes aligned with base. |
-| avia_link | 0.209660, -0.002525, 0.078000 | Centroid of four bottom mounting holes; axes aligned with base. No Livox scan/IMU frame is asserted. |
+| avia_link | 0.183367, 0, 0.053776; pitch +45° (nose-down) | Centroid of four bottom mounting holes in the A-S+ cage v2 (avia_joint xyz 0.035707 0 -0.039474, rpy 0 0.785398 0 from Printables/Pitch_Study/build/urdf_poses.json, 2026-10-05). The runtime `avia_lidar_*` child (bezel plane, +0.0525 X +0.0324 Z) is the ranging-origin proxy; calibrate. |
 | d555_mount_link | 0.104904, 0, -0.026500 | Front belly-plate bolt-pattern centre; axes aligned with base. |
-| d555_link | 0.150000, 0, -0.069350 | Front housing-plane centre; X forward, Y right, Z down (inverted installation, roll pi relative to base). |
+| d555_link | 0.143367, 0, -0.094827; roll pi, pitch +40° | Front housing-plane centre in saddle v0.4: inverted and 40° nose-down (d555_joint xyz 0.038463 0 -0.068327, rpy 3.141592 0.698132 0, urdf_poses.json 2026-10-05). X forward-down, Y right, Z down-aft. |
 | d555_nominal_camera_link | 0.145350, -0.047500, -0.069350 | Provisional left IR/depth origin: lateral offset confirmed in D555 CAD, axial -4.65 mm borrowed from D455. |
 | e1r_mount_link | -0.084000, 0, -0.024500 | Rear belly-plate bolt-pattern centre; axes aligned with base. |
 | e1r_link | -0.084000, 0, -0.084900 | Original E1R CAD datum; X wide axis forward, Y left, Z up; sensor looks along -Z. |
@@ -45,14 +45,14 @@ vertices; exported visual scales remain unit scale.
 
 ## Source decisions
 
-- **Avia:** the newer `Avia/AVIA_MOUNT_extraction_report.md` supersedes the root
-  handoff: 65 x 46 mm mounting pattern, 23.5 mm wall gap, connector to port.
-  Keep the bracket and inner backing plate; omit the temporary drill template
-  and nonphysical field-of-view cone.
-- **D555:** use `D555_belly_bracket_v03.stl`, 10 mm forward of v02, with source
-  placement from `build_bracket_v03.py` and `D555_v03_extraction.json`. The
-  source script rounds the bottom-plane height to 20.850 mm; the extraction
-  reports 20.851 mm. The model follows the script (1 micrometre difference).
+- **Avia:** cage v2 at 45° nose-down (`Avia/avia_cage_v2_*_aircraft.stl`: main,
+  pad strut, top shim t1.6, jack foot v2, backing plate v2) replaced the level
+  bracket and backing plate on 2026-10-05 (`build/avia_envelope.json`). Hardware
+  heads, keep-outs and the M12 cable envelopes are not modelled.
+- **D555:** `D555/D555_saddle_v04_aircraft.stl` (saddle v0.4, 40° nose-down,
+  inverted camera) replaced belly bracket v03 on 2026-10-05; the joint and the
+  saddle come from the Pitch_Study integration (`build/urdf_poses.json`,
+  `build/d555_envelope.json`). Fasteners and cable envelopes are not modelled.
 - **E1R:** use `E1R_belly_bracket_v01.stl` and orientation B in
   `build_e1r_bracket_v01.py`: wide field fore-aft, connector starboard,
   20 mm fin-tip gap. Keep 23 physical solids; omit two CAD datum-marker cubes (optical centre and centre of mass) and two FOV sheet models.
@@ -104,10 +104,10 @@ d555_optics_cad.json for evidence and driver integration details.
 | gnss_main_mount_link | −0.334278, +0.336696, 0.092500 | Port v02 bracket foot-pad plane; yaw 172° from aircraft frame. |
 | gnss_aux_mount_link | −0.334278, −0.336696, 0.092500 | Starboard v02 bracket foot-pad plane; yaw −90°. |
 | gnss_main_link / gnss_aux_link | Same XY as mounts, Z=0.122980 | Antenna mounting-seat centers, +Z up; phase centers unknown. Names identify mechanical sides, not receiver assignment. |
-| hadron_mount_link | 0.164000, 0, 0.012000; rpy 0, 0.261799, 0 | Rear housing face centre (lip-top plane) on backing plate v2 + wedge v1 bolted to the front plate's lower slope; upright, 15° nose-down about this point. Decided 2026-09-30; awaiting the physical offer-up. |
-| hadron_link | Same as mount | Upright, roll 0: thermal lens above the visible lens. +X forward, +Y left, +Z up, pitched 15° nose-down with the mount. Plate v2, wedge v1 and the two channel backing blocks are visuals of hadron_mount_link. |
-| hadron_nominal_thermal_optical_frame | 0.207216, 0, 0.008496 | Proxy thermal lens face, not calibrated optical centre. Optical Z along the lens axis (15° below aircraft forward), X image-right, Y image-down (upright sensor). |
-| hadron_nominal_visible_optical_frame | 0.201073, 0, −0.010564 | Approximate visible lens face; optical axes as above. |
+| hadron_mount_link | 0.166639, 0, 0; rpy 0, 0.261799, 0 | Rear housing face centre (lip-top plane) on base v2 + carrier v1 (15° variant) bolted to the front plate's lower slope; A-S+ integration 2026-10-05 (urdf_poses.json). 20°/25° carriers exist: xyz 0.167922/0.169411, pitch 0.349066/0.436332. |
+| hadron_link | Same as mount | Upright, roll 0: thermal lens above the visible lens. +X forward, +Y left, +Z up, pitched 15° nose-down with the mount. Base v2, the two backing blocks v2, carrier v1 and plate v2 are visuals of hadron_mount_link. |
+| hadron_nominal_thermal_optical_frame | 0.209855, 0, −0.003504 | Proxy thermal lens face, not calibrated optical centre. Optical Z along the lens axis (15° below aircraft forward), X image-right, Y image-down (upright sensor). |
+| hadron_nominal_visible_optical_frame | 0.203712, 0, −0.022564 | Approximate visible lens face; optical axes as above. |
 
 The Holybro model includes its own four short standoffs and one Pixhawk 6X.
 No duplicate hardware or extra risers were added. Its installation is a deliberately

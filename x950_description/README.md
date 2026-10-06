@@ -9,12 +9,12 @@ default assembly in plain URDF.
 Included:
 
 - X950 airframe and fixed propeller visuals.
-- Livox Avia, D555 and E1R manufacturer geometry with the supplied printed brackets.
+- Livox Avia, D555 and E1R manufacturer geometry with the printed brackets: the A-S+ nose set of 2026-10-05 (Avia cage v2 at 45° nose-down, D555 saddle v0.4 at 40° nose-down, Hadron base v2 + carrier v1 at 15°) and the E1R belly bracket v01.
 - Measured battery envelope and final TPU cradle/end-block envelopes.
 - Holybro Jetson/Pixhawk 6X assembly, approximately located in the front avionics bay.
 - Two MAN1216Q50 antenna envelopes on the v02 brackets, replacing both stock GNSS assemblies.
 - Holybro H-Flow optical-flow/ToF landing sensor under the belly (manufacturer STEP, joined into one visual; nominal flow-optical, range-beam and PX4 FRD frames with coverage guides; added 2026-09-30).
-- Drawing-derived Hadron 640R+ approximation on the front plate's lower slope: upright, 15° nose-down, in the printed backing plate v2 on the wedge v1 adapter (mount parts included as visuals; decided 2026-09-30).
+- Drawing-derived Hadron 640R+ approximation on the front plate's lower slope: upright, 15° nose-down, on base v2 + carrier v1 with plate v2 and the two backing blocks v2 (mount parts included as visuals; A-S+ integration 2026-10-05).
 - Confirmed bracket, battery, TPU and frame material identities, with provisional appearance choices identified separately.
 
 This model supports visualization and mounting-frame review. The avionics

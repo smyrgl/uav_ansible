@@ -109,10 +109,19 @@ def validate():
         assert error<3e-6,(name,'mesh placement error metres',error)
         errors[name]=error
     # Independent installation-direction checks catch sign/optical convention mistakes.
-    assert np.allclose(world['d555_link'][:3,:3]@np.array([1,0,0]),[1,0,0],atol=1e-6)
-    assert np.allclose(world['d555_nominal_depth_optical_frame'][:3,:3]@np.array([0,0,1]),[1,0,0],atol=2e-6)
+    # A-S+ nose set (2026-10-05, Printables/Pitch_Study/build/urdf_poses.json): the D555
+    # is inverted and 40 deg nose-down, the Avia 45 deg nose-down.
+    down40=np.array([math.cos(0.698132),0,-math.sin(0.698132)])
+    down45=np.array([math.cos(0.785398),0,-math.sin(0.785398)])
+    assert np.allclose(world['d555_link'][:3,:3]@np.array([1,0,0]),down40,atol=1e-6)
+    assert world['d555_link'][2,2]<0,'D555 must be inverted (its Z points down)'
+    assert np.allclose(world['d555_nominal_depth_optical_frame'][:3,:3]@np.array([0,0,1]),down40,atol=2e-6)
     assert np.allclose(world['e1r_nominal_lidar_frame'][:3,:3]@np.array([1,0,0]),[0,0,-1],atol=1e-6)
-    assert np.allclose(world['avia_link'][:3,3],[.20966,-.002525,.078],atol=1e-6)
+    assert np.allclose(world['avia_link'][:3,3],[.183367,0,.053776],atol=1e-6)
+    assert np.allclose(world['avia_link'][:3,:3]@np.array([1,0,0]),down45,atol=1e-6)
+    assert np.allclose(world['d555_link'][:3,3],[.143367,0,-.094827],atol=1e-6)
+    if 'hadron_nominal_thermal_optical_frame' in links:
+        assert np.allclose(world['hadron_nominal_thermal_optical_frame'][:3,3],[.209855,0,-.003504],atol=2e-6)
     if 'battery_link' in links:
         assert np.allclose(world['battery_link'][:3,3],[-.02623,0,.0341],atol=1e-6)
         assert np.allclose(exported_bounds['battery_link'][1]-exported_bounds['battery_link'][0],[.1915,.1036,.0726],atol=2e-6)
@@ -137,23 +146,23 @@ def validate():
     hadron_frames={'hadron_link','hadron_nominal_thermal_optical_frame','hadron_nominal_visible_optical_frame'}
     if hadron_frames & set(links):
         assert hadron_frames <= set(links),('Incomplete Hadron frame set',hadron_frames-set(links))
-        # Decided installation 2026-09-30: upright housing (roll 0), 15 deg nose-down about the rear housing face centre at (0.164, 0, 0.012).
+        # A-S+ nose set 2026-10-05 (base v2 + carrier v1, 15 deg variant): upright housing (roll 0), 15 deg nose-down about the rear housing face centre at (0.166639, 0, 0).
         pitch=np.radians(15.0)
         housing=world['hadron_link'][:3,:3]
         assert np.allclose(housing@np.array([0,0,1]),[np.sin(pitch),0,np.cos(pitch)],atol=2e-6),'Hadron housing must be upright and pitched 15 deg nose-down'
         assert np.allclose(housing@np.array([0,1,0]),[0,1,0],atol=2e-6),'Hadron housing must have zero roll and yaw'
-        assert np.allclose(world['hadron_mount_link'][:3,3],[.164,0,.012],atol=2e-6),'Hadron rear housing face centre must be at x 0.164, z 0.012'
+        assert np.allclose(world['hadron_mount_link'][:3,3],[.166639,0,0],atol=2e-6),'Hadron rear housing face centre must be at x 0.166639, z 0 (base v2 + carrier v1, 15 deg)'
         assert np.allclose(world['hadron_link'][:3,3],world['hadron_mount_link'][:3,3],atol=2e-6),'Hadron link must sit on its mount'
         for frame in hadron_frames-{'hadron_link'}:
             assert np.allclose(world[frame][:3,:3]@np.array([0,0,1]),housing@np.array([1,0,0]),atol=2e-6),(frame,'Optical Z must point along the housing forward axis')
         assert world['hadron_nominal_thermal_optical_frame'][2,3]>world['hadron_nominal_visible_optical_frame'][2,3],'Hadron thermal must be above visible (upright)'
         assert 'hadron_link' in exported_bounds,'Hadron visual geometry missing'
-        for visual_name in ('hadron_thermal_lens_visual','hadron_visible_lens_visual','hadron_plate_v2_visual','hadron_wedge_v1_visual','hadron_wedge_backing_lower_visual','hadron_wedge_backing_upper_visual'):
+        for visual_name in ('hadron_thermal_lens_visual','hadron_visible_lens_visual','hadron_plate_v2_visual','hadron_base_v2_visual','hadron_carrier_v1_15deg_visual','hadron_backing_block_v2_lower_visual','hadron_backing_block_v2_upper_visual'):
             assert visual_name in exported_visual_bounds,('Hadron visual missing',visual_name)
         thermal_center=np.mean(exported_visual_bounds['hadron_thermal_lens_visual'],axis=0)
         visible_center=np.mean(exported_visual_bounds['hadron_visible_lens_visual'],axis=0)
         assert thermal_center[2]>visible_center[2],'Hadron thermal mesh must be above visible mesh'
-        optional_checks['hadron']='Upright housing pitched 15 deg nose-down at the decided mount, thermal frame and mesh above visible, both nominal optical axes along the housing axis, and plate v1 / wedge v1 / backing block visuals checked'
+        optional_checks['hadron']='Upright housing pitched 15 deg nose-down on base v2 + carrier v1 (A-S+ 2026-10-05), thermal frame and mesh above visible, both nominal optical axes along the housing axis, and plate v2 / base v2 / carrier v1 / backing block v2 visuals checked'
     report={'status':'passed','scope':'Static TF and each named visual world-space bounding box compared to Blender scene; not full surface equivalence','links':len(links),'fixed_joints':len(joints),'visual_meshes':len(files),'triangles':triangles,'max_frame_matrix_error':max(frame_errors.values()),'mesh_bounds_errors_m':errors,'per_visual_bounds_errors_m':visual_errors,'per_visual_mesh_files':visual_files,'max_visual_bounds_error_m':max(visual_errors.values(),default=0.0),'sensor_viewing_directions':'passed','additional_installation_checks':optional_checks,'ros_distro_target':'jazzy','ros_runtime_tested':False}
     (ROOT/'docs/geometry_validation.json').write_text(json.dumps(report,indent=2)+'\n')
     return report

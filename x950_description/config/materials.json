@@ -264,7 +264,14 @@
         "avia_backing_visual",
         "d555_bracket*_visual",
         "e1r_bracket*_visual",
-        "gnss_*_bracket_visual"
+        "gnss_*_bracket_visual",
+        "avia_cage_v2_*_visual",
+        "avia_jack_foot_v2_visual",
+        "avia_backing_plate_v2_visual",
+        "d555_saddle_v04_visual",
+        "hadron_base_v2_visual",
+        "hadron_backing_block_v2_*_visual",
+        "hadron_carrier_v1_*_visual"
       ],
       "material": "paht_cf_black"
     },

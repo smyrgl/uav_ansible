@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "timestamp_utc": "2026-09-30T07:17:29.834110+00:00",
+  "timestamp_utc": "2026-10-06T04:50:59.329881+00:00",
   "blender_version": "5.1.2",
   "scope": "Visual geometry and fixed TF tree; not a dynamics/simulation model",
   "physics": "Supplied sensor masses stored in config/Blender; URDF inertials omitted pending complete physical properties",
@@ -9,7 +9,7 @@
   },
   "linkforge_module": "bl_ext.blender_org.linkforge",
   "scene_link_count": 33,
-  "scene_visual_mesh_count": 47,
+  "scene_visual_mesh_count": 51,
   "conversion_issues": [
     {
       "severity": "warning",
@@ -614,9 +614,9 @@
     {
       "severity": "warning",
       "title": "Sliver Triangles",
-      "message": "Mesh 'avia_mount_link (visual)' has 73 sliver triangle(s) (aspect ratio > 1000.0).",
+      "message": "Mesh 'avia_mount_link (visual)' has 178 sliver triangle(s) (aspect ratio > 1000.0).",
       "affected_objects": [
-        "avia_backing_visual"
+        "avia_backing_plate_v2_visual"
       ],
       "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
       "code": "MESH_SLIVER"
@@ -624,9 +624,29 @@
     {
       "severity": "warning",
       "title": "Sliver Triangles",
-      "message": "Mesh 'avia_mount_link (visual)' has 23 sliver triangle(s) (aspect ratio > 1000.0).",
+      "message": "Mesh 'avia_mount_link (visual)' has 1028 sliver triangle(s) (aspect ratio > 1000.0).",
       "affected_objects": [
-        "avia_bracket_visual"
+        "avia_cage_v2_main_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'avia_mount_link (visual)' has 36 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "avia_cage_v2_pad_strut_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'avia_mount_link (visual)' has 244 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "avia_cage_v2_top_shim_visual"
       ],
       "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
       "code": "MESH_SLIVER"
@@ -664,9 +684,9 @@
     {
       "severity": "warning",
       "title": "Sliver Triangles",
-      "message": "Mesh 'd555_mount_link (visual)' has 156 sliver triangle(s) (aspect ratio > 1000.0).",
+      "message": "Mesh 'd555_mount_link (visual)' has 142 sliver triangle(s) (aspect ratio > 1000.0).",
       "affected_objects": [
-        "d555_bracket_v03_visual"
+        "d555_saddle_v04_visual"
       ],
       "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
       "code": "MESH_SLIVER"
@@ -824,39 +844,59 @@
     {
       "severity": "warning",
       "title": "Sliver Triangles",
+      "message": "Mesh 'hadron_mount_link (visual)' has 16 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "hadron_backing_block_v2_lower_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'hadron_mount_link (visual)' has 4 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "hadron_backing_block_v2_upper_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'hadron_mount_link (visual)' has 23 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "hadron_base_v2_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Unwelded Vertices",
+      "message": "Mesh 'hadron_mount_link (visual)' has 4 unwelded vertices (duplicate coordinates with different indices).",
+      "affected_objects": [
+        "hadron_carrier_v1_15deg_visual"
+      ],
+      "suggestion": "Consider welding vertices in your CAD tool or using the 'Weld' modifier.",
+      "code": "MESH_UNWELDED"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
+      "message": "Mesh 'hadron_mount_link (visual)' has 32 sliver triangle(s) (aspect ratio > 1000.0).",
+      "affected_objects": [
+        "hadron_carrier_v1_15deg_visual"
+      ],
+      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
+      "code": "MESH_SLIVER"
+    },
+    {
+      "severity": "warning",
+      "title": "Sliver Triangles",
       "message": "Mesh 'hadron_mount_link (visual)' has 1 sliver triangle(s) (aspect ratio > 1000.0).",
       "affected_objects": [
         "hadron_plate_v2_visual"
-      ],
-      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
-      "code": "MESH_SLIVER"
-    },
-    {
-      "severity": "warning",
-      "title": "Sliver Triangles",
-      "message": "Mesh 'hadron_mount_link (visual)' has 22 sliver triangle(s) (aspect ratio > 1000.0).",
-      "affected_objects": [
-        "hadron_wedge_backing_lower_visual"
-      ],
-      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
-      "code": "MESH_SLIVER"
-    },
-    {
-      "severity": "warning",
-      "title": "Sliver Triangles",
-      "message": "Mesh 'hadron_mount_link (visual)' has 22 sliver triangle(s) (aspect ratio > 1000.0).",
-      "affected_objects": [
-        "hadron_wedge_backing_upper_visual"
-      ],
-      "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
-      "code": "MESH_SLIVER"
-    },
-    {
-      "severity": "warning",
-      "title": "Sliver Triangles",
-      "message": "Mesh 'hadron_mount_link (visual)' has 10 sliver triangle(s) (aspect ratio > 1000.0).",
-      "affected_objects": [
-        "hadron_wedge_v1_visual"
       ],
       "suggestion": "Skinny triangles cause numerical instability. Refine the mesh to improve quality.",
       "code": "MESH_SLIVER"
@@ -1397,7 +1437,7 @@
   "is_valid": true,
   "link_count": 33,
   "joint_count": 32,
-  "visual_mesh_count": 47,
+  "visual_mesh_count": 51,
   "mesh_files": [
     {
       "link": "base_link",
@@ -1546,14 +1586,32 @@
     {
       "link": "avia_mount_link",
       "role": "visuals",
-      "uri": "package://x950_description/meshes/avia_mount_link_visual_avia_backing_visual.stl",
-      "triangles": 2140
+      "uri": "package://x950_description/meshes/avia_mount_link_visual_avia_backing_plate_v2_visual.stl",
+      "triangles": 1308
     },
     {
       "link": "avia_mount_link",
       "role": "visuals",
-      "uri": "package://x950_description/meshes/avia_mount_link_visual_avia_bracket_visual.stl",
-      "triangles": 3940
+      "uri": "package://x950_description/meshes/avia_mount_link_visual_avia_cage_v2_main_visual.stl",
+      "triangles": 7944
+    },
+    {
+      "link": "avia_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/avia_mount_link_visual_avia_cage_v2_pad_strut_visual.stl",
+      "triangles": 2668
+    },
+    {
+      "link": "avia_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/avia_mount_link_visual_avia_cage_v2_top_shim_visual.stl",
+      "triangles": 1968
+    },
+    {
+      "link": "avia_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/avia_mount_link_visual_avia_jack_foot_v2_visual.stl",
+      "triangles": 796
     },
     {
       "link": "avia_link",
@@ -1564,8 +1622,8 @@
     {
       "link": "d555_mount_link",
       "role": "visuals",
-      "uri": "package://x950_description/meshes/d555_mount_link_visual_d555_bracket_v03_visual.stl",
-      "triangles": 5506
+      "uri": "package://x950_description/meshes/d555_mount_link_visual_d555_saddle_v04_visual.stl",
+      "triangles": 4964
     },
     {
       "link": "d555_link",
@@ -1636,26 +1694,32 @@
     {
       "link": "hadron_mount_link",
       "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_backing_block_v2_lower_visual.stl",
+      "triangles": 2374
+    },
+    {
+      "link": "hadron_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_backing_block_v2_upper_visual.stl",
+      "triangles": 4188
+    },
+    {
+      "link": "hadron_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_base_v2_visual.stl",
+      "triangles": 16888
+    },
+    {
+      "link": "hadron_mount_link",
+      "role": "visuals",
+      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_carrier_v1_15deg_visual.stl",
+      "triangles": 10748
+    },
+    {
+      "link": "hadron_mount_link",
+      "role": "visuals",
       "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_plate_v2_visual.stl",
       "triangles": 10476
-    },
-    {
-      "link": "hadron_mount_link",
-      "role": "visuals",
-      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_backing_lower_visual.stl",
-      "triangles": 1244
-    },
-    {
-      "link": "hadron_mount_link",
-      "role": "visuals",
-      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_backing_upper_visual.stl",
-      "triangles": 1244
-    },
-    {
-      "link": "hadron_mount_link",
-      "role": "visuals",
-      "uri": "package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_v1_visual.stl",
-      "triangles": 2780
     },
     {
       "link": "hadron_link",
@@ -1682,19 +1746,19 @@
       "triangles": 15890
     }
   ],
-  "urdf": "/Users/john/Code/Printables/x950_description/urdf/x950.urdf",
-  "xacro": "/Users/john/Code/Printables/x950_description/urdf/x950.urdf.xacro",
+  "urdf": "/Users/john/Code/uav_ansible/x950_description/urdf/x950.urdf",
+  "xacro": "/Users/john/Code/uav_ansible/x950_description/urdf/x950.urdf.xacro",
   "calibration_arguments": [
     {
       "joint": "avia_joint",
       "child": "avia_link",
       "xyz": {
         "argument": "avia_xyz",
-        "default": "0.062 -0.002525 -0.01525"
+        "default": "0.035707 0 -0.039474"
       },
       "rpy": {
         "argument": "avia_rpy",
-        "default": "0 0 0"
+        "default": "0 0.785398 0"
       }
     },
     {
@@ -1750,11 +1814,11 @@
       "child": "d555_link",
       "xyz": {
         "argument": "d555_xyz",
-        "default": "0.045096 0 -0.04285"
+        "default": "0.038463 0 -0.068327"
       },
       "rpy": {
         "argument": "d555_rpy",
-        "default": "-3.141593 0 0"
+        "default": "3.141592 0.698132 0"
       }
     },
     {
@@ -1882,7 +1946,7 @@
       "child": "hadron_mount_link",
       "xyz": {
         "argument": "hadron_mount_xyz",
-        "default": "0.164 0 0.012"
+        "default": "0.166639 0 0"
       },
       "rpy": {
         "argument": "hadron_mount_rpy",
@@ -2019,5 +2083,5 @@
     "official_ros_xacro_runtime_tested": false
   },
   "error_count": 0,
-  "warning_count": 138
+  "warning_count": 142
 }

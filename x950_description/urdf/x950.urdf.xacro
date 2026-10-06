@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro" name="x950">
-  <xacro:arg name="avia_xyz" default="0.062 -0.002525 -0.01525" />
-  <xacro:arg name="avia_rpy" default="0 0 0" />
+  <xacro:arg name="avia_xyz" default="0.035707 0 -0.039474" />
+  <xacro:arg name="avia_rpy" default="0 0.785398 0" />
   <xacro:arg name="avia_mount_xyz" default="0.14766 0 0.09325" />
   <xacro:arg name="avia_mount_rpy" default="0 0 0" />
   <xacro:arg name="avionics_carrier_xyz" default="0.065 0 0.075" />
@@ -10,8 +10,8 @@
   <xacro:arg name="battery_rpy" default="0 0 0" />
   <xacro:arg name="battery_support_xyz" default="-0.02623 0 -0.01" />
   <xacro:arg name="battery_support_rpy" default="0 0 0" />
-  <xacro:arg name="d555_xyz" default="0.045096 0 -0.04285" />
-  <xacro:arg name="d555_rpy" default="-3.141593 0 0" />
+  <xacro:arg name="d555_xyz" default="0.038463 0 -0.068327" />
+  <xacro:arg name="d555_rpy" default="3.141592 0.698132 0" />
   <xacro:arg name="d555_mount_xyz" default="0.104904 0 -0.0265" />
   <xacro:arg name="d555_mount_rpy" default="0 0 0" />
   <xacro:arg name="d555_nominal_camera_xyz" default="-0.00465 0.0475 0" />
@@ -32,7 +32,7 @@
   <xacro:arg name="gnss_main_mount_rpy" default="0 0 3.001966" />
   <xacro:arg name="hadron_xyz" default="0 0 0" />
   <xacro:arg name="hadron_rpy" default="0 0 0" />
-  <xacro:arg name="hadron_mount_xyz" default="0.164 0 0.012" />
+  <xacro:arg name="hadron_mount_xyz" default="0.166639 0 0" />
   <xacro:arg name="hadron_mount_rpy" default="0 0.261799 0" />
   <xacro:arg name="hadron_nominal_thermal_optical_frame_xyz" default="0.04265 0 0.0078" />
   <xacro:arg name="hadron_nominal_thermal_optical_frame_rpy" default="-1.570796 0 -1.570796" />
@@ -110,17 +110,38 @@
     </visual>
   </link>
   <link name="avia_mount_link">
-    <visual name="avia_backing_visual">
+    <visual name="avia_backing_plate_v2_visual">
       <origin xyz="-0.0035 0 -0.00025" rpy="0 0 0" />
       <geometry>
-        <mesh filename="package://x950_description/meshes/avia_mount_link_visual_avia_backing_visual.stl" />
+        <mesh filename="package://x950_description/meshes/avia_mount_link_visual_avia_backing_plate_v2_visual.stl" />
       </geometry>
       <material name="X950_finish_paht_cf_black" />
     </visual>
-    <visual name="avia_bracket_visual">
-      <origin xyz="0.04942 0 -0.012" rpy="0 0 0" />
+    <visual name="avia_cage_v2_main_visual">
+      <origin xyz="0.057653 0 -0.014508" rpy="0 0 0" />
       <geometry>
-        <mesh filename="package://x950_description/meshes/avia_mount_link_visual_avia_bracket_visual.stl" />
+        <mesh filename="package://x950_description/meshes/avia_mount_link_visual_avia_cage_v2_main_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+    <visual name="avia_cage_v2_pad_strut_visual">
+      <origin xyz="0.007894 0 -0.03125" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/avia_mount_link_visual_avia_cage_v2_pad_strut_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+    <visual name="avia_cage_v2_top_shim_visual">
+      <origin xyz="0.084391 0 0.004615" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/avia_mount_link_visual_avia_cage_v2_top_shim_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+    <visual name="avia_jack_foot_v2_visual">
+      <origin xyz="-0.02542 0 -0.038" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/avia_mount_link_visual_avia_jack_foot_v2_visual.stl" />
       </geometry>
       <material name="X950_finish_paht_cf_black" />
     </visual>
@@ -338,10 +359,10 @@
     </visual>
   </link>
   <link name="d555_mount_link">
-    <visual name="d555_bracket_v03_visual">
-      <origin xyz="0.003596 0 -0.02605" rpy="0 0 0" />
+    <visual name="d555_saddle_v04_visual">
+      <origin xyz="0.010575 0 -0.02205" rpy="0 0 0" />
       <geometry>
-        <mesh filename="package://x950_description/meshes/d555_mount_link_visual_d555_bracket_v03_visual.stl" />
+        <mesh filename="package://x950_description/meshes/d555_mount_link_visual_d555_saddle_v04_visual.stl" />
       </geometry>
       <material name="X950_finish_paht_cf_black" />
     </visual>
@@ -435,31 +456,38 @@
     </visual>
   </link>
   <link name="hadron_mount_link">
+    <visual name="hadron_backing_block_v2_lower_visual">
+      <origin xyz="-0.029585 0 -0.004688" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_backing_block_v2_lower_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+    <visual name="hadron_backing_block_v2_upper_visual">
+      <origin xyz="-0.041385 0 0.021817" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_backing_block_v2_upper_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+    <visual name="hadron_base_v2_visual">
+      <origin xyz="-0.025153 0 0.011829" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_base_v2_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
+    <visual name="hadron_carrier_v1_15deg_visual">
+      <origin xyz="-0.02072 0 0.001845" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_carrier_v1_15deg_visual.stl" />
+      </geometry>
+      <material name="X950_finish_paht_cf_black" />
+    </visual>
     <visual name="hadron_plate_v2_visual">
       <origin xyz="-0.00512 0.000103 -0.000155" rpy="0 0 0" />
       <geometry>
         <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_plate_v2_visual.stl" />
-      </geometry>
-      <material name="X950_finish_unclassified_provisional" />
-    </visual>
-    <visual name="hadron_wedge_backing_lower_visual">
-      <origin xyz="-0.024001 0 -0.016278" rpy="0 0 0" />
-      <geometry>
-        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_backing_lower_visual.stl" />
-      </geometry>
-      <material name="X950_finish_unclassified_provisional" />
-    </visual>
-    <visual name="hadron_wedge_backing_upper_visual">
-      <origin xyz="-0.036451 0 0.011566" rpy="0 0 0" />
-      <geometry>
-        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_backing_upper_visual.stl" />
-      </geometry>
-      <material name="X950_finish_unclassified_provisional" />
-    </visual>
-    <visual name="hadron_wedge_v1_visual">
-      <origin xyz="-0.016236 0.000103 0.001735" rpy="0 0 0" />
-      <geometry>
-        <mesh filename="package://x950_description/meshes/hadron_mount_link_visual_hadron_wedge_v1_visual.stl" />
       </geometry>
       <material name="X950_finish_unclassified_provisional" />
     </visual>
